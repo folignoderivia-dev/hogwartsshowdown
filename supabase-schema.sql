@@ -455,6 +455,28 @@ $$;
 
 grant execute on function public.commit_match_action(text, text, text, text, bigint, jsonb) to authenticated;
 
+-- Ledger de turnos autoritativo (estilo Showdown):
+-- cada jogador publica exatamente 1 ação por turno e a resolução ocorre
+-- quando o turno contém todas as ações dos jogadores vivos.
+create table if not exists public.match_turns (
+  id bigint generated always as identity primary key,
+  match_id text not null references public.matches(match_id) on delete cascade,
+  turn_number integer not null,
+  player_id text not null,
+  action_payload jsonb not null,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (match_id, turn_number, player_id)
+);
+
+alter table public.match_turns enable row level security;
+
+drop policy if exists "match_turns_rw_authenticated" on public.match_turns;
+create policy "match_turns_rw_authenticated"
+on public.match_turns for all
+using (auth.role() = 'authenticated')
+with check (auth.role() = 'authenticated');
+
 -- Ready state para sincronizar início da batalha entre todos os participantes.
 create table if not exists public.match_ready_states (
   match_id text not null references public.matches(match_id) on delete cascade,

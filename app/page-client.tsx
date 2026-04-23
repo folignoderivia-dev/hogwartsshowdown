@@ -4,14 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { applyMatchElo, getSessionUserId, getUserById } from "@/lib/database"
 import type { DbUser } from "@/lib/database"
 import { useMatchManager, type ExternalMatchState } from "@/hooks/useMatchManager"
-import type { RoundAction } from "@/lib/duelActions"
 import type { PlayerBuild } from "@/lib/types"
 import CommonRoom from "@/components/common-room"
 import DuelArena from "@/components/duel-arena"
-
-interface DuelArenaHandle {
-  submitRemoteAction: (casterId: string, action: RoundAction) => void
-}
 
 export default function PageClient() {
   const [isClient, setIsClient] = useState(false)
@@ -26,19 +21,10 @@ export default function PageClient() {
   const [accountUser, setAccountUser] = useState<DbUser | null>(null)
   const [pendingSpectate, setPendingSpectate] = useState<{ matchId: string; mode: PlayerBuild["gameMode"] } | null>(null)
   const [openRooms, setOpenRooms] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number }>>([])
-  const duelArenaRef = useRef<DuelArenaHandle>(null)
   const unsubscribeMatchRef = useRef<null | (() => void)>(null)
-  const { isOnlineMode, applyExternalState, externalMatchState, joinMatchmaker, createRoom, joinRoomById, fetchOpenRooms, findActiveMatchForPlayer, subscribeToMatch, handleAction } = useMatchManager()
+  const { isOnlineMode, applyExternalState, externalMatchState, joinMatchmaker, createRoom, joinRoomById, fetchOpenRooms, findActiveMatchForPlayer, subscribeToMatch } = useMatchManager()
   const [isSpectator, setIsSpectator] = useState(false)
   const [resumableMatch, setResumableMatch] = useState<{ matchId: string; mode: PlayerBuild["gameMode"]; status: "waiting" | "in_progress" } | null>(null)
-  const normalizeIncomingAction = useCallback((playerId: string, action: RoundAction): RoundAction => {
-    return {
-      ...action,
-      casterId: playerId,
-      targetId: action.targetId,
-    }
-  }, [])
-
   useEffect(() => {
     void (async () => {
       const id = await getSessionUserId()
@@ -78,9 +64,6 @@ export default function PageClient() {
             setScreen("battle")
           }
         },
-        onAction: (payload) => {
-          duelArenaRef.current?.submitRemoteAction(payload.playerId, normalizeIncomingAction(payload.playerId, payload.action))
-        },
       })
     })()
   }
@@ -100,11 +83,8 @@ export default function PageClient() {
           setMatchPending(false)
         }
       },
-      onAction: (payload) => {
-        duelArenaRef.current?.submitRemoteAction(payload.playerId, normalizeIncomingAction(payload.playerId, payload.action))
-      },
     })
-  }, [applyExternalState, normalizeIncomingAction, subscribeToMatch])
+  }, [applyExternalState, subscribeToMatch])
 
   const handleCreateRoom = (build: PlayerBuild) => {
     if (!build.userId) return
@@ -206,11 +186,6 @@ export default function PageClient() {
     }
   }, [])
 
-  const dispatchActionToSupabase = (_playerId: string, action: RoundAction, matchId?: string) => {
-    if (!playerBuild || !playerBuild.userId || playerBuild.gameMode === "teste" || isSpectator) return
-    handleAction(playerBuild.userId, action, matchId || activeMatchId || undefined)
-  }
-
   const handleSpectateMatch = useCallback((matchId: string, mode: PlayerBuild["gameMode"]) => {
     const spectatorBuild: PlayerBuild = {
       name: accountUser?.username || "Espectador",
@@ -233,11 +208,8 @@ export default function PageClient() {
     unsubscribeMatchRef.current?.()
     unsubscribeMatchRef.current = subscribeToMatch(matchId, {
       onState: (st) => applyExternalState(st),
-      onAction: (payload) => {
-        duelArenaRef.current?.submitRemoteAction(payload.playerId, normalizeIncomingAction(payload.playerId, payload.action))
-      },
     })
-  }, [accountUser, applyExternalState, normalizeIncomingAction, subscribeToMatch])
+  }, [accountUser, applyExternalState, subscribeToMatch])
 
   const handleResumeMatch = useCallback(() => {
     if (!accountUser || !resumableMatch) return
@@ -277,11 +249,8 @@ export default function PageClient() {
           setMatchPending(false)
         }
       },
-      onAction: (payload) => {
-        duelArenaRef.current?.submitRemoteAction(payload.playerId, normalizeIncomingAction(payload.playerId, payload.action))
-      },
     })
-  }, [accountUser, resumableMatch, subscribeToMatch, applyExternalState, normalizeIncomingAction])
+  }, [accountUser, resumableMatch, subscribeToMatch, applyExternalState])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -331,12 +300,10 @@ export default function PageClient() {
         />
       ) : (
         <DuelArena
-          ref={duelArenaRef}
           playerBuild={playerBuild}
           onReturn={handleReturnToCommonRoom}
           onBattleEnd={handleBattleEnd}
           matchId={activeMatchId || undefined}
-          onDispatchAction={dispatchActionToSupabase}
           isSpectator={isSpectator}
           participantIds={externalMatchState?.participantIds || []}
           participantNames={externalMatchState?.participantNames || []}
