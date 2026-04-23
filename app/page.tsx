@@ -19,6 +19,11 @@ interface DuelArenaHandle {
 }
 
 export default function Home() {
+  const [isClient, setIsClient] = useState(false)
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   const [screen, setScreen] = useState<"setup" | "battle">("setup")
   const [matchPending, setMatchPending] = useState(false)
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null)
@@ -293,6 +298,14 @@ export default function Home() {
     handleSpectateMatch(pendingSpectate.matchId, pendingSpectate.mode)
     setPendingSpectate(null)
   }, [pendingSpectate, handleSpectateMatch])
+
+  if (!isClient) {
+    return (
+      <main className="min-h-screen wood-bg p-6 text-amber-100">
+        <p>Inicializando cliente...</p>
+      </main>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-background">

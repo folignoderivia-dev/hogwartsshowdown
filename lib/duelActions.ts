@@ -5,6 +5,7 @@ export interface RoundAction {
   casterId: string
   type: DuelActionType
   eventId?: string
+  turnId?: number
   spellName?: string
   baseDamage?: number
   targetId?: string

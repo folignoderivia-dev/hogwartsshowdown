@@ -209,6 +209,20 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const getSpellInfo = (name: string) => SPELL_DATABASE.find((s) => s.name === name)
 const getTotalHP = (hp: HPState) => hp.bars.reduce((sum, value) => sum + value, 0)
 const isDefeated = (hp: HPState) => getTotalHP(hp) <= 0
+const computeRoundHash = (turnId: number, state: Duelist[]) => {
+  const compact = [...state]
+    .map((d) => ({
+      id: d.id,
+      hp: d.hp.bars.join(","),
+      debuffs: d.debuffs.map((x) => `${x.type}:${x.duration}:${x.meta || ""}`).sort().join("|"),
+      mana: Object.entries(d.spellMana || {}).map(([k, v]) => `${k}:${v.current}/${v.max}`).sort().join("|"),
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id))
+  const raw = JSON.stringify({ turnId, compact })
+  let h = 0
+  for (let i = 0; i < raw.length; i++) h = (h * 31 + raw.charCodeAt(i)) >>> 0
+  return h.toString(16).padStart(8, "0")
+}
 
 const applyDamage = (hp: HPState, amount: number, opts?: { thestral?: boolean }): HPState => {
   const bars = [...hp.bars]
@@ -290,12 +304,15 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   ref
 ) {
   if (typeof window === "undefined") return null
+  const localOnlineId = localNetworkId || playerBuild.userId || null
+  const selfDuelistId = localOnlineId || ""
+  const isIdentityReady = !!selfDuelistId
 
   const [duelists, setDuelists] = useState<Duelist[]>(() => {
     const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
     const enemySpells = ["Bombarda", "Incendio", "Glacius", "Confrigo", "Expelliarmus", "Protego"]
     const playerDuelist: Duelist = {
-      id: "self",
+      id: playerBuild.userId || "",
       name: playerBuild.name,
       house: playerBuild.house,
       wand: playerBuild.wand,
@@ -392,14 +409,11 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const [turnNumber, setTurnNumber] = useState(1)
   const [timeLeft, setTimeLeft] = useState(60)
   const [pendingSpell, setPendingSpell] = useState<string | null>(null)
-  const [actions, setActions] = useState<Record<string, RoundAction>>({})
+  const [pendingActions, setPendingActions] = useState<Record<string, RoundAction>>({})
   const [battleLog, setBattleLog] = useState<string[]>(["[Turno 0]: O duelo começou!"])
   const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "Sistema", text: "Chat ativo." }])
   const [chatInput, setChatInput] = useState("")
   const isReadOnlySpectator = isSpectator || (!!matchId && !!playerBuild.userId && participantIds.length > 0 && !participantIds.includes(playerBuild.userId))
-  const localOnlineId = localNetworkId || playerBuild.userId || null
-  const selfDuelistId = playerBuild.gameMode === "teste" ? "self" : (localOnlineId || "")
-  const isIdentityReady = playerBuild.gameMode === "teste" || !!localOnlineId
 
   useEffect(() => {
     if (playerBuild.gameMode === "teste") return
@@ -461,13 +475,18 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const [awaitingServerAck, setAwaitingServerAck] = useState(false)
   const processedEventIdsRef = useRef<string[]>([])
   const duelistsRef = useRef<Duelist[]>([])
+  const turnNumberRef = useRef(turnNumber)
+  const lastRoundHashRef = useRef<string>("")
 
   useEffect(() => {
     duelistsRef.current = duelists
   }, [duelists])
+  useEffect(() => {
+    turnNumberRef.current = turnNumber
+  }, [turnNumber])
 
   const processCombatAction = useCallback((actionPayload: RoundAction) => {
-    setActions((prev) => ({ ...prev, [actionPayload.casterId]: actionPayload }))
+    setPendingActions((prev) => ({ ...prev, [actionPayload.casterId]: actionPayload }))
   }, [])
   const addLog = useCallback((line: string) => {
     setBattleLog((prev) => [...prev, line])
@@ -508,6 +527,15 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         addLog(`[Sistema]: ${surrenderedIsMe ? "Você" : (liveCaster?.name || "Oponente")} desistiu da partida.`)
         return
       }
+      const incomingTurn = normalized.turnId ?? turnNumberRef.current
+      if (incomingTurn !== turnNumberRef.current) {
+        console.log("[Realtime] Ignorado por turnId divergente", {
+          eventId: normalized.eventId,
+          incomingTurn,
+          currentTurn: turnNumberRef.current,
+        })
+        return
+      }
       const onlineNow = playerBuild.gameMode !== "teste" && !!matchId
       const expectedNow =
         playerBuild.gameMode === "2v2" || playerBuild.gameMode === "ffa"
@@ -526,7 +554,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         return
       }
       if (normalized.casterId === selfDuelistId) setAwaitingServerAck(false)
-      processCombatAction(normalized)
+      processCombatAction({ ...normalized, turnId: incomingTurn })
     },
   }), [addLog, matchId, matchStatus, onBattleEnd, participantIds, playerBuild.gameMode, playerBuild.userId, processCombatAction, selfDuelistId])
   const arenaRef = useRef<HTMLDivElement | null>(null)
@@ -789,7 +817,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         .filter((d) => !d.isPlayer && !isDefeated(d.hp))
         .forEach((bot) => {
         if (bot.debuffs.some((d) => d.type === "stun" || d.type === "freeze")) {
-          initialActions[bot.id] = { casterId: bot.id, type: "skip" }
+          initialActions[bot.id] = { casterId: bot.id, type: "skip", turnId: turnNumber }
           return
         }
         const availableBotSpells = bot.spells.filter((s) => (bot.disabledSpells?.[s] ?? 0) <= 0)
@@ -818,20 +846,20 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           target = targets[Math.floor(Math.random() * targets.length)]
         }
         initialActions[bot.id] = target
-          ? { casterId: bot.id, type: "cast", spellName, targetId: target.id, areaAll: isAreaSpell(spellName) }
-          : { casterId: bot.id, type: "skip" }
+          ? { casterId: bot.id, type: "cast", spellName, targetId: target.id, areaAll: isAreaSpell(spellName), turnId: turnNumber }
+          : { casterId: bot.id, type: "skip", turnId: turnNumber }
         })
     }
 
     const localPlayer = state.find((d) => d.id === selfDuelistId)
     if (!isOnlineMatch) {
       if (!localPlayer || isDefeated(localPlayer.hp)) {
-        initialActions[selfDuelistId] = { casterId: selfDuelistId, type: "skip" }
+        initialActions[selfDuelistId] = { casterId: selfDuelistId, type: "skip", turnId: turnNumber }
       } else if (localPlayer.debuffs.some((d) => d.type === "stun" || d.type === "freeze")) {
-        initialActions[selfDuelistId] = { casterId: selfDuelistId, type: "skip" }
+        initialActions[selfDuelistId] = { casterId: selfDuelistId, type: "skip", turnId: turnNumber }
       }
     }
-    setActions(initialActions)
+    setPendingActions(initialActions)
   }
 
   const runResolution = async (queuedActions: RoundAction[]) => {
@@ -1608,7 +1636,17 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     }
 
     setBattleLog((prev) => [...prev, ...logs])
-    setActions({})
+    const resolvedTurn = turnNumber
+    const roundHash = computeRoundHash(resolvedTurn, state)
+    if (lastRoundHashRef.current !== roundHash) {
+      console.log("[Engine] roundHash", {
+        turnId: resolvedTurn,
+        roundHash,
+        actions: queuedActions.map((a) => ({ casterId: a.casterId, type: a.type, eventId: a.eventId, turnId: a.turnId })),
+      })
+      lastRoundHashRef.current = roundHash
+    }
+    setPendingActions({})
     const nextTurn = turnNumber + 1
     setTurnNumber(nextTurn)
     resolvingRef.current = false
@@ -1659,14 +1697,14 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         if (prev <= 1) {
           if (isOnlineMatch) {
             if (!awaitingServerAck) {
-              const skipAction: RoundAction = { casterId: selfDuelistId, type: "skip" }
+              const skipAction: RoundAction = { casterId: selfDuelistId, type: "skip", turnId: turnNumber }
               onDispatchAction?.(selfDuelistId, skipAction, matchId)
               setAwaitingServerAck(true)
             }
             return 0
           }
           const aliveIds = duelists.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
-          const unreadyIds = aliveIds.filter((id) => !actions[id])
+          const unreadyIds = aliveIds.filter((id) => !pendingActions[id])
           if (unreadyIds.length > 0) {
             setDuelists((current) =>
               current.map((d) => (unreadyIds.includes(d.id) ? { ...d, hp: { bars: [0, 0, 0, 0, 0] } } : d))
@@ -1675,10 +1713,10 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
               const d = duelists.find((x) => x.id === id)
               if (d) addLog(`[Turno ${turnNumber}]: ${d.name} desconectou por tempo e foi derrotado.`)
             })
-            setActions((current) => {
+            setPendingActions((current) => {
               const next = { ...current }
               unreadyIds.forEach((id) => {
-                next[id] = { casterId: id, type: "skip" }
+                next[id] = { casterId: id, type: "skip", turnId: turnNumber }
               })
               return next
             })
@@ -1689,27 +1727,22 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [actions, awaitingServerAck, battleStatus, duelists, gameOver, isOnlineMatch, matchId, onDispatchAction, player?.name, playerDefeated, selfDuelistId, turnNumber])
+  }, [awaitingServerAck, battleStatus, duelists, gameOver, isOnlineMatch, matchId, onDispatchAction, pendingActions, player?.name, playerDefeated, selfDuelistId, turnNumber])
 
   useEffect(() => {
     if (battleStatus !== "selecting") return
-    if (isOnlineMatch) {
-      const next = Object.values(actions)[0]
-      if (next) void runResolution([next])
-      return
-    }
     const aliveIds = duelists.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
-    const ready = Object.keys(actions).filter((id) => aliveIds.includes(id)).length
+    const ready = Object.keys(pendingActions).filter((id) => aliveIds.includes(id)).length
     if (aliveIds.length > 0 && ready >= aliveIds.length) {
-      void runResolution(Object.values(actions))
+      void runResolution(Object.values(pendingActions).filter((a) => aliveIds.includes(a.casterId)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions, battleStatus, duelists, isOnlineMatch])
+  }, [battleStatus, duelists, pendingActions])
 
   const onSpellClick = (spellName: string) => {
     if (isReadOnlySpectator) return
     if (!isBattleReady || isInitializing) return
-    if (gameOver || battleStatus !== "selecting" || playerCannotAct || playerDefeated || actions[selfDuelistId] || awaitingServerAck) return
+    if (gameOver || battleStatus !== "selecting" || playerCannotAct || playerDefeated || pendingActions[selfDuelistId] || awaitingServerAck) return
     if (!player || isDefeated(player.hp)) return
     const mana = player.spellMana?.[spellName]
     if (!mana || mana.current <= 0) return
@@ -1721,10 +1754,10 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
     const commitCast = (targetId: string, areaAll?: boolean) => {
       const spell = getSpellInfo(spellName)
-      const localAction: RoundAction = { casterId: selfDuelistId, type: "cast", spellName, baseDamage: spell ? getSpellMaxPower(spell) : 0, targetId, areaAll }
+      const localAction: RoundAction = { casterId: selfDuelistId, type: "cast", spellName, baseDamage: spell ? getSpellMaxPower(spell) : 0, targetId, areaAll, turnId: turnNumber }
       onDispatchAction?.(selfDuelistId, localAction, matchId)
       if (isOnlineMatch) setAwaitingServerAck(true)
-      if (!isOnlineMatch) setActions((prev) => ({ ...prev, [selfDuelistId]: localAction }))
+      if (!isOnlineMatch) setPendingActions((prev) => ({ ...prev, [selfDuelistId]: localAction }))
     }
 
     if (isSelfTargetSpell(spellName)) {
@@ -1755,29 +1788,29 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const onTargetClick = (targetId: string) => {
     if (isReadOnlySpectator) return
     if (!isBattleReady || isInitializing) return
-    if (!pendingSpell || !player || playerDefeated || battleStatus !== "selecting" || actions[selfDuelistId] || awaitingServerAck) return
+    if (!pendingSpell || !player || playerDefeated || battleStatus !== "selecting" || pendingActions[selfDuelistId] || awaitingServerAck) return
     const valid = getValidTargetsForSpell(pendingSpell, player, duelists).some((d) => d.id === targetId && !isDefeated(d.hp))
     if (!valid) return
     const prov = player.debuffs.find((d) => d.type === "provoke")
     if (prov?.meta && targetId !== prov.meta) return
     const spell = getSpellInfo(pendingSpell)
-    const localAction: RoundAction = { casterId: selfDuelistId, type: "cast", spellName: pendingSpell, baseDamage: spell ? getSpellMaxPower(spell) : 0, targetId }
+    const localAction: RoundAction = { casterId: selfDuelistId, type: "cast", spellName: pendingSpell, baseDamage: spell ? getSpellMaxPower(spell) : 0, targetId, turnId: turnNumber }
     onDispatchAction?.(selfDuelistId, localAction, matchId)
     if (isOnlineMatch) setAwaitingServerAck(true)
-    if (!isOnlineMatch) setActions((prev) => ({ ...prev, [selfDuelistId]: localAction }))
+    if (!isOnlineMatch) setPendingActions((prev) => ({ ...prev, [selfDuelistId]: localAction }))
     setPendingSpell(null)
   }
 
   const usePotion = () => {
     if (isReadOnlySpectator) return
     if (!isBattleReady || isInitializing) return
-    if (potionUsed || gameOver || !player || playerDefeated || battleStatus !== "selecting" || !!actions[selfDuelistId] || awaitingServerAck) return
+    if (potionUsed || gameOver || !player || playerDefeated || battleStatus !== "selecting" || !!pendingActions[selfDuelistId] || awaitingServerAck) return
     if (player.debuffs.some((d) => d.type === "no_potion")) return
     setPotionUsed(true)
-    const localAction: RoundAction = { casterId: selfDuelistId, type: "potion", potionType: playerBuild.potion }
+    const localAction: RoundAction = { casterId: selfDuelistId, type: "potion", potionType: playerBuild.potion, turnId: turnNumber }
     onDispatchAction?.(selfDuelistId, localAction, matchId)
     if (isOnlineMatch) setAwaitingServerAck(true)
-    if (!isOnlineMatch) setActions((prev) => ({ ...prev, [selfDuelistId]: localAction }))
+    if (!isOnlineMatch) setPendingActions((prev) => ({ ...prev, [selfDuelistId]: localAction }))
   }
 
   const sendChat = () => {
@@ -2252,12 +2285,12 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           )}
           {isReadOnlySpectator && <p className="mb-2 text-xs text-blue-300">Modo espectador: comandos de combate desabilitados.</p>}
           {playerDefeated && <p className="mb-2 text-xs text-red-300">Você foi derrotado e agora é espectador.</p>}
-          {!playerDefeated && battleStatus === "selecting" && actions[selfDuelistId] && <p className="mb-2 text-xs text-amber-300">Aguardando outros bruxos...</p>}
+          {!playerDefeated && battleStatus === "selecting" && pendingActions[selfDuelistId] && <p className="mb-2 text-xs text-amber-300">Aguardando outros bruxos...</p>}
           {!playerDefeated && awaitingServerAck && <p className="mb-2 text-xs text-amber-300">Enviando ação para o servidor...</p>}
-          {playerCannotAct && !playerDefeated && !actions[selfDuelistId] && <p className="mb-2 text-xs text-red-300">Você está sob Freeze/Stun e não pode agir neste turno.</p>}
+          {playerCannotAct && !playerDefeated && !pendingActions[selfDuelistId] && <p className="mb-2 text-xs text-red-300">Você está sob Freeze/Stun e não pode agir neste turno.</p>}
           {pendingSpell && <p className="mb-2 text-xs text-amber-300">Feitiço selecionado: {pendingSpell}. Escolha um alvo.</p>}
 
-          {!isReadOnlySpectator && !actions[selfDuelistId] && (
+          {!isReadOnlySpectator && !pendingActions[selfDuelistId] && (
             <div className="mb-2 flex flex-wrap gap-2">
               {playerBuild.spells.map((spell) => {
                 const mana = player?.spellMana?.[spell]
