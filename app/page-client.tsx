@@ -1,22 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import nextDynamic from "next/dynamic"
 import { applyMatchElo, getSessionUserId, getUserById } from "@/lib/database"
 import type { DbUser } from "@/lib/database"
 import { useMatchManager, type ExternalMatchState } from "@/hooks/useMatchManager"
 import type { RoundAction } from "@/lib/duelActions"
 import type { PlayerBuild } from "@/lib/types"
-
-const CommonRoom = nextDynamic(() => import("@/components/common-room"), {
-  ssr: false,
-  loading: () => <p>Carregando Sala Comunal...</p>,
-})
-
-const DuelArena = nextDynamic(() => import("@/components/duel-arena"), {
-  ssr: false,
-  loading: () => <p>Carregando Arena...</p>,
-})
+import CommonRoom from "@/components/common-room"
+import DuelArena from "@/components/duel-arena"
 
 interface DuelArenaHandle {
   submitRemoteAction: (casterId: string, action: RoundAction) => void

@@ -48,6 +48,32 @@ export function useMatchManager() {
     await supabase.from("match_players").delete().in("match_id", staleIds)
   }, [])
 
+  const toExternalState = useCallback((row: any): ExternalMatchState => {
+    const slots: Array<{ id?: string; name?: string }> = [
+      { id: row.p1_id, name: row.p1_name },
+      { id: row.p2_id, name: row.p2_name },
+      { id: row.p3_id, name: row.p3_name },
+      { id: row.p4_id, name: row.p4_name },
+    ]
+    const ids: string[] = []
+    const names: string[] = []
+    for (const slot of slots) {
+      if (!slot.id) continue
+      ids.push(slot.id)
+      names.push(slot.name || "Bruxo")
+    }
+    return {
+      matchId: row.match_id,
+      status: row.status,
+      playersExpected: row.players_expected,
+      playersJoined: row.players_joined,
+      participantIds: ids,
+      participantNames: names,
+      mode: row.mode,
+      currentTurnOwner: row.current_turn_owner || ids[0],
+    }
+  }, [])
+
   const findSingleActiveRoom = useCallback(async (playerId: string) => {
     const supabase = getSupabaseClient()
     const { data } = await supabase
@@ -80,32 +106,6 @@ export function useMatchManager() {
     if (mode === "2v2" || mode === "ffa") return 4
     if (mode === "ffa3") return 3
     return 2
-  }, [])
-
-  const toExternalState = useCallback((row: any): ExternalMatchState => {
-    const slots: Array<{ id?: string; name?: string }> = [
-      { id: row.p1_id, name: row.p1_name },
-      { id: row.p2_id, name: row.p2_name },
-      { id: row.p3_id, name: row.p3_name },
-      { id: row.p4_id, name: row.p4_name },
-    ]
-    const ids: string[] = []
-    const names: string[] = []
-    for (const slot of slots) {
-      if (!slot.id) continue
-      ids.push(slot.id)
-      names.push(slot.name || "Bruxo")
-    }
-    return {
-      matchId: row.match_id,
-      status: row.status,
-      playersExpected: row.players_expected,
-      playersJoined: row.players_joined,
-      participantIds: ids,
-      participantNames: names,
-      mode: row.mode,
-      currentTurnOwner: row.current_turn_owner || ids[0],
-    }
   }, [])
 
   const joinMatchmaker = useCallback(async (mode: PlayerBuild["gameMode"], playerId: string, playerName: string) => {
