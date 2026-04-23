@@ -2,12 +2,13 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import { ArrowLeft, FlaskConical, Send, Wand2, X } from "lucide-react"
-import type { PlayerBuild } from "@/app/page"
+import type { PlayerBuild } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { SpellInfo } from "@/components/common-room"
 import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, WAND_PASSIVES } from "@/components/common-room"
+import { useArenaMatchSync } from "@/hooks/useArenaMatchSync"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
 
@@ -393,11 +394,13 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   { playerBuild, onReturn, onBattleEnd, matchId, onDispatchAction, isSpectator = false, participantIds = [], participantNames = [], localNetworkId, currentTurnOwner, matchStatus },
   ref
 ) {
+  if (typeof window === "undefined") return null
+
   const [duelists, setDuelists] = useState<Duelist[]>(() => {
     const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
     const enemySpells = ["Bombarda", "Incendio", "Glacius", "Confrigo", "Expelliarmus", "Protego"]
     const playerDuelist: Duelist = {
-      id: "player",
+      id: "self",
       name: playerBuild.name,
       house: playerBuild.house,
       wand: playerBuild.wand,
@@ -500,7 +503,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const [chatInput, setChatInput] = useState("")
   const isReadOnlySpectator = isSpectator || (!!matchId && !!playerBuild.userId && participantIds.length > 0 && !participantIds.includes(playerBuild.userId))
   const localOnlineId = localNetworkId || playerBuild.userId || null
-  const selfDuelistId = playerBuild.gameMode === "teste" ? "player" : (localOnlineId || "")
+  const selfDuelistId = playerBuild.gameMode === "teste" ? "self" : (localOnlineId || "")
   const isIdentityReady = playerBuild.gameMode === "teste" || !!localOnlineId
 
   useEffect(() => {
@@ -561,9 +564,6 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const resolvingRef = useRef(false)
   const botTimeoutsRef = useRef<number[]>([])
   const [awaitingServerAck, setAwaitingServerAck] = useState(false)
-  const [isBattleReady, setIsBattleReady] = useState(playerBuild.gameMode === "teste")
-  const [isInitializing, setIsInitializing] = useState(playerBuild.gameMode !== "teste")
-  const [readyByPlayerId, setReadyByPlayerId] = useState<Record<string, boolean>>({})
   const processedEventIdsRef = useRef<string[]>([])
   const duelistsRef = useRef<Duelist[]>([])
 
@@ -643,108 +643,27 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       : playerBuild.gameMode === "ffa3"
         ? 3
         : 2
+  const {
+    isOnlineMatch,
+    isBattleReady,
+    isInitializing,
+    readyByPlayerId,
+    readyCount,
+    localIsReady,
+    markReady,
+  } = useArenaMatchSync({
+    gameMode: playerBuild.gameMode,
+    matchId,
+    matchStatus,
+    selfDuelistId,
+    isIdentityReady,
+    participantIds,
+    duelists,
+    expectedOnlinePlayers,
+  })
+  const isInProgress = !isOnlineMatch || matchStatus === "in_progress"
   const onlineReadyPlayers = Math.max(duelists.length, participantIds.length || 0)
   const participantRoster = participantIds.length > 0 ? participantIds : duelists.map((d) => d.id)
-  const readyCount = participantRoster.filter((id) => !!readyByPlayerId[id]).length
-  const localIsReady = !!readyByPlayerId[selfDuelistId]
-  const isOnlineMatch = playerBuild.gameMode !== "teste" && !!matchId
-  const hasExpectedParticipants = !isOnlineMatch || participantIds.length >= expectedOnlinePlayers
-  const onlineStateLoaded = !isOnlineMatch || (hasExpectedParticipants && duelists.length >= expectedOnlinePlayers && duelists.every((d) => !!d.hp && Array.isArray(d.hp.bars) && d.hp.bars.length === 5))
-  const isInProgress = !isOnlineMatch || matchStatus === "in_progress"
-  const isBattlePrepared = !isOnlineMatch || (onlineStateLoaded && isInProgress && readyCount >= expectedOnlinePlayers)
-
-  useEffect(() => {
-    setIsBattleReady(isBattlePrepared)
-  }, [isBattlePrepared])
-
-  useEffect(() => {
-    if (!isOnlineMatch || !matchId || !isIdentityReady) {
-      setIsInitializing(false)
-      return
-    }
-    let mounted = true
-    const supabase = getSupabaseClient()
-    const checkInit = async () => {
-      const { count } = await supabase
-        .from("match_players")
-        .select("player_id", { count: "exact", head: true })
-        .eq("match_id", matchId)
-      const rosterReady = (count || 0) >= expectedOnlinePlayers
-      const stateReady =
-        participantIds.length >= expectedOnlinePlayers &&
-        duelistsRef.current.length >= expectedOnlinePlayers &&
-        duelistsRef.current.every((d) => !!d.hp && Array.isArray(d.hp.bars) && d.hp.bars.length === 5 && getTotalHP(d.hp) > 0)
-      console.log("[Arena:init] checkInit", {
-        matchId,
-        rosterReady,
-        stateReady,
-        expectedOnlinePlayers,
-        participantCount: participantIds.length,
-        duelistsCount: duelistsRef.current.length,
-        status: matchStatus,
-        readyCount,
-      })
-      if (mounted) setIsInitializing(!(rosterReady && stateReady && matchStatus === "in_progress" && readyCount >= expectedOnlinePlayers))
-    }
-    void checkInit()
-    const timer = window.setInterval(() => void checkInit(), 1000)
-    return () => {
-      mounted = false
-      window.clearInterval(timer)
-    }
-  }, [expectedOnlinePlayers, isIdentityReady, isOnlineMatch, matchId, matchStatus, participantIds.length, readyCount])
-
-  useEffect(() => {
-    if (playerBuild.gameMode === "teste" || !matchId || !selfDuelistId) return
-    const supabase = getSupabaseClient()
-
-    const pullReadyState = async () => {
-      const { data } = await supabase
-        .from("match_ready_states")
-        .select("player_id,is_ready")
-        .eq("match_id", matchId)
-      const next: Record<string, boolean> = {}
-      for (const row of data || []) {
-        const r = row as any
-        next[String(r.player_id)] = !!r.is_ready
-      }
-      console.log("[Arena:ready] pullReadyState", { matchId, next })
-      setReadyByPlayerId(next)
-    }
-
-    void supabase.from("match_ready_states").upsert(
-      { match_id: matchId, player_id: selfDuelistId, is_ready: false, updated_at: new Date().toISOString() },
-      { onConflict: "match_id,player_id" }
-    )
-    console.log("[Arena:ready] upsert local ready=false", { matchId, selfDuelistId })
-    void pullReadyState()
-
-    const readyChannel = supabase
-      .channel(`match-ready-db-${matchId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "match_ready_states", filter: `match_id=eq.${matchId}` },
-        () => void pullReadyState()
-      )
-      .subscribe()
-
-    return () => {
-      void supabase.removeChannel(readyChannel)
-    }
-  }, [matchId, playerBuild.gameMode, selfDuelistId])
-
-  useEffect(() => {
-    if (!isOnlineMatch || !matchId) return
-    if (matchStatus !== "waiting") return
-    if (participantIds.length < expectedOnlinePlayers) return
-    if (readyCount < expectedOnlinePlayers) return
-    const supabase = getSupabaseClient()
-    void supabase
-      .from("matches")
-      .update({ status: "in_progress", updated_at: new Date().toISOString() })
-      .eq("match_id", matchId)
-      .eq("status", "waiting")
-  }, [expectedOnlinePlayers, isOnlineMatch, matchId, matchStatus, participantIds.length, readyCount])
 
   const addLog = (line: string) => setBattleLog((prev) => [...prev, line])
 
@@ -2421,15 +2340,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
                 })}
               </div>
               {onlineReadyPlayers >= expectedOnlinePlayers && !localIsReady && !isReadOnlySpectator && (
-                <Button size="sm" className="mt-2 border border-amber-700 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50" onClick={async () => {
-                  if (!matchId) return
-                  const supabase = getSupabaseClient()
-                  await supabase.from("match_ready_states").upsert(
-                    { match_id: matchId, player_id: selfDuelistId, is_ready: true, updated_at: new Date().toISOString() },
-                    { onConflict: "match_id,player_id" }
-                  )
-                  setReadyByPlayerId((prev) => ({ ...prev, [selfDuelistId]: true }))
-                }}>
+                <Button size="sm" className="mt-2 border border-amber-700 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50" onClick={() => void markReady()}>
                   Preparar
                 </Button>
               )}

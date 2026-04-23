@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import type { PlayerBuild } from "@/app/page"
+import type { PlayerBuild } from "@/lib/types"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
 

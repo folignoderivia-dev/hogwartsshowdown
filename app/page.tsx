@@ -7,19 +7,7 @@ import { applyMatchElo, getSessionUserId, getUserById } from "@/lib/database"
 import type { DbUser } from "@/lib/database"
 import { useMatchManager, type ExternalMatchState } from "@/hooks/useMatchManager"
 import type { RoundAction } from "@/lib/duelActions"
-
-export interface PlayerBuild {
-  name: string
-  house: string
-  wand: string
-  potion: string
-  spells: string[]
-  avatar: string
-  gameMode: "teste" | "1v1" | "2v2" | "ffa" | "ffa3"
-  userId?: string
-  username?: string
-  elo?: number
-}
+import type { PlayerBuild } from "@/lib/types"
 
 export default function Home() {
   const [screen, setScreen] = useState<"setup" | "battle">("setup")
