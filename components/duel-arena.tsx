@@ -563,6 +563,11 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const [awaitingServerAck, setAwaitingServerAck] = useState(false)
   const lastSyncedRoundRef = useRef(0)
   const processedEventIdsRef = useRef<string[]>([])
+  const duelistsRef = useRef<Duelist[]>([])
+
+  useEffect(() => {
+    duelistsRef.current = duelists
+  }, [duelists])
 
   const applyRoundSync = useCallback((snapshot: RoundSyncSnapshot) => {
     if (snapshot.round <= lastSyncedRoundRef.current) return
@@ -592,6 +597,17 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         casterId: internalCaster,
         targetId: fromNetworkId(action.targetId),
       }
+      const liveState = duelistsRef.current
+      const liveCaster = liveState.find((d) => d.id === internalCaster)
+      const liveTarget = normalized.targetId ? liveState.find((d) => d.id === normalized.targetId) : undefined
+      console.log("[Realtime] Acao recebida", {
+        eventId: normalized.eventId,
+        type: normalized.type,
+        caster: internalCaster,
+        target: normalized.targetId,
+        hpCasterAntes: liveCaster ? getTotalHP(liveCaster.hp) : null,
+        hpAlvoAntes: liveTarget ? getTotalHP(liveTarget.hp) : null,
+      })
       if (normalized.eventId) {
         if (processedEventIdsRef.current.includes(normalized.eventId)) return
         processedEventIdsRef.current.push(normalized.eventId)
@@ -601,7 +617,32 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       }
       if (normalized.type === "sync" && normalized.syncSnapshot) {
         applyRoundSync(normalized.syncSnapshot)
+        const refreshedState = normalized.syncSnapshot.duelists as Duelist[]
+        const nextCaster = refreshedState.find((d) => d.id === internalCaster)
+        const nextTarget = normalized.targetId ? refreshedState.find((d) => d.id === normalized.targetId) : undefined
+        console.log("[Realtime] Sync aplicado", {
+          eventId: normalized.eventId,
+          hpCasterDepois: nextCaster ? getTotalHP(nextCaster.hp) : null,
+          hpAlvoDepois: nextTarget ? getTotalHP(nextTarget.hp) : null,
+        })
         setAwaitingServerAck(false)
+        return
+      }
+      const onlineNow = playerBuild.gameMode !== "teste" && !!matchId
+      const expectedNow =
+        playerBuild.gameMode === "2v2" || playerBuild.gameMode === "ffa"
+          ? 4
+          : playerBuild.gameMode === "ffa3"
+            ? 3
+            : 2
+      const loadedNow =
+        !onlineNow ||
+        (participantIds.length >= expectedNow &&
+          liveState.length >= expectedNow &&
+          liveState.every((d) => !!d.hp && Array.isArray(d.hp.bars) && d.hp.bars.length === 5))
+      const preparedNow = !onlineNow || (loadedNow && !!currentTurnOwner && matchStatus === "in_progress")
+      if (!preparedNow) {
+        console.log("[Realtime] Ignorado por preparo incompleto", { eventId: normalized.eventId, matchStatus })
         return
       }
       if (
@@ -616,7 +657,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       if (normalized.casterId === "player") setAwaitingServerAck(false)
       setActions((prev) => ({ ...prev, [internalCaster]: normalized }))
     },
-  }), [applyRoundSync, currentTurnOwner, fromNetworkId, matchId, playerBuild.gameMode, toNetworkId])
+  }), [applyRoundSync, currentTurnOwner, fromNetworkId, matchId, matchStatus, participantIds, playerBuild.gameMode, toNetworkId])
   const arenaRef = useRef<HTMLDivElement | null>(null)
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
@@ -957,7 +998,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     resolvingRef.current = true
     setBattleStatus("resolving")
 
-    let state = [...duelists]
+    let state = [...duelistsRef.current]
     const logs: string[] = []
     let combatEndedEarly = false
     const rankAction = (a: RoundAction) => {
@@ -1945,6 +1986,36 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     setChatInput("")
   }
 
+  const handleLeaveRoom = async () => {
+    try {
+      const supabase = getSupabaseClient()
+      const leavingId = playerBuild.userId || localOnlineId
+      if (matchId && leavingId && playerBuild.gameMode !== "teste" && !isReadOnlySpectator) {
+        await supabase
+          .from("match_players")
+          .delete()
+          .eq("match_id", matchId)
+          .eq("player_id", leavingId)
+        if (playerBuild.gameMode === "1v1") {
+          const remaining = participantIds.filter((id) => id !== leavingId)
+          await supabase
+            .from("matches")
+            .update({
+              status: "finished",
+              current_turn_owner: remaining[0] || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("match_id", matchId)
+        }
+      }
+      if (playerBuild.userId && typeof window !== "undefined") {
+        window.localStorage.removeItem(`duel:lastBuild:${playerBuild.userId}`)
+      }
+    } finally {
+      onReturn()
+    }
+  }
+
   const markReady = async () => {
     if (playerBuild.gameMode === "teste" || !matchId) return
     const supabase = getSupabaseClient()
@@ -2070,12 +2141,12 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">{battleStatus.toUpperCase()}</Badge>
             {isReadOnlySpectator && <Badge className="border-blue-700 bg-blue-950/40 text-blue-200">ESPECTADOR</Badge>}
             {isReadOnlySpectator ? (
-              <Button onClick={onReturn} className="h-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 px-2 text-xs text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Voltar para o Lobby">
+              <Button onClick={handleLeaveRoom} className="h-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 px-2 text-xs text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Voltar para o Lobby">
                 <ArrowLeft className="mr-1 h-3.5 w-3.5" />
                 Lobby
               </Button>
             ) : (
-              <Button onClick={onReturn} className="h-8 w-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 p-0 text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Sair">
+              <Button onClick={handleLeaveRoom} className="h-8 w-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 p-0 text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Sair">
                 <X className="h-4 w-4" />
               </Button>
             )}
@@ -2430,7 +2501,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="w-full max-w-md rounded-xl border border-amber-700 bg-stone-900 p-8 text-center">
             <h2 className="text-2xl text-amber-300">{gameOver === "win" ? "Vitoria!" : gameOver === "timeout" ? "Time Out!" : "Derrota"}</h2>
-            <Button onClick={onReturn} className="mt-4 border border-red-700 bg-red-900 text-amber-100 hover:bg-red-800">
+            <Button onClick={handleLeaveRoom} className="mt-4 border border-red-700 bg-red-900 text-amber-100 hover:bg-red-800">
               <ArrowLeft className="mr-2 h-4 w-4" />
               {isReadOnlySpectator ? "Voltar para o Lobby" : "Voltar"}
             </Button>
