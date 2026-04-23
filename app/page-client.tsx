@@ -171,12 +171,8 @@ export default function PageClient() {
     })()
   }, [accountUser?.id, findActiveMatchForPlayer])
 
-  useEffect(() => {
-    if (!accountUser) {
-      setOpenRooms([])
-      return
-    }
-    const refresh = async () => {
+  const refreshOpenRooms = useCallback(async () => {
+    try {
       const rows = await fetchOpenRooms()
       setOpenRooms(
         rows.map((r) => ({
@@ -187,11 +183,21 @@ export default function PageClient() {
           playersExpected: r.playersExpected,
         }))
       )
+    } catch {
+      setOpenRooms([])
     }
-    void refresh()
-    const timer = window.setInterval(() => void refresh(), 2500)
+  }, [fetchOpenRooms])
+
+  useEffect(() => {
+    void refreshOpenRooms()
+    const timer = window.setInterval(() => void refreshOpenRooms(), 2500)
     return () => window.clearInterval(timer)
-  }, [accountUser, fetchOpenRooms])
+  }, [refreshOpenRooms])
+
+  useEffect(() => {
+    if (screen !== "setup") return
+    void refreshOpenRooms()
+  }, [screen, refreshOpenRooms])
 
   useEffect(() => {
     return () => {

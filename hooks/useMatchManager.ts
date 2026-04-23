@@ -33,6 +33,10 @@ export function useMatchManager() {
     return build.gameMode !== "teste" && build.gameMode !== "challenge"
   }, [])
 
+  const logMatch = useCallback((scope: string, payload: Record<string, unknown>) => {
+    console.log(`[MatchManager:${scope}]`, payload)
+  }, [])
+
   const closeInactiveWaitingRooms = useCallback(async () => {
     const supabase = getSupabaseClient()
     const cutoffIso = new Date(Date.now() - 10 * 60 * 1000).toISOString()
@@ -109,9 +113,18 @@ export function useMatchManager() {
   }, [])
 
   const joinMatchmaker = useCallback(async (mode: PlayerBuild["gameMode"], playerId: string, playerName: string) => {
+    logMatch("joinMatchmaker:start", { mode, playerId, playerName })
     await closeInactiveWaitingRooms()
     const active = await findSingleActiveRoom(playerId)
-    if (active) return active
+    if (active) {
+      logMatch("joinMatchmaker:reuse-active", {
+        matchId: active.matchId,
+        status: active.status,
+        playersJoined: active.playersJoined,
+        playersExpected: active.playersExpected,
+      })
+      return active
+    }
     const supabase = getSupabaseClient()
     const callRpc = async () => {
       const { data, error } = await supabase.rpc("join_matchmaker", {
@@ -126,8 +139,17 @@ export function useMatchManager() {
     }
 
     try {
-      return await callRpc()
+      const joined = await callRpc()
+      logMatch("joinMatchmaker:rpc-ok", {
+        matchId: joined.matchId,
+        status: joined.status,
+        playersJoined: joined.playersJoined,
+        playersExpected: joined.playersExpected,
+        mode: joined.mode,
+      })
+      return joined
     } catch {
+      logMatch("joinMatchmaker:rpc-fallback", { mode, playerId })
       // Fallback cliente para ambientes onde a RPC ainda não foi aplicada.
       const playersExpected = expectedPlayersByMode(mode)
       const { data: waitingRows } = await supabase
@@ -141,7 +163,14 @@ export function useMatchManager() {
       for (const row of waitingRows || []) {
         if ([row.p1_id, row.p2_id, row.p3_id, row.p4_id].includes(playerId)) {
           await supabase.from("match_players").upsert({ match_id: row.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
-          return toExternalState(row)
+          const reused = toExternalState(row)
+          logMatch("joinMatchmaker:fallback-reuse-row", {
+            matchId: reused.matchId,
+            status: reused.status,
+            playersJoined: reused.playersJoined,
+            playersExpected: reused.playersExpected,
+          })
+          return reused
         }
         const oldJoined = Number(row.players_joined || 0)
         if (oldJoined >= playersExpected) continue
@@ -173,7 +202,14 @@ export function useMatchManager() {
           .maybeSingle()
         if (updated) {
           await supabase.from("match_players").upsert({ match_id: updated.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
-          return toExternalState(updated)
+          const joined = toExternalState(updated)
+          logMatch("joinMatchmaker:fallback-joined-existing", {
+            matchId: joined.matchId,
+            status: joined.status,
+            playersJoined: joined.playersJoined,
+            playersExpected: joined.playersExpected,
+          })
+          return joined
         }
       }
 
@@ -192,14 +228,30 @@ export function useMatchManager() {
         .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner")
         .single()
       await supabase.from("match_players").upsert({ match_id: created.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
-      return toExternalState(created)
+      const opened = toExternalState(created)
+      logMatch("joinMatchmaker:fallback-created", {
+        matchId: opened.matchId,
+        status: opened.status,
+        playersJoined: opened.playersJoined,
+        playersExpected: opened.playersExpected,
+      })
+      return opened
     }
-  }, [closeInactiveWaitingRooms, expectedPlayersByMode, findSingleActiveRoom, toExternalState])
+  }, [closeInactiveWaitingRooms, expectedPlayersByMode, findSingleActiveRoom, logMatch, toExternalState])
 
   const createRoom = useCallback(async (mode: PlayerBuild["gameMode"], playerId: string, playerName: string) => {
+    logMatch("createRoom:start", { mode, playerId, playerName })
     await closeInactiveWaitingRooms()
     const active = await findSingleActiveRoom(playerId)
-    if (active) return active
+    if (active) {
+      logMatch("createRoom:reuse-active", {
+        matchId: active.matchId,
+        status: active.status,
+        playersJoined: active.playersJoined,
+        playersExpected: active.playersExpected,
+      })
+      return active
+    }
     const supabase = getSupabaseClient()
     const playersExpected = expectedPlayersByMode(mode)
     const { data, error } = await supabase
@@ -218,13 +270,25 @@ export function useMatchManager() {
       .single()
     if (error) throw error
     await supabase.from("match_players").upsert({ match_id: data.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
-    return toExternalState(data)
-  }, [closeInactiveWaitingRooms, expectedPlayersByMode, findSingleActiveRoom, toExternalState])
+    const created = toExternalState(data)
+    logMatch("createRoom:ok", {
+      matchId: created.matchId,
+      status: created.status,
+      playersJoined: created.playersJoined,
+      playersExpected: created.playersExpected,
+    })
+    return created
+  }, [closeInactiveWaitingRooms, expectedPlayersByMode, findSingleActiveRoom, logMatch, toExternalState])
 
   const joinRoomById = useCallback(async (matchId: string, playerId: string, playerName: string) => {
+    logMatch("joinRoomById:start", { matchId, playerId, playerName })
     await closeInactiveWaitingRooms()
     const active = await findSingleActiveRoom(playerId)
     if (active && active.matchId !== matchId) {
+      logMatch("joinRoomById:blocked-other-active", {
+        activeMatchId: active.matchId,
+        requestedMatchId: matchId,
+      })
       throw new Error("Você já está em outra sala ativa. Saia dela antes de entrar em uma nova.")
     }
     const supabase = getSupabaseClient()
@@ -237,15 +301,32 @@ export function useMatchManager() {
       if (error) throw error
       const row = Array.isArray(data) ? data[0] : data
       if (!row) throw new Error("join_specific_room retornou vazio")
-      return toExternalState(row)
+      const joined = toExternalState(row)
+      logMatch("joinRoomById:rpc-ok", {
+        matchId: joined.matchId,
+        status: joined.status,
+        playersJoined: joined.playersJoined,
+        playersExpected: joined.playersExpected,
+      })
+      return joined
     } catch {
+      logMatch("joinRoomById:rpc-fallback", { matchId, playerId })
       const { data: row } = await supabase
         .from("matches")
         .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner")
         .eq("match_id", matchId)
         .maybeSingle()
       if (!row) throw new Error("Sala não encontrada")
-      if ([row.p1_id, row.p2_id, row.p3_id, row.p4_id].includes(playerId)) return toExternalState(row)
+      if ([row.p1_id, row.p2_id, row.p3_id, row.p4_id].includes(playerId)) {
+        const reused = toExternalState(row)
+        logMatch("joinRoomById:fallback-already-member", {
+          matchId: reused.matchId,
+          status: reused.status,
+          playersJoined: reused.playersJoined,
+          playersExpected: reused.playersExpected,
+        })
+        return reused
+      }
       const oldJoined = Number(row.players_joined || 0)
       if (row.status !== "waiting" || oldJoined >= Number(row.players_expected || 0)) throw new Error("Sala já fechada")
       const payload: Record<string, any> = {
@@ -276,9 +357,16 @@ export function useMatchManager() {
         .maybeSingle()
       if (!updated) throw new Error("Não foi possível entrar na sala")
       await supabase.from("match_players").upsert({ match_id: updated.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
-      return toExternalState(updated)
+      const joined = toExternalState(updated)
+      logMatch("joinRoomById:fallback-joined", {
+        matchId: joined.matchId,
+        status: joined.status,
+        playersJoined: joined.playersJoined,
+        playersExpected: joined.playersExpected,
+      })
+      return joined
     }
-  }, [closeInactiveWaitingRooms, findSingleActiveRoom, toExternalState])
+  }, [closeInactiveWaitingRooms, findSingleActiveRoom, logMatch, toExternalState])
 
   const fetchOpenRooms = useCallback(async (mode?: PlayerBuild["gameMode"]) => {
     await closeInactiveWaitingRooms()
@@ -291,8 +379,19 @@ export function useMatchManager() {
       .limit(30)
     if (mode) query = query.eq("mode", mode)
     const { data } = await query
-    return (data || []).map((r: any) => toExternalState(r))
-  }, [closeInactiveWaitingRooms, toExternalState])
+    const rows = (data || []).map((r: any) => toExternalState(r))
+    logMatch("fetchOpenRooms", {
+      mode: mode || "all",
+      count: rows.length,
+      sample: rows.slice(0, 5).map((r) => ({
+        matchId: r.matchId,
+        status: r.status,
+        playersJoined: r.playersJoined,
+        playersExpected: r.playersExpected,
+      })),
+    })
+    return rows
+  }, [closeInactiveWaitingRooms, logMatch, toExternalState])
 
   const findActiveMatchForPlayer = useCallback(async (playerId: string) => {
     await closeInactiveWaitingRooms()

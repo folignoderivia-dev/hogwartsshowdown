@@ -478,7 +478,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </CardTitle>
           </CardHeader>
           {showSpectatePanel && (
-          <CardContent className="max-h-[36vh] min-h-[220px] overflow-y-auto pt-2 lg:max-h-[40vh]">
+          <CardContent className="max-h-[36vh] min-h-[220px] overflow-y-auto pt-2 lg:max-h-[34vh]">
               {duelsInProgress.length === 0 && <p className="text-xs text-amber-200/95">Nenhum duelo em andamento no momento.</p>}
               <div className="space-y-2">
                 {duelsInProgress.map((d) => (
@@ -704,7 +704,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               </Button>
             </CardTitle>
           </CardHeader>
-          {showFriendsPanel && <CardContent className="max-h-[42vh] min-h-[260px] overflow-y-auto pt-3 lg:max-h-[50vh]">
+          {showFriendsPanel && <CardContent className="max-h-[42vh] min-h-[260px] overflow-y-auto pt-3 lg:max-h-[36vh]">
             {!currentUser ? (
               <p className="text-xs text-amber-200/95">Entre na sua conta para adicionar amigos.</p>
             ) : (
@@ -849,7 +849,18 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           : "border-stone-700 hover:border-amber-700"
                       }`}
                     >
-                      <img src={av.image} alt={av.label} className="h-20 w-full object-cover" />
+                      <img
+                        src={av.image}
+                        alt={av.label}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const target = e.currentTarget
+                          target.onerror = null
+                          target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(av.label)}&background=2d1a0f&color=fbbf24&size=256`
+                        }}
+                        className="h-20 w-full object-cover"
+                      />
                       <div className="bg-stone-900 px-2 py-1 text-xs text-amber-200">{av.label}</div>
                     </button>
                   ))}
@@ -952,17 +963,17 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </CardHeader>
             <CardContent className="pt-3">
               <Select value={potion} onValueChange={setPotion}>
-                <SelectTrigger className="border-amber-800 bg-stone-800 text-amber-100">
+                <SelectTrigger className="w-full border-amber-800 bg-stone-800 text-amber-100">
                   <SelectValue placeholder="Selecione sua pocao..." />
                 </SelectTrigger>
-                <SelectContent className="medieval-frame border-0 bg-stone-800">
+                <SelectContent className="medieval-frame w-[var(--radix-select-trigger-width)] max-w-[92vw] border-0 bg-stone-800">
                   {POTIONS.map((p) => (
                     <SelectItem
                       key={p.value}
                       value={p.value}
                       className="text-amber-100 focus:bg-amber-900/50 focus:text-amber-200"
                     >
-                      <div className="flex flex-col">
+                      <div className="flex flex-col whitespace-normal break-words">
                         <span className="font-medium">{p.label}</span>
                         <span className="text-xs text-amber-400/70">{p.effect}</span>
                       </div>
