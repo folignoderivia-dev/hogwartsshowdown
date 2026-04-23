@@ -656,8 +656,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               </Button>
             </CardTitle>
           </CardHeader>
-          {showRankingPanel && <CardContent className="overflow-x-auto pt-2">
-            <ol className="flex min-w-max gap-2 pb-1 text-xs">
+          {showRankingPanel && <CardContent className="overflow-x-auto whitespace-nowrap pt-2">
+            <ol className="flex min-w-max flex-row flex-nowrap gap-2 pb-1 text-xs">
               {ranking.map((u, i) => (
                 <li
                   key={u.id}
