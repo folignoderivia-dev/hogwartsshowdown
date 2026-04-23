@@ -27,6 +27,7 @@ interface DuelArenaProps {
   onDispatchAction?: (playerId: string, action: RoundAction, matchId?: string) => void
   isSpectator?: boolean
   participantIds?: string[]
+  participantNames?: string[]
 }
 
 type DebuffType =
@@ -386,7 +387,7 @@ function Heart({ fillPercent }: { fillPercent: number }) {
 }
 
 const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena(
-  { playerBuild, onReturn, onBattleEnd, matchId, onDispatchAction, isSpectator = false, participantIds = [] },
+  { playerBuild, onReturn, onBattleEnd, matchId, onDispatchAction, isSpectator = false, participantIds = [], participantNames = [] },
   ref
 ) {
   const [duelists, setDuelists] = useState<Duelist[]>(() => {
@@ -438,6 +439,54 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     return [playerDuelist]
   })
 
+  const buildOnlineDuelists = useCallback(
+    (ids: string[]) => {
+      const userId = playerBuild.userId
+      const uniqueIds = ids.filter((id, idx) => !!id && ids.indexOf(id) === idx)
+      const seats = userId && !uniqueIds.includes(userId) ? [userId, ...uniqueIds] : uniqueIds
+      const normalizedSeats = seats.length > 0 ? seats : userId ? [userId] : []
+
+      const resolveTeam = (id: string, seatIdx: number) => {
+        if (playerBuild.gameMode === "ffa" || playerBuild.gameMode === "ffa3") return id === userId ? "player" : "enemy"
+        if (playerBuild.gameMode === "2v2" && normalizedSeats.length >= 4) {
+          const firstHalf = normalizedSeats.slice(0, 2)
+          const secondHalf = normalizedSeats.slice(2, 4)
+          const myGroup = firstHalf.includes(userId || "") ? firstHalf : secondHalf
+          return myGroup.includes(id) ? "player" : "enemy"
+        }
+        return seatIdx === 0 || id === userId ? "player" : "enemy"
+      }
+
+      return normalizedSeats.map((id, idx) => {
+        const isLocal = !!userId && id === userId
+        const duelId = isLocal ? "player" : id
+        const duelName = isLocal ? playerBuild.name : participantNames[idx] || `Bruxo ${idx + 1}`
+        const duelHouse = isLocal ? playerBuild.house : "slytherin"
+        const duelWand = isLocal ? playerBuild.wand : "dragon"
+        const duelAvatar = isLocal ? playerBuild.avatar : DEFAULT_AVATARS[(idx + 1) % DEFAULT_AVATARS.length]
+        const duelSpells = isLocal ? playerBuild.spells : []
+        return {
+          id: duelId,
+          name: duelName,
+          house: duelHouse,
+          wand: duelWand,
+          avatar: duelAvatar,
+          spells: duelSpells,
+          hp: { bars: [100, 100, 100, 100, 100] },
+          speed: 95 - idx * 2,
+          debuffs: [],
+          isPlayer: isLocal,
+          team: resolveTeam(id, idx),
+          spellMana: buildSpellManaForSpells(duelSpells, duelHouse),
+          turnsInBattle: 0,
+          disabledSpells: {},
+          missStreakBySpell: {},
+        } as Duelist
+      })
+    },
+    [participantNames, playerBuild.avatar, playerBuild.gameMode, playerBuild.house, playerBuild.name, playerBuild.spells, playerBuild.userId, playerBuild.wand]
+  )
+
   const [battleStatus, setBattleStatus] = useState<BattleStatus>("idle")
   const [turnNumber, setTurnNumber] = useState(1)
   const [timeLeft, setTimeLeft] = useState(60)
@@ -447,6 +496,38 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "Sistema", text: "Chat ativo." }])
   const [chatInput, setChatInput] = useState("")
   const isReadOnlySpectator = isSpectator || (!!matchId && !!playerBuild.userId && participantIds.length > 0 && !participantIds.includes(playerBuild.userId))
+
+  useEffect(() => {
+    if (playerBuild.gameMode === "teste") return
+    const base = buildOnlineDuelists(participantIds)
+    if (base.length === 0) return
+    setDuelists((prev) => {
+      return base.map((d) => {
+        const old = prev.find((p) => p.id === d.id)
+        if (!old) return d
+        return {
+          ...d,
+          hp: old.hp,
+          debuffs: old.debuffs,
+          spellMana: old.spellMana || d.spellMana,
+          lastSpellUsed: old.lastSpellUsed,
+          lastRoundSpellWasProtego: old.lastRoundSpellWasProtego,
+          lastRoundSpellWasLumus: old.lastRoundSpellWasLumus,
+          arrestoStacks: old.arrestoStacks,
+          cruciusWeakness: old.cruciusWeakness,
+          wandPassiveStripped: old.wandPassiveStripped,
+          circumAura: old.circumAura,
+          maximosChargePct: old.maximosChargePct,
+          nextAccBonusPct: old.nextAccBonusPct,
+          nextDamagePotionMult: old.nextDamagePotionMult,
+          destinyBond: old.destinyBond,
+          disabledSpells: old.disabledSpells,
+          missStreakBySpell: old.missStreakBySpell,
+          turnsInBattle: old.turnsInBattle,
+        }
+      })
+    })
+  }, [buildOnlineDuelists, participantIds, playerBuild.gameMode])
   const [gameOver, setGameOver] = useState<"win" | "lose" | "timeout" | null>(null)
   /** Mensagem central da fila de resolução (sincronia com acertos/efeitos). */
   const [battleMessage, setBattleMessage] = useState("")

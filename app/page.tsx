@@ -328,6 +328,7 @@ export default function Home() {
           onDispatchAction={dispatchActionToSupabase}
           isSpectator={isSpectator}
           participantIds={externalMatchState?.participantIds || []}
+          participantNames={externalMatchState?.participantNames || []}
         />
       )}
       {matchPending && (
