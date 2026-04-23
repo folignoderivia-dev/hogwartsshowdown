@@ -168,12 +168,14 @@ export default function PageClient() {
     }
   }, [fetchOpenRooms])
 
+  // Busca salas UMA ÚNICA VEZ ao montar. Sem polling automático.
+  // Atualização manual via botão "Atualizar Salas" no CommonRoom.
   useEffect(() => {
     void refreshOpenRooms()
-    const timer = window.setInterval(() => void refreshOpenRooms(), 2500)
-    return () => window.clearInterval(timer)
-  }, [refreshOpenRooms])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
+  // Recarrega a lista ao voltar para a tela de setup (ex: saiu da batalha).
   useEffect(() => {
     if (screen !== "setup") return
     void refreshOpenRooms()
@@ -293,6 +295,7 @@ export default function PageClient() {
           onStartDuel={handleStartDuel}
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinOpenRoom}
+          onRefreshRooms={refreshOpenRooms}
           openRooms={openRooms}
           onSpectateMatch={handleSpectateMatch}
           resumableMatch={resumableMatch}

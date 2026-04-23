@@ -478,32 +478,42 @@ export function useMatchManager() {
       }
     ) => {
       const supabase = getSupabaseClient()
-      const channel = supabase
-        .channel(`match-${matchId}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "matches", filter: `match_id=eq.${matchId}` },
-          (evt: any) => {
-            const row = evt.new || evt.old
-            if (!row) return
-            handlers.onState?.({
-              matchId: row.match_id,
-              status: row.status,
-              playersExpected: row.players_expected,
-              playersJoined: row.players_joined,
-              participantIds: [row.p1_id, row.p2_id, row.p3_id, row.p4_id].filter(Boolean),
-              participantNames: [
-                row.p1_id ? (row.p1_name || "Bruxo") : null,
-                row.p2_id ? (row.p2_name || "Bruxo") : null,
-                row.p3_id ? (row.p3_name || "Bruxo") : null,
-                row.p4_id ? (row.p4_name || "Bruxo") : null,
-              ].filter(Boolean) as string[],
-              mode: row.mode,
-              currentTurnOwner: row.current_turn_owner || row.p1_id,
-            })
-          }
-        )
-        .subscribe()
+      // Remove canal com mesmo tópico antes de criar (evita reutilizar canal já subscrito).
+      const channelName = `match-meta-${matchId}`
+      for (const existing of supabase.getChannels()) {
+        if (existing.topic === channelName || existing.topic === `realtime:${channelName}`) {
+          void supabase.removeChannel(existing)
+        }
+      }
+      const channel = supabase.channel(channelName)
+      // Todos os .on() ANTES de subscribe().
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "matches", filter: `match_id=eq.${matchId}` },
+        (evt: any) => {
+          const row = evt.new || evt.old
+          if (!row) return
+          const ids = [row.p1_id, row.p2_id, row.p3_id, row.p4_id].filter(
+            (id): id is string => typeof id === "string" && id.length > 0
+          )
+          handlers.onState?.({
+            matchId: row.match_id,
+            status: row.status,
+            playersExpected: row.players_expected,
+            playersJoined: row.players_joined,
+            participantIds: ids,
+            participantNames: ids.map((id) => {
+              if (id === row.p1_id) return row.p1_name || "Bruxo"
+              if (id === row.p2_id) return row.p2_name || "Bruxo"
+              if (id === row.p3_id) return row.p3_name || "Bruxo"
+              return row.p4_name || "Bruxo"
+            }),
+            mode: row.mode,
+            currentTurnOwner: row.current_turn_owner || row.p1_id,
+          })
+        }
+      )
+      channel.subscribe()
 
       return () => {
         void supabase.removeChannel(channel)

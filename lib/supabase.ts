@@ -1,33 +1,31 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
+/**
+ * SINGLETON ABSOLUTO — createClient é chamado no máximo UMA VEZ por processo de browser.
+ * Jamais zere esta referência depois de criada: zerá-la dispara "Multiple GoTrueClient instances".
+ */
 let singleton: SupabaseClient | null = null
 
 function normalizeUrl(raw: string): string {
   return raw.replace(/\/rest\/v1\/?$/i, "")
 }
 
-function readSupabaseEnv() {
+export function getSupabaseClient(): SupabaseClient {
+  if (singleton) return singleton
+  if (typeof window === "undefined") {
+    throw new Error("getSupabaseClient() só pode ser chamado no navegador.")
+  }
   const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!rawUrl || !anonKey) {
     throw new Error("Supabase não configurado: defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.")
   }
-  return { rawUrl, anonKey }
-}
-
-export function getSupabaseClient(): SupabaseClient {
-  if (singleton) return singleton
-  // Cliente Supabase é estritamente client-side para evitar inicialização prematura em SSR.
-  if (typeof window === "undefined") {
-    throw new Error("getSupabaseClient() só pode ser chamado no navegador.")
-  }
-  const { rawUrl, anonKey } = readSupabaseEnv()
   singleton = createClient(normalizeUrl(rawUrl), anonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storage: typeof window !== "undefined" ? window.localStorage : undefined,
+      storage: window.localStorage,
       flowType: "pkce",
     },
     global: {
@@ -37,7 +35,10 @@ export function getSupabaseClient(): SupabaseClient {
   return singleton
 }
 
-/** Encerra sessão PKCE, zera singleton e remove tokens `sb-*` do localStorage (útil em mobile com canal instável). */
+/**
+ * Encerra a sessão PKCE e limpa tokens do localStorage.
+ * NÃO destrói o singleton — isso evita "Multiple GoTrueClient instances".
+ */
 export async function clearSupabaseSessionAndResetClient(): Promise<void> {
   if (typeof window === "undefined") return
   try {
@@ -46,17 +47,15 @@ export async function clearSupabaseSessionAndResetClient(): Promise<void> {
     }
   } catch (e) {
     console.warn("[Supabase] signOut:", e)
-  } finally {
-    singleton = null
-    try {
-      const toRemove: string[] = []
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const k = window.localStorage.key(i)
-        if (k && k.startsWith("sb-") && k.includes("-auth-")) toRemove.push(k)
-      }
-      toRemove.forEach((k) => window.localStorage.removeItem(k))
-    } catch {
-      // ignore
+  }
+  try {
+    const toRemove: string[] = []
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i)
+      if (k && (k.startsWith("sb-") && k.includes("-auth-"))) toRemove.push(k)
     }
+    toRemove.forEach((k) => window.localStorage.removeItem(k))
+  } catch {
+    // ignore
   }
 }
