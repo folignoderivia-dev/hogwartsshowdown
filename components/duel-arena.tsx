@@ -36,6 +36,11 @@ interface DuelArenaProps {
   matchStatus?: "waiting" | "in_progress" | "finished"
 }
 
+type MatchBroadcastMessage =
+  | { event: "HERE_I_AM"; userId: string; name?: string }
+  | { event: "GAME_START"; players: string[]; from: string }
+  | { event: "TURN_ACTION"; action: RoundAction }
+
 const HAND_BOTTOM = "https://i.postimg.cc/hPdCk474/varinhaposicao03.png"
 const HAND_TOP = "https://i.postimg.cc/3JvLsrD8/varinhaposicao02.png"
 const SCENARIOS = [
@@ -507,10 +512,20 @@ const DuelArena = (
   const resolvingRef = useRef(false)
   const botTimeoutsRef = useRef<number[]>([])
   const [awaitingServerAck, setAwaitingServerAck] = useState(false)
-  const [isTurnSyncReady, setIsTurnSyncReady] = useState(false)
-  const processedEventIdsRef = useRef<string[]>([])
+  /** Só fica true ao receber `GAME_START` via broadcast (inclui eco self:true). */
+  const [gameStartAcknowledged, setGameStartAcknowledged] = useState(isOfflineMode)
+  const [knownBroadcastPlayers, setKnownBroadcastPlayers] = useState<string[]>(isOfflineMode ? [selfDuelistId] : [selfDuelistId].filter(Boolean))
+  const [broadcastChannelConnected, setBroadcastChannelConnected] = useState(false)
+  const [debugLastEvent, setDebugLastEvent] = useState("")
+  /** Chaves de ingestão (broadcast ∪ backup): Set evita dupla aplicação na mesma tarefa síncrona. */
+  const ingestedActionKeysRef = useRef<Set<string>>(new Set())
+  const broadcastChannelRef = useRef<any | null>(null)
+  const turnActionConfirmedRef = useRef<Set<string>>(new Set())
   const duelistsRef = useRef<Duelist[]>([])
   const turnNumberRef = useRef(turnNumber)
+  const battleStatusRef = useRef<BattleStatus>("idle")
+  const gameStartAcknowledgedRef = useRef(isOfflineMode)
+  const peerHereAtRef = useRef<Record<string, number>>({})
   const lastRoundHashRef = useRef<string>("")
 
   useEffect(() => {
@@ -519,6 +534,12 @@ const DuelArena = (
   useEffect(() => {
     turnNumberRef.current = turnNumber
   }, [turnNumber])
+  useEffect(() => {
+    battleStatusRef.current = battleStatus
+  }, [battleStatus])
+  useEffect(() => {
+    gameStartAcknowledgedRef.current = gameStartAcknowledged
+  }, [gameStartAcknowledged])
 
   const processCombatAction = useCallback((actionPayload: RoundAction) => {
     setPendingActions((prev) => ({ ...prev, [actionPayload.casterId]: actionPayload }))
@@ -526,15 +547,61 @@ const DuelArena = (
   const addLog = useCallback((line: string) => {
     setBattleLog((prev) => [...prev, line])
   }, [])
-  useEffect(() => {
-    alert("Engine Nova Carregada")
-  }, [])
 
+  const mergeDuelistsFromPlayerIds = useCallback(
+    (ids: string[]) => {
+      const unique = [...new Set(ids.filter(Boolean))].sort()
+      if (unique.length === 0) return
+      setDuelists((prev) => {
+        const base = buildOnlineDuelists(unique)
+        return base.map((d) => {
+          const old = prev.find((p) => p.id === d.id)
+          return old ? { ...d, hp: old.hp, debuffs: old.debuffs, spellMana: old.spellMana || d.spellMana } : d
+        })
+      })
+    },
+    [buildOnlineDuelists]
+  )
+
+  const ingestTurnActionFromNetwork = useCallback(
+    (incoming: RoundAction, source: "broadcast" | "backup") => {
+      if (!incoming?.casterId || incoming.turnId == null) return
+      if (incoming.turnId !== turnNumberRef.current) return
+      if (!isOfflineMode && matchId && battleStatusRef.current !== "selecting") return
+      if (!duelistsRef.current.some((d) => d.id === incoming.casterId)) return
+      const dedupeKey =
+        incoming.eventId != null && String(incoming.eventId).length > 0
+          ? `eid:${incoming.eventId}`
+          : `row:${incoming.turnId}:${incoming.casterId}:${incoming.type}:${incoming.spellName ?? ""}:${incoming.targetId ?? ""}:${incoming.potionType ?? ""}`
+      const seen = ingestedActionKeysRef.current
+      if (seen.has(dedupeKey)) return
+      seen.add(dedupeKey)
+      if (seen.size > 400) {
+        const arr = [...seen]
+        ingestedActionKeysRef.current = new Set(arr.slice(-200))
+      }
+      processCombatAction(incoming)
+      turnActionConfirmedRef.current.add(`${incoming.turnId}:${incoming.casterId}`)
+      setDebugLastEvent(
+        source === "broadcast" ? `TURN_ACTION rx ${incoming.casterId.slice(0, 8)}…` : `BACKUP rx ${incoming.casterId.slice(0, 8)}…`
+      )
+    },
+    [isOfflineMode, matchId, processCombatAction]
+  )
   const submitTurnAction = useCallback(async (action: RoundAction) => {
     if (isOfflineMode || !matchId || !selfDuelistId) return
     const supabase = getSupabaseClient()
-    const payload: RoundAction = { ...action, casterId: selfDuelistId, turnId: turnNumber }
-    const { error } = await supabase
+    const eventId = action.eventId || `${selfDuelistId}-${turnNumber}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const payload: RoundAction = { ...action, casterId: selfDuelistId, turnId: turnNumber, eventId }
+    setAwaitingServerAck(true)
+    setBattleMessage("Aguardando confirmação broadcast...")
+    setDebugLastEvent(`TURN_ACTION enviado T${turnNumber}`)
+    await broadcastChannelRef.current?.send({
+      type: "broadcast",
+      event: "TURN_ACTION",
+      payload: { event: "TURN_ACTION", action: payload } satisfies MatchBroadcastMessage,
+    })
+    void supabase
       .from("match_turns")
       .upsert(
         {
@@ -546,14 +613,10 @@ const DuelArena = (
         },
         { onConflict: "match_id,turn_number,player_id" }
       )
-    if (error) {
-      addLog(`[Sync]: falha ao enviar ação do turno ${turnNumber}.`)
-      return
-    }
-    setAwaitingServerAck(true)
-    setBattleMessage("Aguardando oponente...")
-    processCombatAction(payload)
-  }, [addLog, isOfflineMode, matchId, processCombatAction, selfDuelistId, turnNumber])
+      .then(({ error }) => {
+        if (error) addLog(`[Backup]: falha ao persistir ação do turno ${turnNumber}.`)
+      })
+  }, [addLog, isOfflineMode, matchId, selfDuelistId, turnNumber])
   const arenaRef = useRef<HTMLDivElement | null>(null)
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
@@ -570,33 +633,25 @@ const DuelArena = (
     isOnlineMatch,
     isBattleReady,
     isInitializing,
-    readyByPlayerId,
-    readyCount,
-    localIsReady,
-    markReady,
   } = useArenaMatchSync({
     gameMode: playerBuild.gameMode,
     matchId,
-    matchStatus,
     selfDuelistId,
-    isIdentityReady,
     participantIds,
-    duelists,
     expectedOnlinePlayers,
   })
-  const isInProgress = !isOnlineMatch || matchStatus === "in_progress"
   const onlineReadyPlayers = Math.max(duelists.length, participantIds.length || 0)
   const participantRoster = participantIds.length > 0 ? participantIds : duelists.map((d) => d.id)
 
   useEffect(() => {
     if (!isOnlineMatch) {
-      setIsTurnSyncReady(true)
+      setGameStartAcknowledged(true)
       return
     }
-    if (!matchId || matchStatus !== "in_progress") {
-      setIsTurnSyncReady(false)
+    if (!matchId) {
+      setGameStartAcknowledged(false)
     }
-  }, [isOnlineMatch, matchId, matchStatus])
+  }, [isOnlineMatch, matchId])
 
   useEffect(() => {
     if (!isOnlineMatch || matchStatus !== "finished") return
@@ -608,53 +663,143 @@ const DuelArena = (
   }, [isOnlineMatch, matchStatus])
 
   useEffect(() => {
-    if (!isOnlineMatch || !matchId || battleStatus !== "selecting" || !isBattleReady || isInitializing) return
+    if (!isOnlineMatch || !matchId || !selfDuelistId) return
     const supabase = getSupabaseClient()
-    const turnNow = turnNumber
     let active = true
+    const known = new Set<string>([selfDuelistId])
+    const expectedPlayers = expectedOnlinePlayers
+    const STALE_HERE_MS = 14_000
+    let lastGameStartEmitAt = 0
+    peerHereAtRef.current[selfDuelistId] = Date.now()
 
-    const consumeRow = (row: any) => {
-      if (!active) return
-      if (!row || Number(row.turn_number) !== turnNow) return
-      const playerId = String(row.player_id || "")
-      if (!playerId) return
-      const payload = (row.action_payload || {}) as RoundAction
-      processCombatAction({
-        ...payload,
-        casterId: playerId,
-        turnId: turnNow,
-      })
-      if (playerId === selfDuelistId) setAwaitingServerAck(false)
+    const pruneStalePeers = () => {
+      const now = Date.now()
+      for (const id of [...known]) {
+        if (id === selfDuelistId) continue
+        const last = peerHereAtRef.current[id] ?? 0
+        if (last === 0 || now - last > STALE_HERE_MS) known.delete(id)
+      }
     }
 
-    const loadExisting = async () => {
-      const { data } = await supabase
+    const coordinator = () => {
+      pruneStalePeers()
+      const alive = Array.from(known).sort()
+      return alive[0] === selfDuelistId
+    }
+
+    const emitGameStart = async (players: string[]) => {
+      const uniquePlayers = players.filter((id, idx) => !!id && players.indexOf(id) === idx)
+      if (uniquePlayers.length < expectedPlayers) return
+      setDebugLastEvent("GAME_START tx")
+      await broadcastChannelRef.current?.send({
+        type: "broadcast",
+        event: "GAME_START",
+        payload: { event: "GAME_START", players: uniquePlayers, from: selfDuelistId } satisfies MatchBroadcastMessage,
+      })
+    }
+
+    const ch = supabase
+      .channel(`match-${matchId}`, { config: { broadcast: { self: true } } })
+      .on("broadcast", { event: "HERE_I_AM" }, async ({ payload }: { payload: MatchBroadcastMessage }) => {
+        if (!active || payload.event !== "HERE_I_AM") return
+        if (!payload.userId) return
+        peerHereAtRef.current[payload.userId] = Date.now()
+        known.add(payload.userId)
+        pruneStalePeers()
+        const ids = Array.from(known).sort()
+        setKnownBroadcastPlayers(ids)
+        setDebugLastEvent(`HERE_I_AM ${payload.userId.slice(0, 8)}…`)
+        mergeDuelistsFromPlayerIds(ids)
+        if (coordinator() && known.size >= expectedPlayers) await emitGameStart(ids)
+      })
+      .on("broadcast", { event: "GAME_START" }, ({ payload }: { payload: MatchBroadcastMessage }) => {
+        if (!active || payload.event !== "GAME_START") return
+        const players = (payload.players || []).filter((id) => !!id)
+        if (players.length < expectedPlayers) return
+        if (!players.includes(selfDuelistId)) return
+        setKnownBroadcastPlayers(players.sort())
+        mergeDuelistsFromPlayerIds(players)
+        setGameStartAcknowledged(true)
+        setBattleMessage("")
+        setDebugLastEvent("GAME_START rx")
+      })
+      .on("broadcast", { event: "TURN_ACTION" }, ({ payload }: { payload: MatchBroadcastMessage }) => {
+        if (!active || payload.event !== "TURN_ACTION") return
+        ingestTurnActionFromNetwork(payload.action, "broadcast")
+      })
+      .subscribe(async (status) => {
+        if (!active) return
+        setBroadcastChannelConnected(status === "SUBSCRIBED")
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          setDebugLastEvent(`Canal: ${status}`)
+        }
+        if (status !== "SUBSCRIBED") return
+        setDebugLastEvent("Canal SUBSCRIBED")
+        peerHereAtRef.current[selfDuelistId] = Date.now()
+        await ch.send({
+          type: "broadcast",
+          event: "HERE_I_AM",
+          payload: { event: "HERE_I_AM", userId: selfDuelistId, name: playerBuild.name } satisfies MatchBroadcastMessage,
+        })
+      })
+
+    const heartbeat = window.setInterval(() => {
+      if (!active) return
+      peerHereAtRef.current[selfDuelistId] = Date.now()
+      void ch.send({
+        type: "broadcast",
+        event: "HERE_I_AM",
+        payload: { event: "HERE_I_AM", userId: selfDuelistId, name: playerBuild.name } satisfies MatchBroadcastMessage,
+      })
+    }, 8000)
+
+    const gameStartRetry = window.setInterval(() => {
+      if (!active || gameStartAcknowledgedRef.current) return
+      pruneStalePeers()
+      const ids = Array.from(known).sort()
+      setKnownBroadcastPlayers(ids)
+      mergeDuelistsFromPlayerIds(ids)
+      if (known.size < expectedPlayers) return
+      if (!coordinator()) return
+      const now = Date.now()
+      if (now - lastGameStartEmitAt < 4500) return
+      lastGameStartEmitAt = now
+      void emitGameStart(ids)
+    }, 3200)
+
+    broadcastChannelRef.current = ch
+    return () => {
+      active = false
+      window.clearInterval(heartbeat)
+      window.clearInterval(gameStartRetry)
+      broadcastChannelRef.current = null
+      setBroadcastChannelConnected(false)
+      void supabase.removeChannel(ch)
+    }
+  }, [expectedOnlinePlayers, ingestTurnActionFromNetwork, isOnlineMatch, matchId, mergeDuelistsFromPlayerIds, playerBuild.name, selfDuelistId])
+
+  useEffect(() => {
+    if (!isOnlineMatch || !matchId || battleStatus !== "selecting") return
+    const supabase = getSupabaseClient()
+    const poll = async () => {
+      const tn = turnNumberRef.current
+      const { data, error } = await supabase
         .from("match_turns")
         .select("turn_number,player_id,action_payload")
         .eq("match_id", matchId)
-        .eq("turn_number", turnNow)
-      for (const row of data || []) consumeRow(row)
+        .eq("turn_number", tn)
+      if (error) return
+      for (const row of data || []) {
+        const playerId = String((row as { player_id?: string }).player_id || "")
+        const raw = (row as { action_payload?: RoundAction }).action_payload
+        if (!playerId || !raw) continue
+        ingestTurnActionFromNetwork({ ...raw, casterId: playerId, turnId: tn }, "backup")
+      }
     }
-    void loadExisting().finally(() => {
-      if (active && turnNow === 1) setIsTurnSyncReady(true)
-    })
-
-    const ch = supabase
-      .channel(`match-turns-${matchId}-${turnNow}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "match_turns", filter: `match_id=eq.${matchId}` },
-        (evt: any) => consumeRow(evt.new)
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED" && active && turnNow === 1) setIsTurnSyncReady(true)
-      })
-
-    return () => {
-      active = false
-      void supabase.removeChannel(ch)
-    }
-  }, [battleStatus, isBattleReady, isInitializing, isOnlineMatch, matchId, processCombatAction, selfDuelistId, turnNumber])
+    const id = window.setInterval(() => void poll(), 1500)
+    void poll()
+    return () => window.clearInterval(id)
+  }, [battleStatus, ingestTurnActionFromNetwork, isOnlineMatch, matchId])
 
   const playSpellVfx = async (spellName: string, attacker: Duelist, targets: Duelist[]) => {
     const arena = arenaRef.current
@@ -736,7 +881,7 @@ const DuelArena = (
   }
 
   const evaluateWinConditions = (state: Duelist[]) => {
-    if (isOnlineMatch && (!isInProgress || !isBattleReady || isInitializing)) return null
+    if (isOnlineMatch && (!gameStartAcknowledged || !isBattleReady || isInitializing)) return null
     if (!state || state.length === 0) return null
     if (state.some((d) => !d || !d.hp || !Array.isArray(d.hp.bars))) return null
     const playerAliveCount = state.filter((d) => d.team === "player" && !isDefeated(d.hp)).length
@@ -781,6 +926,10 @@ const DuelArena = (
 
   const beginRoundSelection = (state: Duelist[] = duelists) => {
     if (gameOver) return
+    if (isOnlineMatch) {
+      turnActionConfirmedRef.current = new Set()
+      ingestedActionKeysRef.current.clear()
+    }
     setCircumFlames((prev) => {
       const next: Record<string, number> = {}
       for (const [id, turns] of Object.entries(prev)) {
@@ -862,88 +1011,94 @@ const DuelArena = (
   const runResolution = async (queuedActions: RoundAction[]) => {
     if (resolvingRef.current) return
     resolvingRef.current = true
-    setBattleStatus("resolving")
-    setAwaitingServerAck(false)
-    setBattleMessage("")
-    const snapshot = [...duelistsRef.current]
-    const outcome = calculateTurnOutcome({
-      duelists: snapshot,
-      actions: queuedActions,
-      spellDatabase: SPELL_DATABASE,
-      turnNumber,
-      gameMode: playerBuild.gameMode,
-      circumFlames,
-    })
-    let state = outcome.newDuelists
-    for (const anim of outcome.animationsToPlay) {
-      if (isOnlineMatch && matchStatus === "finished") {
-        resolvingRef.current = false
-        setGameOver((prev) => prev ?? "timeout")
+    try {
+      setBattleStatus("resolving")
+      setAwaitingServerAck(false)
+      setBattleMessage("")
+      const snapshot = [...duelistsRef.current]
+      const outcome = calculateTurnOutcome({
+        duelists: snapshot,
+        actions: queuedActions,
+        spellDatabase: SPELL_DATABASE,
+        turnNumber,
+        gameMode: playerBuild.gameMode,
+        circumFlames,
+      })
+      let state = outcome.newDuelists
+      for (const anim of outcome.animationsToPlay) {
+        if (isOnlineMatch && matchStatus === "finished") {
+          setGameOver((prev) => prev ?? "timeout")
+          setBattleStatus("finished")
+          return
+        }
+        const caster = state.find((d) => d.id === anim.casterId)
+        const resolvedTargetIds = anim.targetIds?.length ? anim.targetIds : anim.targetId ? [anim.targetId] : []
+        const targets = state.filter((d) => resolvedTargetIds.includes(d.id))
+        if (anim.type === "cast" && caster && anim.spellName) {
+          const prefix = anim.isMiss ? "ERROU" : "CONJUROU"
+          const critText = anim.isCrit ? " (CRIT!)" : ""
+          setResolutionText(`${caster.name} ${prefix} ${anim.spellName}!${critText}`)
+          setBattleMessage(`${caster.name} ${prefix} ${anim.spellName}!${critText}`)
+          await sleep(500)
+          await playSpellVfx(anim.spellName, caster, targets)
+          setResolutionText("")
+        } else if (anim.type === "potion" && caster) {
+          setResolutionText(`${caster.name} usou poção!`)
+          await sleep(500)
+          setResolutionText("")
+        }
+        await sleep(anim.delay ?? 900)
+      }
+
+      setDuelists(state)
+      setBattleLog((prev) => [...prev, ...outcome.logs])
+      const resolvedTurn = turnNumber
+      const roundHash = computeRoundHash(resolvedTurn, state)
+      if (lastRoundHashRef.current !== roundHash) {
+        console.log("[Engine] roundHash", {
+          turnId: resolvedTurn,
+          roundHash,
+          actions: queuedActions.map((a) => ({ casterId: a.casterId, type: a.type, eventId: a.eventId, turnId: a.turnId })),
+        })
+        lastRoundHashRef.current = roundHash
+      }
+      setPendingActions({})
+      const nextTurn = turnNumber + 1
+      setTurnNumber(nextTurn)
+      if (outcome.outcome) {
+        if (playerBuild.gameMode === "challenge" && outcome.outcome === "win" && challengeStage < CHALLENGE_LABELS.length - 1) {
+          const nextStage = challengeStage + 1
+          setChallengeStage(nextStage)
+          addLog(`[Challenge]: ${playerBuild.name} avançou para ${CHALLENGE_LABELS[nextStage]}!`)
+          const nextRound = applyRapinomonioBlock(buildChallengeRound(nextStage))
+          setDuelists(nextRound)
+          setPendingActions({})
+          setPotionUsed(false)
+          setPendingSpell(null)
+          setGameOver(null)
+          setTurnNumber(1)
+          setBattleStatus("selecting")
+          beginRoundSelection(nextRound)
+          return
+        }
+        if (playerBuild.gameMode === "challenge" && outcome.outcome === "lose") {
+          setChallengeStage(0)
+        }
+        setGameOver(outcome.outcome)
+        if ((outcome.outcome === "win" || outcome.outcome === "lose") && playerBuild.gameMode !== "challenge") {
+          onBattleEnd?.(outcome.outcome, playerBuild.userId)
+        }
         setBattleStatus("finished")
         return
       }
-      const caster = state.find((d) => d.id === anim.casterId)
-      const resolvedTargetIds = anim.targetIds?.length ? anim.targetIds : anim.targetId ? [anim.targetId] : []
-      const targets = state.filter((d) => resolvedTargetIds.includes(d.id))
-      if (anim.type === "cast" && caster && anim.spellName) {
-        const prefix = anim.isMiss ? "ERROU" : "CONJUROU"
-        const critText = anim.isCrit ? " (CRIT!)" : ""
-        setResolutionText(`${caster.name} ${prefix} ${anim.spellName}!${critText}`)
-        setBattleMessage(`${caster.name} ${prefix} ${anim.spellName}!${critText}`)
-        await sleep(500)
-        await playSpellVfx(anim.spellName, caster, targets)
-        setResolutionText("")
-      } else if (anim.type === "potion" && caster) {
-        setResolutionText(`${caster.name} usou poção!`)
-        await sleep(500)
-        setResolutionText("")
-      }
-      await sleep(anim.delay ?? 900)
+      beginRoundSelection(state)
+    } catch (e) {
+      console.error("[Arena] runResolution", e)
+      addLog("[Engine]: erro na resolução do turno; estado revertido para seleção.")
+      setBattleStatus("selecting")
+    } finally {
+      resolvingRef.current = false
     }
-
-    setDuelists(state)
-    setBattleLog((prev) => [...prev, ...outcome.logs])
-    const resolvedTurn = turnNumber
-    const roundHash = computeRoundHash(resolvedTurn, state)
-    if (lastRoundHashRef.current !== roundHash) {
-      console.log("[Engine] roundHash", {
-        turnId: resolvedTurn,
-        roundHash,
-        actions: queuedActions.map((a) => ({ casterId: a.casterId, type: a.type, eventId: a.eventId, turnId: a.turnId })),
-      })
-      lastRoundHashRef.current = roundHash
-    }
-    setPendingActions({})
-    const nextTurn = turnNumber + 1
-    setTurnNumber(nextTurn)
-    resolvingRef.current = false
-    if (outcome.outcome) {
-      if (playerBuild.gameMode === "challenge" && outcome.outcome === "win" && challengeStage < CHALLENGE_LABELS.length - 1) {
-        const nextStage = challengeStage + 1
-        setChallengeStage(nextStage)
-        addLog(`[Challenge]: ${playerBuild.name} avançou para ${CHALLENGE_LABELS[nextStage]}!`)
-        const nextRound = applyRapinomonioBlock(buildChallengeRound(nextStage))
-        setDuelists(nextRound)
-        setPendingActions({})
-        setPotionUsed(false)
-        setPendingSpell(null)
-        setGameOver(null)
-        setTurnNumber(1)
-        setBattleStatus("selecting")
-        beginRoundSelection(nextRound)
-        return
-      }
-      if (playerBuild.gameMode === "challenge" && outcome.outcome === "lose") {
-        setChallengeStage(0)
-      }
-      setGameOver(outcome.outcome)
-      if ((outcome.outcome === "win" || outcome.outcome === "lose") && playerBuild.gameMode !== "challenge") {
-        onBattleEnd?.(outcome.outcome, playerBuild.userId)
-      }
-      setBattleStatus("finished")
-      return
-    }
-    beginRoundSelection(state)
   }
 
   useEffect(() => {
@@ -973,7 +1128,7 @@ const DuelArena = (
 
   useEffect(() => {
     if (isOfflineMode) return
-    if (!isBattleReady || isInitializing) {
+    if (!isBattleReady || isInitializing || !gameStartAcknowledged) {
       setBattleStatus("idle")
       return
     }
@@ -986,7 +1141,7 @@ const DuelArena = (
     setDuelists(seeded)
     beginRoundSelection(seeded)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [battleStatus, playerBuild.gameMode, onlineReadyPlayers, expectedOnlinePlayers, isBattleReady, isInitializing])
+  }, [battleStatus, playerBuild.gameMode, onlineReadyPlayers, expectedOnlinePlayers, isBattleReady, gameStartAcknowledged, isInitializing])
 
   useEffect(() => {
     return () => {
@@ -1036,17 +1191,25 @@ const DuelArena = (
   useEffect(() => {
     if (battleStatus !== "selecting") return
     const aliveIds = duelists.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
-    const ready = Object.keys(pendingActions).filter((id) => aliveIds.includes(id)).length
-    if (aliveIds.length > 0 && ready >= aliveIds.length) {
-      const actionList = Object.values(pendingActions).filter((a) => aliveIds.includes(a.casterId))
-      console.log("[SHOWDOWN] Turno Completo Recebido:", actionList)
-      void runResolution(actionList)
+    if (aliveIds.length === 0) return
+    const pendingComplete = aliveIds.every((id) => {
+      const a = pendingActions[id]
+      return !!a && a.turnId === turnNumber
+    })
+    if (!pendingComplete) return
+    if (isOnlineMatch) {
+      const allConfirmed = aliveIds.every((id) => turnActionConfirmedRef.current.has(`${turnNumber}:${id}`))
+      if (!allConfirmed) return
     }
+    const actionList = Object.values(pendingActions).filter((a) => aliveIds.includes(a.casterId))
+    console.log("[SHOWDOWN] Turno Completo Recebido:", actionList)
+    void runResolution(actionList)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [battleStatus, duelists, pendingActions])
+  }, [battleStatus, duelists, isOnlineMatch, pendingActions, turnNumber])
 
   const onSpellClick = (spellName: string) => {
     if (isReadOnlySpectator) return
+    if (isOnlineMatch && !gameStartAcknowledged) return
     if (!isBattleReady || isInitializing) return
     if (gameOver || battleStatus !== "selecting" || playerCannotAct || playerDefeated || pendingActions[selfDuelistId] || awaitingServerAck) return
     if (!player || isDefeated(player.hp)) return
@@ -1095,6 +1258,7 @@ const DuelArena = (
 
   const onTargetClick = (targetId: string) => {
     if (isReadOnlySpectator) return
+    if (isOnlineMatch && !gameStartAcknowledged) return
     if (!isBattleReady || isInitializing) return
     if (!pendingSpell || !player || playerDefeated || battleStatus !== "selecting" || pendingActions[selfDuelistId] || awaitingServerAck) return
     const valid = getValidTargetsForSpell(pendingSpell, player, duelists).some((d) => d.id === targetId && !isDefeated(d.hp))
@@ -1113,6 +1277,7 @@ const DuelArena = (
 
   const usePotion = () => {
     if (isReadOnlySpectator) return
+    if (isOnlineMatch && !gameStartAcknowledged) return
     if (!isBattleReady || isInitializing) return
     if (potionUsed || gameOver || !player || playerDefeated || battleStatus !== "selecting" || !!pendingActions[selfDuelistId] || awaitingServerAck) return
     if (player.debuffs.some((d) => d.type === "no_potion")) return
@@ -1274,29 +1439,6 @@ const DuelArena = (
 
   const topDuelists = useMemo(() => duelists.filter((d) => d.team === "enemy"), [duelists])
   const bottomDuelists = useMemo(() => duelists.filter((d) => d.team === "player"), [duelists])
-
-  if (isOnlineMatch && (matchStatus !== "in_progress" || !isIdentityReady || !isBattleReady || isInitializing || !isTurnSyncReady)) {
-    return (
-      <div className="min-h-screen bg-stone-800 font-serif text-amber-100">
-        <header className="border-b border-amber-900/80 bg-stone-950/80 px-4 py-3">
-          <div className="mx-auto flex max-w-6xl items-center justify-between">
-            <h1 className="text-2xl text-amber-300">Arena de Duelo</h1>
-            <Button onClick={handleLeaveRoom} className="h-8 w-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 p-0 text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Sair">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </header>
-        <main className="mx-auto flex max-w-6xl items-center justify-center p-8">
-          <div className="w-full max-w-lg rounded-xl border border-amber-700 bg-stone-900/90 p-6 text-center">
-            <p className="text-lg font-semibold text-amber-200">Sincronizando Bruxos...</p>
-            <p className="mt-2 text-sm text-amber-300/90">
-              A batalha inicia somente quando identidade, jogadores, HPs e sincronização do `match_turns` (Turno 1) estiverem prontos.
-            </p>
-          </div>
-        </main>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-stone-800 font-serif text-amber-100">
@@ -1521,6 +1663,14 @@ const DuelArena = (
               [?]
             </div>
           )}
+          {!isOfflineMode && !gameStartAcknowledged && (
+            <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-red-950/50">
+              <div className="rounded-xl border border-red-600 bg-red-900/80 px-6 py-4 text-center shadow-[0_0_30px_rgba(239,68,68,0.45)]">
+                <p className="text-xl font-bold tracking-wide text-red-100">AGUARDANDO OPONENTE...</p>
+                <p className="mt-1 text-xs text-red-200/90">Conexão via broadcast ativa. A luta começa sem esperar o banco.</p>
+              </div>
+            </div>
+          )}
 
           {playerBuild.gameMode === "ffa" || playerBuild.gameMode === "ffa3" ? (
             <div className="grid h-full min-h-[560px] grid-cols-2 grid-rows-2 gap-3 p-3">
@@ -1570,29 +1720,24 @@ const DuelArena = (
             <div className="mb-2 rounded border border-amber-900/60 bg-stone-950/60 p-2 text-xs">
               <p className="mb-1 text-amber-300">Jogadores na sala</p>
               <div className="flex flex-wrap gap-1">
-                {participantRoster.map((id, idx) => {
+                {(knownBroadcastPlayers.length > 0 ? knownBroadcastPlayers : participantRoster).map((id, idx) => {
                   const label = id === selfDuelistId ? `${playerBuild.name} (você)` : participantNames[idx] || `Bruxo ${idx + 1}`
                   return (
                     <Badge key={`${id}-${idx}`} className="border-amber-700 bg-stone-800 text-amber-200">
-                      {label} {readyByPlayerId[id] ? "✓" : "…"}
+                      {label}
                     </Badge>
                   )
                 })}
               </div>
-              {onlineReadyPlayers >= expectedOnlinePlayers && !localIsReady && !isReadOnlySpectator && (
-                <Button size="sm" className="mt-2 border border-amber-700 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50" onClick={() => void markReady()}>
-                  Preparar
-                </Button>
-              )}
             </div>
           )}
-          {!isOfflineMode && onlineReadyPlayers < expectedOnlinePlayers && (
+          {!isOfflineMode && !gameStartAcknowledged && (
             <p className="mb-2 text-xs text-amber-300">
-              Aguardando jogadores na sala ({onlineReadyPlayers}/{expectedOnlinePlayers})...
+              Aguardando jogadores na sala ({knownBroadcastPlayers.length || 1}/{expectedOnlinePlayers})...
             </p>
           )}
           {!isOfflineMode && !isBattleReady && (
-            <p className="mb-2 text-xs text-amber-300">Aguardando oponente e sincronização do estado da partida...</p>
+            <p className="mb-2 text-xs text-amber-300">Conectando canal de broadcast da partida...</p>
           )}
           {isReadOnlySpectator && <p className="mb-2 text-xs text-blue-300">Modo espectador: comandos de combate desabilitados.</p>}
           {playerDefeated && <p className="mb-2 text-xs text-red-300">Você foi derrotado e agora é espectador.</p>}
@@ -1614,6 +1759,7 @@ const DuelArena = (
                   !!gameOver ||
                   battleStatus !== "selecting" ||
                   !isBattleReady ||
+                  (isOnlineMatch && !gameStartAcknowledged) ||
                   awaitingServerAck ||
                   playerCannotAct ||
                   playerDefeated ||
@@ -1627,7 +1773,18 @@ const DuelArena = (
                 )
               })}
               {!potionUsed && (
-                <Button disabled={!!gameOver || battleStatus !== "selecting" || playerDefeated || !isBattleReady || awaitingServerAck} onClick={usePotion} className="border border-purple-700 bg-purple-900 text-purple-100 hover:bg-purple-800">
+                <Button
+                  disabled={
+                    !!gameOver ||
+                    battleStatus !== "selecting" ||
+                    playerDefeated ||
+                    !isBattleReady ||
+                    (isOnlineMatch && !gameStartAcknowledged) ||
+                    awaitingServerAck
+                  }
+                  onClick={usePotion}
+                  className="border border-purple-700 bg-purple-900 text-purple-100 hover:bg-purple-800"
+                >
                   <FlaskConical className="mr-1 h-3.5 w-3.5" />
                   {POTION_NAMES[playerBuild.potion] || "Pocao"}
                 </Button>
@@ -1636,6 +1793,21 @@ const DuelArena = (
           )}
         </div>
       </main>
+
+      {!isOfflineMode && matchId && (
+        <div
+          className="pointer-events-none fixed bottom-20 right-3 z-[90] max-w-[13rem] rounded border border-stone-600/90 bg-black/85 px-2 py-1 font-mono text-[10px] leading-tight text-stone-300 shadow-md backdrop-blur-sm"
+          aria-hidden
+        >
+          <p>[Conectado: {broadcastChannelConnected ? "Sim" : "Não"}]</p>
+          <p>
+            [Players: {knownBroadcastPlayers.length}/{expectedOnlinePlayers}]
+          </p>
+          <p className="truncate" title={debugLastEvent}>
+            [Último Evento: {debugLastEvent || "—"}]
+          </p>
+        </div>
+      )}
 
       <footer className="grid gap-3 border-t-4 border-amber-900 bg-stone-950/90 p-3 md:grid-cols-2">
         <div className="rounded-lg border-2 border-amber-900 bg-stone-800/90 p-3">

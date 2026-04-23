@@ -53,7 +53,7 @@ export default function PageClient() {
       applyExternalState(joined)
       setMatchPending(joined.status !== "in_progress")
       setIsSpectator(false)
-      setScreen(joined.status === "in_progress" ? "battle" : "setup")
+      setScreen("battle")
 
       unsubscribeMatchRef.current?.()
       unsubscribeMatchRef.current = subscribeToMatch(joined.matchId, {
