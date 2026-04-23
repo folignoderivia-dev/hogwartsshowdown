@@ -28,10 +28,11 @@ export default function Home() {
   const [playerBuild, setPlayerBuild] = useState<PlayerBuild | null>(null)
   const [accountUser, setAccountUser] = useState<DbUser | null>(null)
   const [pendingSpectate, setPendingSpectate] = useState<{ matchId: string; mode: PlayerBuild["gameMode"] } | null>(null)
+  const [openRooms, setOpenRooms] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number }>>([])
   /** Ex.: `duelArenaRef.current?.submitRemoteAction(id, createCastAction(...))` quando o WebSocket estiver ativo. */
   const duelArenaRef = useRef<DuelArenaHandle>(null)
   const unsubscribeMatchRef = useRef<null | (() => void)>(null)
-  const { isOnlineMode, applyExternalState, externalMatchState, joinMatchmaker, findActiveMatchForPlayer, subscribeToMatch, handleAction } = useMatchManager()
+  const { isOnlineMode, applyExternalState, externalMatchState, joinMatchmaker, createRoom, joinRoomById, fetchOpenRooms, findActiveMatchForPlayer, subscribeToMatch, handleAction } = useMatchManager()
   const [isSpectator, setIsSpectator] = useState(false)
   const [resumableMatch, setResumableMatch] = useState<{ matchId: string; mode: PlayerBuild["gameMode"]; status: "waiting" | "in_progress" } | null>(null)
 
@@ -82,6 +83,61 @@ export default function Home() {
     })()
   }
 
+  const attachMatch = useCallback((build: PlayerBuild, joined: { matchId: string; status: "waiting" | "in_progress"; playersJoined: number; playersExpected: number }) => {
+    setActiveMatchId(joined.matchId)
+    applyExternalState({
+      matchId: joined.matchId,
+      status: joined.status,
+      playersExpected: joined.playersExpected,
+      playersJoined: joined.playersJoined,
+      participantIds: [],
+      participantNames: [],
+      mode: build.gameMode,
+    })
+    setMatchPending(joined.status !== "in_progress")
+    setIsSpectator(false)
+    setScreen(joined.status === "in_progress" ? "battle" : "setup")
+
+    unsubscribeMatchRef.current?.()
+    unsubscribeMatchRef.current = subscribeToMatch(joined.matchId, {
+      onState: (st) => {
+        applyExternalState(st)
+        if (st.status === "in_progress" && st.playersJoined >= st.playersExpected) {
+          setMatchPending(false)
+          setScreen("battle")
+        }
+      },
+      onAction: (payload) => {
+        if (!build.userId || payload.playerId === build.userId) return
+        duelArenaRef.current?.submitRemoteAction(payload.playerId, payload.action)
+      },
+    })
+  }, [applyExternalState, subscribeToMatch])
+
+  const handleCreateRoom = (build: PlayerBuild) => {
+    if (!build.userId) return
+    setPlayerBuild(build)
+    if (typeof window !== "undefined") window.localStorage.setItem(`duel:lastBuild:${build.userId}`, JSON.stringify(build))
+    void (async () => {
+      if (!isOnlineMode(build)) {
+        handleStartDuel(build)
+        return
+      }
+      const created = await createRoom(build.gameMode, build.userId!, build.username || build.name)
+      attachMatch(build, created)
+    })()
+  }
+
+  const handleJoinOpenRoom = (build: PlayerBuild, matchId: string) => {
+    if (!build.userId) return
+    setPlayerBuild(build)
+    if (typeof window !== "undefined") window.localStorage.setItem(`duel:lastBuild:${build.userId}`, JSON.stringify(build))
+    void (async () => {
+      const joined = await joinRoomById(matchId, build.userId!, build.username || build.name)
+      attachMatch(build, joined)
+    })()
+  }
+
   const handleReturnToCommonRoom = () => {
     setScreen("setup")
     setMatchPending(false)
@@ -122,6 +178,28 @@ export default function Home() {
       setResumableMatch({ matchId: active.matchId, mode: active.mode, status: active.status })
     })()
   }, [accountUser?.id, findActiveMatchForPlayer])
+
+  useEffect(() => {
+    if (!accountUser) {
+      setOpenRooms([])
+      return
+    }
+    const refresh = async () => {
+      const rows = await fetchOpenRooms()
+      setOpenRooms(
+        rows.map((r) => ({
+          matchId: r.matchId,
+          mode: r.mode,
+          host: r.participantNames[0] || "Bruxo",
+          playersJoined: r.playersJoined,
+          playersExpected: r.playersExpected,
+        }))
+      )
+    }
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 2500)
+    return () => window.clearInterval(timer)
+  }, [accountUser, fetchOpenRooms])
 
   useEffect(() => {
     return () => {
@@ -233,6 +311,9 @@ export default function Home() {
           currentUser={accountUser}
           onAuthChange={setAccountUser}
           onStartDuel={handleStartDuel}
+          onCreateRoom={handleCreateRoom}
+          onJoinRoom={handleJoinOpenRoom}
+          openRooms={openRooms}
           onSpectateMatch={handleSpectateMatch}
           resumableMatch={resumableMatch}
           onResumeMatch={handleResumeMatch}

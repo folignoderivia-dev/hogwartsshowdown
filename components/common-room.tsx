@@ -33,6 +33,9 @@ import { getSupabaseClient } from "@/lib/supabase"
 
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
+  onCreateRoom?: (build: PlayerBuild) => void
+  onJoinRoom?: (build: PlayerBuild, matchId: string) => void
+  openRooms?: Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number }>
   onSpectateMatch: (matchId: string, mode: PlayerBuild["gameMode"]) => void
   onResumeMatch?: () => void
   resumableMatch?: { matchId: string; mode: PlayerBuild["gameMode"]; status: "waiting" | "in_progress" } | null
@@ -330,7 +333,7 @@ const GAME_MODES = [
 const MAX_SPELL_POINTS = 6
 const MAX_UNFORGIVABLE = 1
 
-export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch, resumableMatch, currentUser, onAuthChange }: CommonRoomProps) {
+export default function CommonRoom({ onStartDuel, onCreateRoom, onJoinRoom, openRooms = [], onSpectateMatch, onResumeMatch, resumableMatch, currentUser, onAuthChange }: CommonRoomProps) {
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
   const [authEmail, setAuthEmail] = useState("")
@@ -348,6 +351,7 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
   const [onlineWizards, setOnlineWizards] = useState(0)
   const [duelsInProgress, setDuelsInProgress] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; p1: string; p2: string }>>([])
   const [showSpectatePanel, setShowSpectatePanel] = useState(false)
+  const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [shareFeedback, setShareFeedback] = useState("")
 
@@ -554,6 +558,34 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
     }
   }
 
+  const buildPayload = (): PlayerBuild | null => {
+    if (!currentUser || !isReady || !gameMode) return null
+    return {
+      name: currentUser.username,
+      house,
+      wand,
+      potion,
+      spells: selectedSpells,
+      avatar,
+      gameMode: gameMode as "teste" | "1v1" | "2v2" | "ffa" | "ffa3",
+      userId: currentUser.id,
+      username: currentUser.username,
+      elo: currentUser.elo,
+    }
+  }
+
+  const handleCreateRoomClick = () => {
+    const payload = buildPayload()
+    if (!payload || !onCreateRoom) return
+    onCreateRoom(payload)
+  }
+
+  const handleJoinRoomClick = (matchId: string) => {
+    const payload = buildPayload()
+    if (!payload || !onJoinRoom) return
+    onJoinRoom(payload, matchId)
+  }
+
   const handleAddFriend = async () => {
     if (!currentUser?.id) return
     setFriendFeedback("")
@@ -703,6 +735,41 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
                 ))}
               </div>
               {shareFeedback && <p className="mt-2 text-xs text-amber-300">{shareFeedback}</p>}
+            </CardContent>
+          )}
+        </Card>
+        <Card className="medieval-frame mb-4 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
+          <CardHeader className="border-b border-amber-900/50 py-2">
+            <CardTitle className="flex items-center justify-between text-sm text-amber-200">
+              <span>Salas em Aberto</span>
+              <Button size="sm" variant="outline" className="h-7 border-amber-700 text-amber-300" onClick={() => setShowOpenRoomsPanel((v) => !v)}>
+                {showOpenRoomsPanel ? "Ocultar" : "Mostrar"}
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          {showOpenRoomsPanel && (
+            <CardContent className="max-h-52 overflow-y-auto pt-2">
+              {openRooms.length === 0 ? (
+                <p className="text-xs text-amber-300/80">Nenhuma sala esperando jogadores.</p>
+              ) : (
+                <div className="space-y-2">
+                  {openRooms.map((r) => (
+                    <div key={r.matchId} className="flex flex-col gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-amber-100">
+                        {r.mode.toUpperCase()} · Host: {r.host} · {r.playersJoined}/{r.playersExpected}
+                      </span>
+                      <Button
+                        size="sm"
+                        className="h-7 border border-amber-700 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50"
+                        onClick={() => handleJoinRoomClick(r.matchId)}
+                        disabled={!isReady}
+                      >
+                        Entrar
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           )}
         </Card>
@@ -1257,7 +1324,7 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
           <Button
             size="lg"
             disabled={!isReady}
-            onClick={handleStartDuel}
+            onClick={gameMode === "teste" ? handleStartDuel : handleCreateRoomClick}
             className={`medieval-frame border-0 px-12 py-6 text-lg font-bold transition-all ${
               isReady
                 ? "bg-gradient-to-b from-red-800 to-red-900 text-amber-100 shadow-lg shadow-red-900/50 hover:from-red-700 hover:to-red-800"
@@ -1265,7 +1332,7 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
             }`}
           >
             <Wand2 className="mr-2 h-5 w-5" />
-            Procurar Duelo
+            {gameMode === "teste" ? "Procurar Duelo" : "Criar Sala"}
           </Button>
         </div>
 

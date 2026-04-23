@@ -279,3 +279,103 @@ end;
 $$;
 
 grant execute on function public.join_matchmaker(text, text, text) to authenticated;
+
+create or replace function public.join_specific_room(
+  p_match_id text,
+  p_player_id text,
+  p_player_name text
+)
+returns table (
+  match_id text,
+  mode text,
+  status text,
+  players_expected int,
+  players_joined int,
+  p1_id text,
+  p2_id text,
+  p3_id text,
+  p4_id text,
+  p1_name text,
+  p2_name text,
+  p3_name text,
+  p4_name text
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_match public.matches%rowtype;
+begin
+  select m.* into v_match
+  from public.matches m
+  where m.match_id = p_match_id
+  limit 1
+  for update;
+
+  if not found then
+    raise exception 'Sala não encontrada';
+  end if;
+
+  if v_match.status <> 'waiting' then
+    raise exception 'Sala não está disponível';
+  end if;
+
+  if v_match.p1_id = p_player_id or v_match.p2_id = p_player_id or v_match.p3_id = p_player_id or v_match.p4_id = p_player_id then
+    insert into public.match_players(match_id, player_id)
+    values (v_match.match_id, p_player_id)
+    on conflict (match_id, player_id) do nothing;
+
+    return query
+    select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined,
+           v_match.p1_id, v_match.p2_id, v_match.p3_id, v_match.p4_id,
+           v_match.p1_name, v_match.p2_name, v_match.p3_name, v_match.p4_name;
+    return;
+  end if;
+
+  if v_match.players_joined >= v_match.players_expected then
+    raise exception 'Sala lotada';
+  end if;
+
+  if v_match.p2_id is null then
+    v_match.p2_id := p_player_id;
+    v_match.p2_name := p_player_name;
+  elsif v_match.p3_id is null then
+    v_match.p3_id := p_player_id;
+    v_match.p3_name := p_player_name;
+  elsif v_match.p4_id is null then
+    v_match.p4_id := p_player_id;
+    v_match.p4_name := p_player_name;
+  else
+    raise exception 'Sala lotada';
+  end if;
+
+  v_match.players_joined := least(v_match.players_expected, coalesce(v_match.players_joined, 0) + 1);
+  v_match.status := case when v_match.players_joined >= v_match.players_expected then 'in_progress' else 'waiting' end;
+  v_match.updated_at := now();
+
+  update public.matches
+  set players_joined = v_match.players_joined,
+      status = v_match.status,
+      p2_id = v_match.p2_id,
+      p3_id = v_match.p3_id,
+      p4_id = v_match.p4_id,
+      p2_name = v_match.p2_name,
+      p3_name = v_match.p3_name,
+      p4_name = v_match.p4_name,
+      updated_at = v_match.updated_at
+  where match_id = v_match.match_id
+  returning * into v_match;
+
+  insert into public.match_players(match_id, player_id)
+  values (v_match.match_id, p_player_id)
+  on conflict (match_id, player_id) do nothing;
+
+  return query
+  select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined,
+         v_match.p1_id, v_match.p2_id, v_match.p3_id, v_match.p4_id,
+         v_match.p1_name, v_match.p2_name, v_match.p3_name, v_match.p4_name;
+end;
+$$;
+
+grant execute on function public.join_specific_room(text, text, text) to authenticated;
