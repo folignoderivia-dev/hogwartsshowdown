@@ -75,6 +75,7 @@ export const WAND_PASSIVES: Record<string, { name: string; description: string; 
   ocammy: { name: "Pena de Ocammy", description: "50% recoil 50% se atacado com feitico do grimorio", effect: "ocammy_parry" },
   kelpie: { name: "Crina de Kelpie", description: "Imune a Incendio e Confrigo", effect: "kelpie_fire_immune" },
   acromantula: { name: "Pelo de Acromantula", description: "+20 poder base por turno de batalha completo", effect: "acromantula_power_stack" },
+  rapinomonio: { name: "Pele de Rapinomonio", description: "2 feitiços aleatórios bloqueados", effect: "rapinomonio_random_block_2" },
 }
 
 const WAND_CORES = [
@@ -87,6 +88,7 @@ const WAND_CORES = [
   { value: "ocammy", label: "Pena de Ocammy", desc: "50% recoil se mesmo feitico", icon: Shield },
   { value: "kelpie", label: "Crina de Kelpie", desc: "Imune a Incendio e Confrigo", icon: Wind },
   { value: "acromantula", label: "Pelo de Acromantula", desc: "+20 poder/turno de batalha", icon: Bug },
+  { value: "rapinomonio", label: "Pele de Rapinomonio", desc: "2 feitiços aleatórios bloqueados", icon: AlertTriangle },
 ]
 
 const POTIONS = [
@@ -95,6 +97,7 @@ const POTIONS = [
   { value: "edurus", label: "Edurus", effect: "Limpa todos os debuffs" },
   { value: "maxima", label: "Maxima", effect: "Proximo feitico x2 dano; rivais +50% dano 1 turno" },
   { value: "foco", label: "Foco", effect: "Proximo feitico +30% acerto" },
+  { value: "merlin", label: "Poção de Merlin", effect: "Copia 1 feitiço aleatório do oponente com mana 1" },
 ]
 
 export type SpellDebuffType =
@@ -290,8 +293,19 @@ export const SPELL_DATABASE: SpellInfo[] = [
     accuracy: 100,
     pp: 3,
     cost: 1,
+    priority: 4,
     special: "protego_diabolico_unforgivable_acc_down",
     effect: "Área (exceto em si): reduz em 15% a precisão de Crucius, Avada Kedavra e Imperio por 2 turnos.",
+  },
+  {
+    name: "Protego Maximo",
+    power: 0,
+    accuracy: 100,
+    pp: 2,
+    cost: 1,
+    priority: 6,
+    special: "protego_maximo_unforgivable_heal",
+    effect: "Self: ao receber Crucius/Avada/Imperio, cura totalmente a vida.",
   },
   { name: "Maximos", power: 0, accuracy: 100, pp: 5, cost: 1, priority: 0, special: "maximos_charge", effect: "Self: proximo feitico +10% a +100% poder" },
 ]
@@ -334,6 +348,7 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
   const [onlineWizards, setOnlineWizards] = useState(0)
   const [duelsInProgress, setDuelsInProgress] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; p1: string; p2: string }>>([])
   const [showSpectatePanel, setShowSpectatePanel] = useState(false)
+  const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [shareFeedback, setShareFeedback] = useState("")
 
   const [name, setName] = useState("")
@@ -344,6 +359,44 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
   const [gameMode, setGameMode] = useState<"teste" | "1v1" | "2v2" | "ffa" | "ffa3" | "">("")
+
+  useEffect(() => {
+    if (!currentUser?.id) return
+    const key = `duel:build:${currentUser.id}`
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem(key) : null
+    if (!raw) return
+    try {
+      const saved = JSON.parse(raw) as Partial<PlayerBuild>
+      if (saved.house) setHouse(saved.house)
+      if (saved.wand) setWand(saved.wand)
+      if (saved.potion) setPotion(saved.potion)
+      if (saved.avatar) setAvatar(saved.avatar)
+      if (Array.isArray(saved.spells)) setSelectedSpells(saved.spells.filter((s) => SPELL_DATABASE.some((sp) => sp.name === s)))
+      if (saved.gameMode && ["teste", "1v1", "2v2", "ffa", "ffa3"].includes(saved.gameMode)) {
+        setGameMode(saved.gameMode as "teste" | "1v1" | "2v2" | "ffa" | "ffa3")
+      }
+    } catch {
+      // ignora build inválida no storage
+    }
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    if (!currentUser?.id) return
+    const key = `duel:build:${currentUser.id}`
+    const payload: Partial<PlayerBuild> = {
+      name: currentUser.username,
+      house,
+      wand,
+      potion,
+      spells: selectedSpells,
+      avatar,
+      gameMode: gameMode || undefined,
+      userId: currentUser.id,
+      username: currentUser.username,
+      elo: currentUser.elo,
+    }
+    if (typeof window !== "undefined") window.localStorage.setItem(key, JSON.stringify(payload))
+  }, [currentUser?.id, currentUser?.username, currentUser?.elo, house, wand, potion, selectedSpells, avatar, gameMode])
 
   const { totalCost, unforgivableCount } = useMemo(() => {
     let total = 0
@@ -558,7 +611,7 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
   const effectiveName = currentUser?.username || name
 
   return (
-    <div className="min-h-screen wood-bg p-6">
+    <div className="min-h-screen wood-bg p-3 sm:p-6">
       <div className="mx-auto max-w-4xl">
         {/* Header with Medieval Style */}
         <header className="mb-8 text-center">
@@ -621,7 +674,7 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
               {duelsInProgress.length === 0 && <p className="text-xs text-amber-300/80">Nenhum duelo em andamento no momento.</p>}
               <div className="space-y-2">
                 {duelsInProgress.map((d) => (
-                  <div key={d.matchId} className="flex items-center justify-between gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs">
+                  <div key={d.matchId} className="flex flex-col items-start justify-between gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs sm:flex-row sm:items-center">
                     <span className="text-amber-100">{d.p1} vs {d.p2}</span>
                     <div className="flex items-center gap-1">
                       <Button
@@ -753,9 +806,14 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
 
         <Card className="medieval-frame mb-6 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
           <CardHeader className="border-b border-amber-900/50 py-2">
-            <CardTitle className="text-sm text-amber-200">Modo Amigos</CardTitle>
+            <CardTitle className="flex items-center justify-between text-sm text-amber-200">
+              <span>Modo Amigos</span>
+              <Button size="sm" variant="outline" className="h-7 border-amber-700 text-amber-300" onClick={() => setShowFriendsPanel((v) => !v)}>
+                {showFriendsPanel ? "Ocultar" : "Mostrar"}
+              </Button>
+            </CardTitle>
           </CardHeader>
-          <CardContent className="pt-3">
+          {showFriendsPanel && <CardContent className="pt-3">
             {!currentUser ? (
               <p className="text-xs text-amber-300/80">Entre na sua conta para adicionar amigos.</p>
             ) : (
@@ -803,9 +861,9 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
                   <div className="space-y-2">
                     {friends.map((friend) => (
                       <div key={friend.id} className="rounded border border-amber-900/60 bg-stone-900/60 px-3 py-2 text-xs text-amber-100">
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
                           <p className="font-semibold text-amber-200">{friend.username}</p>
-                          <div className="flex gap-1">
+                          <div className="flex flex-wrap gap-1">
                             <Button
                               type="button"
                               size="sm"
@@ -860,7 +918,7 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
                 )}
               </>
             )}
-          </CardContent>
+          </CardContent>}
         </Card>
 
         <div className="grid gap-6 md:grid-cols-2">

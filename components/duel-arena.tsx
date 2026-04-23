@@ -1,6 +1,6 @@
 "use client"
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import { ArrowLeft, FlaskConical, Send, Wand2, X } from "lucide-react"
 import type { PlayerBuild } from "@/app/page"
 import { Badge } from "@/components/ui/badge"
@@ -52,6 +52,7 @@ type DebuffType =
   | "anti_debuff"
   | "crit_boost"
   | "unforgivable_acc_down"
+  | "protego_maximo"
 type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 
 interface Debuff {
@@ -167,6 +168,7 @@ const POTION_NAMES: Record<string, string> = {
   edurus: "Edurus",
   maxima: "Maxima",
   foco: "Foco",
+  merlin: "Poção de Merlin",
 }
 const DEBUFF_LABEL: Record<DebuffType, string> = {
   burn: "🔥 BURN",
@@ -191,6 +193,7 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   anti_debuff: "✨ ANTI-DEBUFF",
   crit_boost: "🎯 CRIT+",
   unforgivable_acc_down: "🜏 IMPERDOÁVEIS ACC-15%",
+  protego_maximo: "🛡️ MAXIMO",
 }
 /** Mensagem flutuante curta ao aplicar debuff do grimório. */
 const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
@@ -214,6 +217,7 @@ const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
   anti_debuff: "IMUNIZOU!",
   crit_boost: "CRÍTICO+!",
   unforgivable_acc_down: "IMPERDOÁVEIS -15% ACC!",
+  protego_maximo: "PROTEGO MAXIMO!",
 }
 const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
 
@@ -259,7 +263,7 @@ function getCritChance(attacker: Duelist, defender?: Duelist, spellNameNorm?: st
 function isSelfTargetSpell(spellName: string): boolean {
   const n = normSpell(spellName)
   return (
-    n.includes("protego") ||
+    (n.includes("protego") && !n.includes("diabol")) ||
     n.includes("ferula") ||
     n.includes("episkey") ||
     (n.includes("finite") && n.includes("incantatem")) ||
@@ -645,6 +649,20 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     return null
   }
 
+  const applyRapinomonioBlock = useCallback((state: Duelist[]) => {
+    return state.map((d) => {
+      if (WAND_PASSIVES[d.wand]?.effect !== "rapinomonio_random_block_2") return d
+      if (!d.spells || d.spells.length === 0) return d
+      const shuffled = [...d.spells].sort(() => Math.random() - 0.5)
+      const picks = shuffled.slice(0, Math.min(2, shuffled.length))
+      const nextDisabled = { ...(d.disabledSpells || {}) }
+      picks.forEach((s) => {
+        nextDisabled[s] = Math.max(nextDisabled[s] || 0, 999)
+      })
+      return { ...d, disabledSpells: nextDisabled }
+    })
+  }, [])
+
   const beginRoundSelection = (state: Duelist[] = duelists) => {
     if (gameOver) return
     setCircumFlames((prev) => {
@@ -784,6 +802,22 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           })
         } else if (potKey === "foco") {
           state = state.map((d) => (d.id === attacker.id ? { ...d, nextAccBonusPct: 30 } : d))
+        } else if (potKey === "merlin") {
+          const foes = state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
+          const donor = foes[Math.floor(Math.random() * foes.length)]
+          if (donor?.spells?.length) {
+            const copied = donor.spells[Math.floor(Math.random() * donor.spells.length)]
+            state = state.map((d) => {
+              if (d.id !== attacker.id) return d
+              const nextSpells = d.spells.includes(copied) ? d.spells : [...d.spells.slice(-7), copied]
+              const nextMana = { ...(d.spellMana || {}) }
+              nextMana[copied] = { current: Math.max(1, nextMana[copied]?.current ?? 1), max: Math.max(1, nextMana[copied]?.max ?? 1) }
+              return { ...d, spells: nextSpells, spellMana: nextMana }
+            })
+            logs.push(`[Poção de Merlin]: ${attacker.name} copiou ${copied} com mana 1.`)
+          } else {
+            logs.push(`[Poção de Merlin]: sem alvo válido para copiar feitiço.`)
+          }
         }
         setDuelists(state)
         const elapsedP = Date.now() - actionStart
@@ -881,8 +915,21 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         }
       }
 
-      const applyDamageWithCircum = (defId: string, dmg: number, dealerId: string) => {
+      const applyDamageWithCircum = (defId: string, dmg: number, dealerId: string, sourceSpellNorm?: string) => {
         const def = state.find((d) => d.id === defId)!
+        if (
+          sourceSpellNorm &&
+          def.debuffs.some((d) => d.type === "protego_maximo") &&
+          (sourceSpellNorm.includes("crucius") || sourceSpellNorm.includes("avada") || sourceSpellNorm.includes("imperio") || sourceSpellNorm.includes("imperius"))
+        ) {
+          state = state.map((d) =>
+            d.id === defId
+              ? { ...d, hp: healFlatTotal(d.hp, 500), debuffs: d.debuffs.filter((x) => x.type !== "protego_maximo") }
+              : d
+          )
+          logs.push(`[Protego Maximo]: ${def.name} anulou maldição imperdoável e curou totalmente a vida!`)
+          return
+        }
         const th = def.wand === "thestral"
         state = state.map((d) => (d.id === defId ? { ...d, hp: applyDamage(d.hp, dmg, { thestral: th }) } : d))
         if (def.debuffs.some((d) => d.type === "salvio_reflect") && dealerId !== defId && dmg > 0) {
@@ -904,7 +951,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       const atkNow = () => state.find((d) => d.id === action.casterId)!
 
       if (isSelfTargetSpell(sn)) {
-        if (n.includes("protego")) {
+        if (n.includes("protego") && !n.includes("maximo") && !n.includes("diabol")) {
           if (atkNow().lastRoundSpellWasProtego) {
             setFeedbackText("Protego falhou!")
             setFeedbackTargetId(attacker.id)
@@ -964,6 +1011,14 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           )
           setStatusFloater({ text: "CRÍTICO+ 2T!", targetId: attacker.id, key: Date.now() + Math.random() })
           logs.push(`[Episkey]: ${attacker.name} curou 50% HP e recebeu buff de crítico por 2 turnos.`)
+        } else if (n.includes("protego") && n.includes("maximo")) {
+          state = state.map((d) =>
+            d.id === attacker.id
+              ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "protego_maximo"), { type: "protego_maximo", duration: 2 }] }
+              : d
+          )
+          setStatusFloater({ text: "PROTEGO MAXIMO!", targetId: attacker.id, key: Date.now() + Math.random() })
+          logs.push(`[Protego Maximo]: ${attacker.name} preparou proteção suprema contra imperdoáveis.`)
         } else if (n.includes("finite") && n.includes("incantatem")) {
           state = state.map((d) => (d.id === attacker.id ? { ...d, debuffs: [] } : d))
           setStatusFloater({ text: "CLEANSE TOTAL!", targetId: attacker.id, key: Date.now() + Math.random() })
@@ -974,7 +1029,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           logs.push(`[Aqua Eructo]: ${attacker.name} extinguiu o BURN antes do jato.`)
           const foes = state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
           for (const f of foes) {
-            applyDamageWithCircum(f.id, splash, attacker.id)
+            applyDamageWithCircum(f.id, splash, attacker.id, n)
             const nm = state.find((x) => x.id === f.id)?.name
             logs.push(`[Aqua Eructo]: jato atingiu ${nm ?? f.name} (${splash}% pressão mágica).`)
           }
@@ -1017,7 +1072,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           const raw = rollCombatPower(attacker, spell, sn, t)
           let damage = calculateDamage(attacker, t, raw, normSpell(sn))
           if (protegoBlocks(t)) damage = 0
-          applyDamageWithCircum(t.id, damage, attacker.id)
+          applyDamageWithCircum(t.id, damage, attacker.id, n)
           state = state.map((d) =>
             d.id === t.id
               ? {
@@ -1104,7 +1159,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           }
           const def = state.find((d) => d.id === t.id)!
           if (protegoBlocks(def)) damage = 0
-          applyDamageWithCircum(t.id, damage, attacker.id)
+          applyDamageWithCircum(t.id, damage, attacker.id, n)
           const targetAfter = state.find((d) => d.id === t.id)!
           const hitMsg = crit ? `CRÍTICO! -${damage}` : `-${damage}`
           setBattleMessage(hitMsg)
@@ -1184,7 +1239,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
             const defH = state.find((d) => d.id === target.id)!
             if (protegoBlocks(defH)) dmg = 0
             if (dmg > 0) {
-              applyDamageWithCircum(target.id, dmg, attacker.id)
+              applyDamageWithCircum(target.id, dmg, attacker.id, n)
               const targetAfterH = state.find((d) => d.id === target.id)!
               const msgH = critH ? `CRÍTICO! -${dmg}` : `-${dmg}`
               setBattleMessage(`Flagellum ${hi}/${nHits}: ${msgH}`)
@@ -1219,7 +1274,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
               let dmg = calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n)
               const defS = state.find((d) => d.id === target.id)!
               if (protegoBlocks(defS)) dmg = 0
-              applyDamageWithCircum(target.id, dmg, attacker.id)
+              applyDamageWithCircum(target.id, dmg, attacker.id, n)
               setFeedbackText(`-${dmg}`)
               setFeedbackTargetId(target.id)
               logs.push(`[Sectumsempra] Hit ${i}/${hits}: ${target.name} sofreu ${dmg}.`)
@@ -1244,7 +1299,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
               let dmg = calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n)
               const defV = state.find((d) => d.id === target.id)!
               if (protegoBlocks(defV)) dmg = 0
-              applyDamageWithCircum(target.id, dmg, attacker.id)
+              applyDamageWithCircum(target.id, dmg, attacker.id, n)
               setFeedbackText(`-${dmg}`)
               setFeedbackTargetId(target.id)
               logs.push(`[Vermillious] Hit ${i}/${hits}: ${target.name} sofreu ${dmg}.`)
@@ -1284,7 +1339,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
             setBattleMessage(`IMUNE — ${target.name}`)
           }
           if (damage > 0) {
-            applyDamageWithCircum(target.id, damage, attacker.id)
+            applyDamageWithCircum(target.id, damage, attacker.id, n)
             const targetAfter = state.find((d) => d.id === target.id)!
             const hitMsg = crit ? `CRÍTICO! -${damage}` : `-${damage}`
             setBattleMessage(hitMsg)
@@ -1468,7 +1523,9 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
   useEffect(() => {
     setBackgroundImage(SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)])
-    beginRoundSelection()
+    const seeded = applyRapinomonioBlock(duelists)
+    setDuelists(seeded)
+    beginRoundSelection(seeded)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

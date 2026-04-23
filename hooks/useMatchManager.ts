@@ -64,16 +64,86 @@ export function useMatchManager() {
 
   const joinMatchmaker = useCallback(async (mode: PlayerBuild["gameMode"], playerId: string, playerName: string) => {
     const supabase = getSupabaseClient()
-    const { data, error } = await supabase.rpc("join_matchmaker", {
-      p_mode: mode,
-      p_player_id: playerId,
-      p_player_name: playerName,
-    })
-    if (error) throw error
-    const row = Array.isArray(data) ? data[0] : data
-    if (!row) throw new Error("join_matchmaker retornou vazio")
-    return toExternalState(row)
-  }, [toExternalState])
+    const callRpc = async () => {
+      const { data, error } = await supabase.rpc("join_matchmaker", {
+        p_mode: mode,
+        p_player_id: playerId,
+        p_player_name: playerName,
+      })
+      if (error) throw error
+      const row = Array.isArray(data) ? data[0] : data
+      if (!row) throw new Error("join_matchmaker retornou vazio")
+      return toExternalState(row)
+    }
+
+    try {
+      return await callRpc()
+    } catch {
+      // Fallback cliente para ambientes onde a RPC ainda não foi aplicada.
+      const playersExpected = expectedPlayersByMode(mode)
+      const { data: waitingRows } = await supabase
+        .from("matches")
+        .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,updated_at")
+        .eq("status", "waiting")
+        .eq("mode", mode)
+        .order("updated_at", { ascending: true })
+        .limit(10)
+
+      for (const row of waitingRows || []) {
+        if ([row.p1_id, row.p2_id, row.p3_id, row.p4_id].includes(playerId)) {
+          await supabase.from("match_players").upsert({ match_id: row.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
+          return toExternalState(row)
+        }
+        const oldJoined = Number(row.players_joined || 0)
+        if (oldJoined >= playersExpected) continue
+        const updatePayload: Record<string, any> = {
+          players_joined: oldJoined + 1,
+          status: oldJoined + 1 >= playersExpected ? "in_progress" : "waiting",
+          updated_at: new Date().toISOString(),
+        }
+        if (!row.p2_id) {
+          updatePayload.p2_id = playerId
+          updatePayload.p2_name = playerName
+        } else if (!row.p3_id) {
+          updatePayload.p3_id = playerId
+          updatePayload.p3_name = playerName
+        } else if (!row.p4_id) {
+          updatePayload.p4_id = playerId
+          updatePayload.p4_name = playerName
+        } else {
+          continue
+        }
+        const { data: updated } = await supabase
+          .from("matches")
+          .update(updatePayload)
+          .eq("match_id", row.match_id)
+          .eq("status", "waiting")
+          .eq("players_joined", oldJoined)
+          .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name")
+          .maybeSingle()
+        if (updated) {
+          await supabase.from("match_players").upsert({ match_id: updated.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
+          return toExternalState(updated)
+        }
+      }
+
+      const { data: created } = await supabase
+        .from("matches")
+        .insert({
+          mode,
+          status: "waiting",
+          players_expected: playersExpected,
+          players_joined: 1,
+          p1_id: playerId,
+          p1_name: playerName,
+          updated_at: new Date().toISOString(),
+        })
+        .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name")
+        .single()
+      await supabase.from("match_players").upsert({ match_id: created.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
+      return toExternalState(created)
+    }
+  }, [expectedPlayersByMode, toExternalState])
 
   const findActiveMatchForPlayer = useCallback(async (playerId: string) => {
     const supabase = getSupabaseClient()
