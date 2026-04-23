@@ -283,7 +283,7 @@ export function useMatchManager() {
     if (
       externalMatchState &&
       externalMatchState.currentTurnOwner &&
-      action.type !== "sync" &&
+      action.type !== "surrender" &&
       playerId !== externalMatchState.currentTurnOwner
     ) {
       return null
@@ -297,7 +297,7 @@ export function useMatchManager() {
         const currentOwner = externalMatchState?.currentTurnOwner
         const idx = currentOwner ? participants.indexOf(currentOwner) : -1
         const nextOwner =
-          action.type === "sync"
+          action.type === "surrender"
             ? null
             : participants.length > 0
               ? participants[(Math.max(0, idx) + 1) % participants.length] || participants[0]
@@ -309,8 +309,8 @@ export function useMatchManager() {
           p_target_id: payload.targetId ?? null,
           p_timestamp_ms: payload.timestamp,
           p_payload: payload,
-          p_expected_owner: action.type === "sync" ? null : currentOwner || null,
-          p_next_owner: action.type === "sync" ? null : nextOwner,
+          p_expected_owner: action.type === "surrender" ? null : currentOwner || null,
+          p_next_owner: action.type === "surrender" ? null : nextOwner,
         })
         if (error) throw error
       } catch {

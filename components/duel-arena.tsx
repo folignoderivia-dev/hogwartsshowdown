@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { SpellInfo } from "@/components/common-room"
 import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, WAND_PASSIVES } from "@/components/common-room"
-import type { RoundAction, RoundSyncSnapshot } from "@/lib/duelActions"
+import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
 
 export type { RoundAction } from "@/lib/duelActions"
@@ -562,7 +562,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const [readyByPlayerId, setReadyByPlayerId] = useState<Record<string, boolean>>({})
   const [awaitingServerAck, setAwaitingServerAck] = useState(false)
   const [isBattleReady, setIsBattleReady] = useState(playerBuild.gameMode === "teste")
-  const lastSyncedRoundRef = useRef(0)
+  const [isInitializing, setIsInitializing] = useState(playerBuild.gameMode !== "teste")
   const processedEventIdsRef = useRef<string[]>([])
   const duelistsRef = useRef<Duelist[]>([])
 
@@ -573,26 +573,6 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const processCombatAction = useCallback((actionPayload: RoundAction) => {
     setActions((prev) => ({ ...prev, [actionPayload.casterId]: actionPayload }))
   }, [])
-
-  const applyRoundSync = useCallback((snapshot: RoundSyncSnapshot) => {
-    if (snapshot.round <= lastSyncedRoundRef.current) return
-    lastSyncedRoundRef.current = snapshot.round
-    setDuelists(snapshot.duelists as Duelist[])
-    setBattleLog((prev) => [...prev, ...snapshot.logs])
-    setTurnNumber(snapshot.turnNumber)
-    setBattleStatus(snapshot.battleStatus as BattleStatus)
-    setActions({})
-    setPendingSpell(null)
-    setCurrentTargetId(null)
-    setPotionUsed(false)
-    setTimeLeft(60)
-    if (snapshot.gameOver) {
-      setGameOver(snapshot.gameOver)
-      if (snapshot.gameOver === "win" || snapshot.gameOver === "lose") {
-        onBattleEnd?.(snapshot.gameOver, playerBuild.userId)
-      }
-    }
-  }, [onBattleEnd, playerBuild.userId])
 
   useImperativeHandle(ref, () => ({
     submitRemoteAction: (casterId: string, action: RoundAction) => {
@@ -620,17 +600,13 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           processedEventIdsRef.current = processedEventIdsRef.current.slice(-300)
         }
       }
-      if (normalized.type === "sync" && normalized.syncSnapshot) {
-        applyRoundSync(normalized.syncSnapshot)
-        const refreshedState = normalized.syncSnapshot.duelists as Duelist[]
-        const nextCaster = refreshedState.find((d) => d.id === internalCaster)
-        const nextTarget = normalized.targetId ? refreshedState.find((d) => d.id === normalized.targetId) : undefined
-        console.log("[Realtime] Sync aplicado", {
-          eventId: normalized.eventId,
-          hpCasterDepois: nextCaster ? getTotalHP(nextCaster.hp) : null,
-          hpAlvoDepois: nextTarget ? getTotalHP(nextTarget.hp) : null,
-        })
+      if (normalized.type === "surrender") {
+        const surrenderedIsMe = normalized.casterId === "player"
+        setGameOver(surrenderedIsMe ? "lose" : "win")
+        setBattleStatus("finished")
+        if (!surrenderedIsMe) onBattleEnd?.("win", playerBuild.userId)
         setAwaitingServerAck(false)
+        addLog(`[Sistema]: ${surrenderedIsMe ? "Você" : (liveCaster?.name || "Oponente")} desistiu da partida.`)
         return
       }
       const onlineNow = playerBuild.gameMode !== "teste" && !!matchId
@@ -653,7 +629,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       if (normalized.casterId === "player") setAwaitingServerAck(false)
       processCombatAction(normalized)
     },
-  }), [applyRoundSync, currentTurnOwner, fromNetworkId, matchId, matchStatus, participantIds, playerBuild.gameMode, processCombatAction, toNetworkId])
+  }), [currentTurnOwner, fromNetworkId, matchId, matchStatus, participantIds, playerBuild.gameMode, processCombatAction, toNetworkId])
   const arenaRef = useRef<HTMLDivElement | null>(null)
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
@@ -682,6 +658,33 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   useEffect(() => {
     setIsBattleReady(isBattlePrepared)
   }, [isBattlePrepared])
+
+  useEffect(() => {
+    if (!isOnlineMatch || !matchId) {
+      setIsInitializing(false)
+      return
+    }
+    let mounted = true
+    const supabase = getSupabaseClient()
+    const checkInit = async () => {
+      const { count } = await supabase
+        .from("match_players")
+        .select("player_id", { count: "exact", head: true })
+        .eq("match_id", matchId)
+      const rosterReady = (count || 0) >= expectedOnlinePlayers
+      const stateReady =
+        participantIds.length >= expectedOnlinePlayers &&
+        duelistsRef.current.length >= expectedOnlinePlayers &&
+        duelistsRef.current.every((d) => !!d.hp && Array.isArray(d.hp.bars) && d.hp.bars.length === 5 && getTotalHP(d.hp) > 0)
+      if (mounted) setIsInitializing(!(rosterReady && stateReady && !!currentTurnOwner && matchStatus === "in_progress"))
+    }
+    void checkInit()
+    const timer = window.setInterval(() => void checkInit(), 1000)
+    return () => {
+      mounted = false
+      window.clearInterval(timer)
+    }
+  }, [currentTurnOwner, expectedOnlinePlayers, isOnlineMatch, matchId, matchStatus, participantIds.length])
 
   useEffect(() => {
     if (playerBuild.gameMode === "teste" || !matchId) return
@@ -870,7 +873,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   }
 
   const evaluateWinConditions = (state: Duelist[]) => {
-    if (isOnlineMatch && (!isInProgress || !isBattleReady)) return null
+    if (isOnlineMatch && (!isInProgress || !isBattleReady || isInitializing)) return null
     if (!state || state.length === 0) return null
     if (state.some((d) => !d || !d.hp || !Array.isArray(d.hp.bars))) return null
     const playerAliveCount = state.filter((d) => d.team === "player" && !isDefeated(d.hp)).length
@@ -1790,7 +1793,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   useEffect(() => {
     if (playerBuild.gameMode === "teste") return
     if (onlineBattleStartedRef.current) return
-    if (!isBattleReady) {
+    if (!isBattleReady || isInitializing) {
       setBattleStatus("idle")
       return
     }
@@ -1807,7 +1810,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     setDuelists(seeded)
     beginRoundSelection(seeded)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerBuild.gameMode, onlineReadyPlayers, readyCount, expectedOnlinePlayers, isBattleReady])
+  }, [playerBuild.gameMode, onlineReadyPlayers, readyCount, expectedOnlinePlayers, isBattleReady, isInitializing])
 
   useEffect(() => {
     return () => {
@@ -1875,7 +1878,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const onSpellClick = (spellName: string) => {
     if (isReadOnlySpectator) return
     if (!isMyTurn) return
-    if (!isBattleReady) return
+    if (!isBattleReady || isInitializing) return
     if (gameOver || battleStatus !== "selecting" || playerCannotAct || playerDefeated || actions.player || awaitingServerAck) return
     if (!player || isDefeated(player.hp)) return
     const mana = player.spellMana?.[spellName]
@@ -1923,7 +1926,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const onTargetClick = (targetId: string) => {
     if (isReadOnlySpectator) return
     if (!isMyTurn) return
-    if (!isBattleReady) return
+    if (!isBattleReady || isInitializing) return
     if (!pendingSpell || !player || playerDefeated || battleStatus !== "selecting" || actions.player || awaitingServerAck) return
     const valid = getValidTargetsForSpell(pendingSpell, player, duelists).some((d) => d.id === targetId && !isDefeated(d.hp))
     if (!valid) return
@@ -1941,7 +1944,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const usePotion = () => {
     if (isReadOnlySpectator) return
     if (!isMyTurn) return
-    if (!isBattleReady) return
+    if (!isBattleReady || isInitializing) return
     if (potionUsed || gameOver || !player || playerDefeated || battleStatus !== "selecting" || !!actions.player || awaitingServerAck) return
     if (player.debuffs.some((d) => d.type === "no_potion")) return
     setPotionUsed(true)
@@ -1972,6 +1975,8 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       const supabase = getSupabaseClient()
       const leavingId = playerBuild.userId || localOnlineId
       if (matchId && leavingId && playerBuild.gameMode !== "teste" && !isReadOnlySpectator) {
+        const surrenderAction: RoundAction = { casterId: toNetworkId("player"), type: "surrender" }
+        onDispatchAction?.(toNetworkId("player"), surrenderAction, matchId)
         await supabase
           .from("match_players")
           .delete()
@@ -2112,7 +2117,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const topDuelists = useMemo(() => duelists.filter((d) => d.team === "enemy"), [duelists])
   const bottomDuelists = useMemo(() => duelists.filter((d) => d.team === "player"), [duelists])
 
-  if (isOnlineMatch && !isBattleReady) {
+  if (isOnlineMatch && (!isBattleReady || isInitializing)) {
     return (
       <div className="min-h-screen bg-stone-800 font-serif text-amber-100">
         <header className="border-b border-amber-900/80 bg-stone-950/80 px-4 py-3">
