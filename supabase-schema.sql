@@ -455,7 +455,19 @@ $$;
 
 grant execute on function public.commit_match_action(text, text, text, text, bigint, jsonb) to authenticated;
 
--- Limpeza de artefatos legados (pipeline antigo de ready/turno).
-drop function if exists public.advance_turn_owner(text, text, text);
+-- Ready state para sincronizar início da batalha entre todos os participantes.
+create table if not exists public.match_ready_states (
+  match_id text not null references public.matches(match_id) on delete cascade,
+  player_id text not null,
+  is_ready boolean not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (match_id, player_id)
+);
+
+alter table public.match_ready_states enable row level security;
+
 drop policy if exists "match_ready_states_rw_authenticated" on public.match_ready_states;
-drop table if exists public.match_ready_states;
+create policy "match_ready_states_rw_authenticated"
+on public.match_ready_states for all
+using (auth.role() = 'authenticated')
+with check (auth.role() = 'authenticated');

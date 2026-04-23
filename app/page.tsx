@@ -39,7 +39,7 @@ export default function Home() {
     return {
       ...action,
       casterId: playerId,
-      targetId: action.targetId === "player" ? playerId : action.targetId,
+      targetId: action.targetId,
     }
   }, [])
 
