@@ -34,6 +34,8 @@ import { getSupabaseClient } from "@/lib/supabase"
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
   onSpectateMatch: (matchId: string, mode: PlayerBuild["gameMode"]) => void
+  onResumeMatch?: () => void
+  resumableMatch?: { matchId: string; mode: PlayerBuild["gameMode"]; status: "waiting" | "in_progress" } | null
   /** Conta logada (obrigatória para entrar na arena). */
   currentUser: DbUser | null
   onAuthChange: (user: DbUser | null) => void
@@ -304,7 +306,7 @@ const GAME_MODES = [
 const MAX_SPELL_POINTS = 6
 const MAX_UNFORGIVABLE = 1
 
-export default function CommonRoom({ onStartDuel, onSpectateMatch, currentUser, onAuthChange }: CommonRoomProps) {
+export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch, resumableMatch, currentUser, onAuthChange }: CommonRoomProps) {
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
   const [authEmail, setAuthEmail] = useState("")
@@ -722,6 +724,22 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, currentUser, 
             </ol>
           </CardContent>
         </Card>
+        {currentUser && resumableMatch && onResumeMatch && (
+          <Card className="medieval-frame mb-4 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
+            <CardContent className="flex items-center justify-between gap-3 pt-4">
+              <p className="text-xs text-amber-200">
+                Você possui uma sala ativa: <span className="font-mono text-amber-300">{resumableMatch.matchId}</span> ({resumableMatch.mode} · {resumableMatch.status})
+              </p>
+              <Button
+                type="button"
+                onClick={onResumeMatch}
+                className="border border-amber-700 bg-amber-900/50 text-amber-100 hover:bg-amber-800/60"
+              >
+                Voltar para sala
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="medieval-frame mb-6 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
           <CardHeader className="border-b border-amber-900/50 py-2">
