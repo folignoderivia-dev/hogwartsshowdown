@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { getSupabaseClient } from "@/lib/supabase"
-import type { GameMode } from "@/lib/types"
+import type { GameMode } from "@/lib/constants"
 
 interface SyncDuelist {
   hp?: {

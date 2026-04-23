@@ -7,9 +7,12 @@ import { applyMatchElo, getSessionUserId, getUserById } from "@/lib/database"
 import type { DbUser } from "@/lib/database"
 import { useMatchManager, type ExternalMatchState } from "@/hooks/useMatchManager"
 import type { RoundAction } from "@/lib/duelActions"
-import type { PlayerBuild } from "@/lib/types"
+import type { PlayerBuild } from "@/lib/constants"
 
-const DuelArena = dynamic(() => import("@/components/duel-arena"), { ssr: false })
+const DuelArena = dynamic(() => import("@/components/duel-arena"), {
+  ssr: false,
+  loading: () => <p>Carregando Arena...</p>,
+})
 
 interface DuelArenaHandle {
   submitRemoteAction: (casterId: string, action: RoundAction) => void

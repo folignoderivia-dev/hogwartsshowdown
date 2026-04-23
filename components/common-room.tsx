@@ -15,8 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug } from "lucide-react"
-import type { PlayerBuild } from "@/lib/types"
-import { formatSpellPower, SPELL_DATABASE, type SpellInfo } from "@/lib/game-data"
+import { formatSpellPower, SPELL_DATABASE, type PlayerBuild, type SpellInfo } from "@/lib/constants"
 import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
 import {
   addFriendByUsername,

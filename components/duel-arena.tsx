@@ -2,12 +2,10 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import { ArrowLeft, FlaskConical, Send, Wand2, X } from "lucide-react"
-import type { PlayerBuild } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { ArenaVfxState, BattleStatus, Duelist, Point } from "@/lib/arena-types"
-import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, type SpellInfo, WAND_PASSIVES } from "@/lib/game-data"
+import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, type ArenaVfxState, type BattleStatus, type Duelist, type PlayerBuild, type Point, type SpellInfo, WAND_PASSIVES } from "@/lib/constants"
 import { useArenaMatchSync } from "@/hooks/useArenaMatchSync"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
