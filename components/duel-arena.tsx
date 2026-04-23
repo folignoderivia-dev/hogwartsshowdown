@@ -1098,7 +1098,15 @@ const DuelArena = (
     if (!isOnlineMatch || !matchId || !selfDuelistId || isReadOnlySpectator) return
     const supabase = getSupabaseClient()
     const presenceKey = playerBuild.userId || selfDuelistId
-    const channel = supabase.channel(`match-${matchId}`, {
+    const channelName = `match-${matchId}`
+    const fullTopic = `realtime:${channelName}`
+    for (const existing of supabase.getChannels()) {
+      if (existing.topic === channelName || existing.topic === fullTopic) {
+        void supabase.removeChannel(existing)
+      }
+    }
+
+    const channel = supabase.channel(channelName, {
       config: { presence: { key: presenceKey } },
     })
 
@@ -1120,45 +1128,44 @@ const DuelArena = (
       }
     }
 
-    channel
-      .on("presence", { event: "sync" }, syncPresenceRoster)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "match_turns", filter: `match_id=eq.${matchId}` },
-        (payload: { eventType?: string; new?: Record<string, unknown> }) => {
-          if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") return
-          const row = payload.new as { id?: number | string; match_id?: string; turn_number?: number; player_id?: string; action_payload?: RoundAction }
-          if (!row) return
-          if (row.match_id != null && String(row.match_id) !== matchId) return
-          ingestMatchTurnRow(row)
+    const onMatchTurnChange = (payload: { eventType?: string; new?: Record<string, unknown> }) => {
+      if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") return
+      const row = payload.new as { id?: number | string; match_id?: string; turn_number?: number; player_id?: string; action_payload?: RoundAction }
+      if (!row) return
+      if (row.match_id != null && String(row.match_id) !== matchId) return
+      ingestMatchTurnRow(row)
+    }
+
+    // Supabase Realtime: todos os .on() devem ser registados antes de subscribe() (não encadear subscribe no retorno de .on).
+    channel.on("presence", { event: "sync" }, syncPresenceRoster)
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "match_turns", filter: `match_id=eq.${matchId}` }, onMatchTurnChange)
+
+    channel.subscribe(async (status, err) => {
+      if (err) {
+        const em = err instanceof Error ? err.message : String(err)
+        setChannelSubscribeError(em)
+        console.warn("[Arena] Realtime:", err)
+      }
+      if (status === "SUBSCRIBED") {
+        setMatchChannelConnected(true)
+        setChannelSubscribeError("")
+        setDebugLastEvent("match channel SUBSCRIBED")
+        try {
+          await channel.track({
+            user_id: selfDuelistId,
+            name: playerBuild.name,
+            online_at: new Date().toISOString(),
+          })
+        } catch (trackErr) {
+          console.warn("[Arena] presence.track", trackErr)
         }
-      )
-      .subscribe(async (status, err) => {
-        if (err) {
-          const em = err instanceof Error ? err.message : String(err)
-          setChannelSubscribeError(em)
-          console.warn("[Arena] Realtime:", err)
-        }
-        if (status === "SUBSCRIBED") {
-          setMatchChannelConnected(true)
-          setChannelSubscribeError("")
-          setDebugLastEvent("match channel SUBSCRIBED")
-          try {
-            await channel.track({
-              user_id: selfDuelistId,
-              name: playerBuild.name,
-              online_at: new Date().toISOString(),
-            })
-          } catch (trackErr) {
-            console.warn("[Arena] presence.track", trackErr)
-          }
-          syncPresenceRoster()
-        }
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          setMatchChannelConnected(false)
-          setDebugLastEvent(`match channel ${status}`)
-        }
-      })
+        syncPresenceRoster()
+      }
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        setMatchChannelConnected(false)
+        setDebugLastEvent(`match channel ${status}`)
+      }
+    })
 
     matchRealtimeChannelRef.current = channel
     return () => {
