@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic"
-import PageClient from "./page-client"
+import PageShell from "./page-shell"
 
 export default function Page() {
-  return <PageClient />
+  return <PageShell />
 }

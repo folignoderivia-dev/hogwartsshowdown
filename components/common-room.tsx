@@ -15,7 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug } from "lucide-react"
-import { formatSpellPower, SPELL_DATABASE, type PlayerBuild, type SpellInfo } from "@/lib/constants"
+import { formatSpellPower, INITIAL_PLAYER_BUILD, SPELL_DATABASE, type SpellInfo } from "@/lib/data-store"
+import type { PlayerBuild } from "@/lib/types"
 import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
 import {
   addFriendByUsername,
@@ -135,9 +136,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     try {
       const saved = JSON.parse(raw) as Partial<PlayerBuild>
       if (saved.house) setHouse(saved.house)
+      else if (INITIAL_PLAYER_BUILD.house) setHouse(INITIAL_PLAYER_BUILD.house)
       if (saved.wand) setWand(saved.wand)
+      else if (INITIAL_PLAYER_BUILD.wand) setWand(INITIAL_PLAYER_BUILD.wand)
       if (saved.potion) setPotion(saved.potion)
+      else if (INITIAL_PLAYER_BUILD.potion) setPotion(INITIAL_PLAYER_BUILD.potion)
       if (saved.avatar) setAvatar(saved.avatar)
+      else if (INITIAL_PLAYER_BUILD.avatar) setAvatar(INITIAL_PLAYER_BUILD.avatar)
       if (Array.isArray(saved.spells)) setSelectedSpells(saved.spells.filter((s) => SPELL_DATABASE.some((sp) => sp.name === s)))
       if (saved.gameMode && ["teste", "challenge", "1v1", "2v2", "ffa", "ffa3"].includes(saved.gameMode)) {
         setGameMode(saved.gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3")

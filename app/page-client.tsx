@@ -6,7 +6,7 @@ import { applyMatchElo, getSessionUserId, getUserById } from "@/lib/database"
 import type { DbUser } from "@/lib/database"
 import { useMatchManager, type ExternalMatchState } from "@/hooks/useMatchManager"
 import type { RoundAction } from "@/lib/duelActions"
-import type { PlayerBuild } from "@/lib/constants"
+import type { PlayerBuild } from "@/lib/types"
 
 const CommonRoom = nextDynamic(() => import("@/components/common-room"), {
   ssr: false,
@@ -310,6 +310,14 @@ export default function PageClient() {
     )
   }
 
+  if (screen === "battle" && !playerBuild) {
+    return (
+      <main className="min-h-screen wood-bg p-6 text-amber-100">
+        <p>Carregando dados da batalha...</p>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-background">
       {screen === "setup" ? (
@@ -327,7 +335,7 @@ export default function PageClient() {
       ) : (
         <DuelArena
           ref={duelArenaRef}
-          playerBuild={playerBuild!}
+          playerBuild={playerBuild}
           onReturn={handleReturnToCommonRoom}
           onBattleEnd={handleBattleEnd}
           matchId={activeMatchId || undefined}
