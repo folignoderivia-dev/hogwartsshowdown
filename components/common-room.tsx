@@ -86,6 +86,7 @@ const AVATARS = [
 
 const GAME_MODES = [
   { value: "teste", label: "TESTE (BOT)" },
+  { value: "challenge", label: "CHALLENGE (OFFLINE)" },
   { value: "1v1", label: "1 VS 1" },
   { value: "2v2", label: "2 VS 2" },
   { value: "ffa3", label: "ALL IN ONE (3 FFA)" },
@@ -124,7 +125,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [avatar, setAvatar] = useState("")
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
-  const [gameMode, setGameMode] = useState<"teste" | "1v1" | "2v2" | "ffa" | "ffa3" | "">("")
+  const [gameMode, setGameMode] = useState<"teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "">("")
 
   useEffect(() => {
     if (!currentUser?.id) return
@@ -138,8 +139,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       if (saved.potion) setPotion(saved.potion)
       if (saved.avatar) setAvatar(saved.avatar)
       if (Array.isArray(saved.spells)) setSelectedSpells(saved.spells.filter((s) => SPELL_DATABASE.some((sp) => sp.name === s)))
-      if (saved.gameMode && ["teste", "1v1", "2v2", "ffa", "ffa3"].includes(saved.gameMode)) {
-        setGameMode(saved.gameMode as "teste" | "1v1" | "2v2" | "ffa" | "ffa3")
+      if (saved.gameMode && ["teste", "challenge", "1v1", "2v2", "ffa", "ffa3"].includes(saved.gameMode)) {
+        setGameMode(saved.gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3")
       }
     } catch {
       // ignora build inválida no storage
@@ -312,7 +313,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         potion,
         spells: selectedSpells,
         avatar,
-        gameMode: gameMode as "teste" | "1v1" | "2v2" | "ffa" | "ffa3",
+        gameMode: gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3",
         userId: currentUser.id,
         username: currentUser.username,
         elo: currentUser.elo,
@@ -329,7 +330,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       potion,
       spells: selectedSpells,
       avatar,
-      gameMode: gameMode as "teste" | "1v1" | "2v2" | "ffa" | "ffa3",
+      gameMode: gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3",
       userId: currentUser.id,
       username: currentUser.username,
       elo: currentUser.elo,
@@ -578,6 +579,33 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 <Button type="submit" className="w-full border-amber-700 bg-amber-800 text-amber-50">
                   {authMode === "login" ? "Entrar" : "Criar conta"}
                 </Button>
+                {authMode === "login" && (
+                  <button
+                    type="button"
+                    className="text-center text-xs text-amber-400 underline"
+                    onClick={async () => {
+                      try {
+                        const email = authEmail.trim().toLowerCase()
+                        if (!email) {
+                          setAuthError("Informe seu e-mail para recuperar a senha.")
+                          return
+                        }
+                        const supabase = getSupabaseClient()
+                        const redirect = typeof window !== "undefined" ? `${window.location.origin}/` : undefined
+                        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: redirect })
+                        if (error) {
+                          setAuthError(error.message)
+                          return
+                        }
+                        setAuthError("Enviamos um link de recuperação para seu e-mail.")
+                      } catch {
+                        setAuthError("Não foi possível enviar recuperação de senha agora.")
+                      }
+                    }}
+                  >
+                    Esqueci minha senha
+                  </button>
+                )}
                 <button
                   type="button"
                   className="text-center text-xs text-amber-400 underline"
@@ -1070,7 +1098,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   key={mode.value}
                   variant="outline"
                   size="sm"
-                  onClick={() => setGameMode(mode.value as "teste" | "1v1" | "2v2" | "ffa" | "ffa3")}
+                  onClick={() => setGameMode(mode.value as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3")}
                   className={`transition-all ${
                     gameMode === mode.value
                       ? "border-amber-500 bg-amber-700/50 text-amber-200"
@@ -1083,19 +1111,34 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </div>
           </div>
 
-          <Button
-            size="lg"
-            disabled={!isReady}
-            onClick={gameMode === "teste" ? handleStartDuel : handleCreateRoomClick}
-            className={`medieval-frame border-0 px-12 py-6 text-lg font-bold transition-all ${
-              isReady
-                ? "bg-gradient-to-b from-red-800 to-red-900 text-amber-100 shadow-lg shadow-red-900/50 hover:from-red-700 hover:to-red-800"
-                : "cursor-not-allowed bg-stone-700 text-stone-500"
-            }`}
-          >
-            <Wand2 className="mr-2 h-5 w-5" />
-            {gameMode === "teste" ? "Procurar Duelo" : "Criar Sala"}
-          </Button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button
+              size="lg"
+              disabled={!isReady}
+              onClick={gameMode === "teste" || gameMode === "challenge" ? handleStartDuel : handleCreateRoomClick}
+              className={`medieval-frame border-0 px-8 py-5 text-base font-bold transition-all ${
+                isReady
+                  ? "bg-gradient-to-b from-red-800 to-red-900 text-amber-100 shadow-lg shadow-red-900/50 hover:from-red-700 hover:to-red-800"
+                  : "cursor-not-allowed bg-stone-700 text-stone-500"
+              }`}
+            >
+              <Wand2 className="mr-2 h-5 w-5" />
+              {gameMode === "teste" || gameMode === "challenge" ? "Iniciar Offline" : "Criar Sala"}
+            </Button>
+            {gameMode !== "teste" && gameMode !== "challenge" && (
+              <Button
+                size="lg"
+                disabled={!isReady || openRooms.length === 0}
+                onClick={() => {
+                  const first = openRooms[0]
+                  if (first) handleJoinRoomClick(first.matchId)
+                }}
+                className="medieval-frame border border-amber-700 bg-amber-900/50 px-8 py-5 text-base font-bold text-amber-100 hover:bg-amber-800/60"
+              >
+                Entrar em Sala
+              </Button>
+            )}
+          </div>
         </div>
 
         {!isReady && (

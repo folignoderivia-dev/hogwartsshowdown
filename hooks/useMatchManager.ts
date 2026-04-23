@@ -30,8 +30,37 @@ export function useMatchManager() {
 
   const isOnlineMode = useCallback((build: PlayerBuild | null) => {
     if (!build) return false
-    return build.gameMode !== "teste"
+    return build.gameMode !== "teste" && build.gameMode !== "challenge"
   }, [])
+
+  const closeInactiveWaitingRooms = useCallback(async () => {
+    const supabase = getSupabaseClient()
+    const cutoffIso = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+    const { data: staleRows } = await supabase
+      .from("matches")
+      .select("match_id")
+      .eq("status", "waiting")
+      .lt("updated_at", cutoffIso)
+      .limit(100)
+    const staleIds = (staleRows || []).map((r: any) => String(r.match_id)).filter(Boolean)
+    if (staleIds.length === 0) return
+    await supabase.from("matches").update({ status: "finished", updated_at: new Date().toISOString() }).in("match_id", staleIds)
+    await supabase.from("match_players").delete().in("match_id", staleIds)
+  }, [])
+
+  const findSingleActiveRoom = useCallback(async (playerId: string) => {
+    const supabase = getSupabaseClient()
+    const { data } = await supabase
+      .from("matches")
+      .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner,updated_at")
+      .in("status", ["waiting", "in_progress"])
+      .or(`p1_id.eq.${playerId},p2_id.eq.${playerId},p3_id.eq.${playerId},p4_id.eq.${playerId}`)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!data) return null
+    return toExternalState(data)
+  }, [toExternalState])
 
   const buildActionPayload = useCallback((matchId: string, playerId: string, action: RoundAction): ActionPayload => {
     const eventId = `${matchId}:${playerId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`
@@ -80,6 +109,9 @@ export function useMatchManager() {
   }, [])
 
   const joinMatchmaker = useCallback(async (mode: PlayerBuild["gameMode"], playerId: string, playerName: string) => {
+    await closeInactiveWaitingRooms()
+    const active = await findSingleActiveRoom(playerId)
+    if (active) return active
     const supabase = getSupabaseClient()
     const callRpc = async () => {
       const { data, error } = await supabase.rpc("join_matchmaker", {
@@ -162,9 +194,12 @@ export function useMatchManager() {
       await supabase.from("match_players").upsert({ match_id: created.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
       return toExternalState(created)
     }
-  }, [expectedPlayersByMode, toExternalState])
+  }, [closeInactiveWaitingRooms, expectedPlayersByMode, findSingleActiveRoom, toExternalState])
 
   const createRoom = useCallback(async (mode: PlayerBuild["gameMode"], playerId: string, playerName: string) => {
+    await closeInactiveWaitingRooms()
+    const active = await findSingleActiveRoom(playerId)
+    if (active) return active
     const supabase = getSupabaseClient()
     const playersExpected = expectedPlayersByMode(mode)
     const { data, error } = await supabase
@@ -184,9 +219,14 @@ export function useMatchManager() {
     if (error) throw error
     await supabase.from("match_players").upsert({ match_id: data.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
     return toExternalState(data)
-  }, [expectedPlayersByMode, toExternalState])
+  }, [closeInactiveWaitingRooms, expectedPlayersByMode, findSingleActiveRoom, toExternalState])
 
   const joinRoomById = useCallback(async (matchId: string, playerId: string, playerName: string) => {
+    await closeInactiveWaitingRooms()
+    const active = await findSingleActiveRoom(playerId)
+    if (active && active.matchId !== matchId) {
+      throw new Error("Você já está em outra sala ativa. Saia dela antes de entrar em uma nova.")
+    }
     const supabase = getSupabaseClient()
     try {
       const { data, error } = await supabase.rpc("join_specific_room", {
@@ -238,9 +278,10 @@ export function useMatchManager() {
       await supabase.from("match_players").upsert({ match_id: updated.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
       return toExternalState(updated)
     }
-  }, [toExternalState])
+  }, [closeInactiveWaitingRooms, findSingleActiveRoom, toExternalState])
 
   const fetchOpenRooms = useCallback(async (mode?: PlayerBuild["gameMode"]) => {
+    await closeInactiveWaitingRooms()
     const supabase = getSupabaseClient()
     let query = supabase
       .from("matches")
@@ -251,9 +292,10 @@ export function useMatchManager() {
     if (mode) query = query.eq("mode", mode)
     const { data } = await query
     return (data || []).map((r: any) => toExternalState(r))
-  }, [toExternalState])
+  }, [closeInactiveWaitingRooms, toExternalState])
 
   const findActiveMatchForPlayer = useCallback(async (playerId: string) => {
+    await closeInactiveWaitingRooms()
     const supabase = getSupabaseClient()
     const { data } = await supabase
       .from("matches")
@@ -265,7 +307,7 @@ export function useMatchManager() {
       .maybeSingle()
     if (!data) return null
     return toExternalState(data)
-  }, [toExternalState])
+  }, [closeInactiveWaitingRooms, toExternalState])
 
   const fetchInProgressMatches = useCallback(async () => {
     const supabase = getSupabaseClient()

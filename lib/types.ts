@@ -1,4 +1,4 @@
-export type GameMode = "teste" | "1v1" | "2v2" | "ffa" | "ffa3"
+export type GameMode = "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3"
 
 export interface PlayerBuild {
   name: string

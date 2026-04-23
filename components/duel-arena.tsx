@@ -56,6 +56,13 @@ const AVATAR_IMAGES: Record<string, string> = {
   bruxa03: "https://i.postimg.cc/1XV62tXH/bruxa03.png",
 }
 const DEFAULT_AVATARS = ["bruxo01", "bruxo02", "bruxo03", "bruxa01"]
+const CHALLENGE_LABELS = ["Oitavas", "Quartas", "Semifinal", "Final"]
+const CHALLENGE_BOTS = [
+  { name: "Sentinela de Azkaban", house: "slytherin", wand: "dragon", spells: ["Bombarda", "Confrigo", "Crucius", "Imperio", "Protego", "Expelliarmus"] },
+  { name: "Auror Renegado", house: "gryffindor", wand: "thunderbird", spells: ["Scarlatum", "Depulso", "Glacius", "Arestum Momentum", "Protego", "Ferula"] },
+  { name: "Alquimista Sombrio", house: "ravenclaw", wand: "acromantula", spells: ["Confundos", "Flagellum", "Lumus", "Finite Incantatem", "Fumus", "Episkey"] },
+  { name: "Duelista Fantasma", house: "hufflepuff", wand: "kelpie", spells: ["Incendio", "Confrigo", "Diffindo", "Sectumsempra", "Protego Diabólico", "Protego Maximo"] },
+]
 const HOUSE_SYMBOL: Record<string, string> = {
   gryffindor: "🦁",
   slytherin: "🐍",
@@ -304,9 +311,10 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   ref
 ) {
   if (typeof window === "undefined") return null
+  const isOfflineMode = playerBuild.gameMode === "teste" || playerBuild.gameMode === "challenge"
   const localOnlineId = localNetworkId || playerBuild.userId || null
   const selfDuelistId = localOnlineId || ""
-  const isIdentityReady = !!selfDuelistId
+  const isIdentityReady = isOfflineMode || !!selfDuelistId
 
   const [duelists, setDuelists] = useState<Duelist[]>(() => {
     const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
@@ -337,7 +345,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       missStreakBySpell: {},
     })
 
-    if (playerBuild.gameMode === "teste") {
+    if (isOfflineMode) {
       return [
         playerDuelist,
         withMana({
@@ -404,9 +412,48 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     },
     [localOnlineId, participantNames, playerBuild.avatar, playerBuild.gameMode, playerBuild.house, playerBuild.name, playerBuild.spells, playerBuild.userId, playerBuild.wand]
   )
+  const buildChallengeRound = useCallback((stage: number): Duelist[] => {
+    const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
+    const playerDuelist: Duelist = {
+      id: selfDuelistId,
+      name: playerBuild.name,
+      house: playerBuild.house,
+      wand: playerBuild.wand,
+      avatar: playerBuild.avatar,
+      spells: playerBuild.spells,
+      hp: { bars: [100, 100, 100, 100, 100] },
+      speed: Math.round(100 * playerMod.speed),
+      debuffs: [],
+      isPlayer: true,
+      team: "player",
+      spellMana: buildSpellManaForSpells(playerBuild.spells, playerBuild.house),
+      turnsInBattle: 0,
+      disabledSpells: {},
+      missStreakBySpell: {},
+    }
+    const botBase = CHALLENGE_BOTS[Math.floor(Math.random() * CHALLENGE_BOTS.length)]
+    const bot: Duelist = {
+      id: `challenge-bot-${stage + 1}`,
+      name: `${botBase.name} (${CHALLENGE_LABELS[Math.min(stage, CHALLENGE_LABELS.length - 1)]})`,
+      house: botBase.house,
+      wand: botBase.wand,
+      avatar: DEFAULT_AVATARS[(stage + 1) % DEFAULT_AVATARS.length],
+      spells: botBase.spells,
+      hp: { bars: [100, 100, 100, 100, 100] },
+      speed: 92 + stage * 3,
+      debuffs: [],
+      team: "enemy",
+      spellMana: buildSpellManaForSpells(botBase.spells, botBase.house),
+      turnsInBattle: 0,
+      disabledSpells: {},
+      missStreakBySpell: {},
+    }
+    return [playerDuelist, bot]
+  }, [playerBuild.avatar, playerBuild.house, playerBuild.name, playerBuild.spells, playerBuild.wand, selfDuelistId])
 
   const [battleStatus, setBattleStatus] = useState<BattleStatus>("idle")
   const [turnNumber, setTurnNumber] = useState(1)
+  const [challengeStage, setChallengeStage] = useState(0)
   const [timeLeft, setTimeLeft] = useState(60)
   const [pendingSpell, setPendingSpell] = useState<string | null>(null)
   const [pendingActions, setPendingActions] = useState<Record<string, RoundAction>>({})
@@ -416,7 +463,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const isReadOnlySpectator = isSpectator || (!!matchId && !!playerBuild.userId && participantIds.length > 0 && !participantIds.includes(playerBuild.userId))
 
   useEffect(() => {
-    if (playerBuild.gameMode === "teste") return
+    if (isOfflineMode) return
     console.log("[Arena:init] participantIds update", { participantIds, participantNames })
     const base = buildOnlineDuelists(participantIds)
     if (base.length === 0) return
@@ -536,7 +583,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         })
         return
       }
-      const onlineNow = playerBuild.gameMode !== "teste" && !!matchId
+      const onlineNow = !isOfflineMode && !!matchId
       const expectedNow =
         playerBuild.gameMode === "2v2" || playerBuild.gameMode === "ffa"
           ? 4
@@ -812,7 +859,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     botTimeoutsRef.current.forEach((id) => window.clearTimeout(id))
     botTimeoutsRef.current = []
 
-    if (playerBuild.gameMode === "teste") {
+    if (isOfflineMode) {
       state
         .filter((d) => !d.isPlayer && !isDefeated(d.hp))
         .forEach((bot) => {
@@ -1588,8 +1635,24 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       setCurrentTargetId(null)
 
       if (result) {
+        if (playerBuild.gameMode === "challenge" && result === "win" && challengeStage < CHALLENGE_LABELS.length - 1) {
+          const nextStage = challengeStage + 1
+          setChallengeStage(nextStage)
+          addLog(`[Challenge]: ${playerBuild.name} avançou para ${CHALLENGE_LABELS[nextStage]}!`)
+          const nextRound = applyRapinomonioBlock(buildChallengeRound(nextStage))
+          setDuelists(nextRound)
+          setPendingActions({})
+          setTurnNumber(1)
+          setBattleStatus("selecting")
+          beginRoundSelection(nextRound)
+          resolvingRef.current = false
+          return
+        }
+        if (playerBuild.gameMode === "challenge" && result === "lose") {
+          setChallengeStage(0)
+        }
         setGameOver(result)
-        if (result === "win" || result === "lose") onBattleEnd?.(result, playerBuild.userId)
+        if ((result === "win" || result === "lose") && playerBuild.gameMode !== "challenge") onBattleEnd?.(result, playerBuild.userId)
         setBattleStatus("finished")
         combatEndedEarly = true
         break
@@ -1656,7 +1719,14 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
   useEffect(() => {
     setBackgroundImage(SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)])
-    if (playerBuild.gameMode === "teste") {
+    if (playerBuild.gameMode === "challenge") {
+      setChallengeStage(0)
+      const seeded = applyRapinomonioBlock(buildChallengeRound(0))
+      setDuelists(seeded)
+      beginRoundSelection(seeded)
+      return
+    }
+    if (isOfflineMode) {
       const seeded = applyRapinomonioBlock(duelists)
       setDuelists(seeded)
       beginRoundSelection(seeded)
@@ -1664,10 +1734,11 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     }
     setBattleStatus("idle")
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    if (playerBuild.gameMode === "teste") return
+    if (isOfflineMode) return
     if (!isBattleReady || isInitializing) {
       setBattleStatus("idle")
       return
@@ -1832,7 +1903,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     try {
       const supabase = getSupabaseClient()
       const leavingId = selfDuelistId
-      if (matchId && leavingId && playerBuild.gameMode !== "teste" && !isReadOnlySpectator) {
+      if (matchId && leavingId && !isOfflineMode && !isReadOnlySpectator) {
         const surrenderAction: RoundAction = { casterId: selfDuelistId, type: "surrender" }
         onDispatchAction?.(selfDuelistId, surrenderAction, matchId)
         await supabase
@@ -1905,7 +1976,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         {currentTargetId === duelist.id && <div className="absolute -top-2 left-1/2 z-50 -translate-x-1/2 text-xl text-amber-300">⬇</div>}
         <div className="mb-1 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src={avatar} alt={`Avatar ${duelist.name}`} className={`relative z-50 h-10 w-10 rounded-md border border-amber-700 object-cover ${dead ? "grayscale opacity-50" : ""}`} />
+            <img src={avatar} alt={`Avatar ${duelist.name}`} className={`relative z-50 h-16 w-16 rounded-md border border-amber-700 object-cover ${dead ? "grayscale opacity-50" : ""}`} />
             <div className="text-xs">
               <p className="relative z-50 font-semibold text-amber-100">
                 {duelist.name}{" "}
@@ -1996,6 +2067,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           <div className="flex items-center gap-2">
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">{String(Math.floor(timeLeft / 60)).padStart(2, "0")}:{String(timeLeft % 60).padStart(2, "0")}</Badge>
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">{battleStatus.toUpperCase()}</Badge>
+            {playerBuild.gameMode === "challenge" && <Badge className="border-purple-700 bg-purple-950/40 text-purple-200">{CHALLENGE_LABELS[Math.min(challengeStage, CHALLENGE_LABELS.length - 1)]}</Badge>}
             {isReadOnlySpectator && <Badge className="border-blue-700 bg-blue-950/40 text-blue-200">ESPECTADOR</Badge>}
             {isReadOnlySpectator ? (
               <Button onClick={handleLeaveRoom} className="h-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 px-2 text-xs text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Voltar para o Lobby">
@@ -2255,7 +2327,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         </div>
 
         <div className="mt-4 rounded-lg border-2 border-amber-900 bg-stone-900/85 p-3">
-          {playerBuild.gameMode !== "teste" && (
+          {!isOfflineMode && (
             <div className="mb-2 rounded border border-amber-900/60 bg-stone-950/60 p-2 text-xs">
               <p className="mb-1 text-amber-300">Jogadores na sala</p>
               <div className="flex flex-wrap gap-1">
@@ -2275,12 +2347,12 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
               )}
             </div>
           )}
-          {playerBuild.gameMode !== "teste" && onlineReadyPlayers < expectedOnlinePlayers && (
+          {!isOfflineMode && onlineReadyPlayers < expectedOnlinePlayers && (
             <p className="mb-2 text-xs text-amber-300">
               Aguardando jogadores na sala ({onlineReadyPlayers}/{expectedOnlinePlayers})...
             </p>
           )}
-          {playerBuild.gameMode !== "teste" && !isBattleReady && (
+          {!isOfflineMode && !isBattleReady && (
             <p className="mb-2 text-xs text-amber-300">Aguardando oponente e sincronização do estado da partida...</p>
           )}
           {isReadOnlySpectator && <p className="mb-2 text-xs text-blue-300">Modo espectador: comandos de combate desabilitados.</p>}

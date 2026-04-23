@@ -34,11 +34,12 @@ export function useArenaMatchSync({
   duelists,
   expectedOnlinePlayers,
 }: UseArenaMatchSyncParams) {
+  const isOfflineMode = gameMode === "teste" || gameMode === "challenge"
   const [readyByPlayerId, setReadyByPlayerId] = useState<Record<string, boolean>>({})
-  const [isBattleReady, setIsBattleReady] = useState(gameMode === "teste")
-  const [isInitializing, setIsInitializing] = useState(gameMode !== "teste")
+  const [isBattleReady, setIsBattleReady] = useState(isOfflineMode)
+  const [isInitializing, setIsInitializing] = useState(!isOfflineMode)
 
-  const isOnlineMatch = gameMode !== "teste" && !!matchId
+  const isOnlineMatch = !isOfflineMode && !!matchId
   const hasExpectedParticipants = !isOnlineMatch || participantIds.length >= expectedOnlinePlayers
   const onlineStateLoaded =
     !isOnlineMatch ||
@@ -93,7 +94,7 @@ export function useArenaMatchSync({
   }, [duelists, expectedOnlinePlayers, isIdentityReady, isOnlineMatch, matchId, matchStatus, participantIds, readyCount])
 
   useEffect(() => {
-    if (gameMode === "teste" || !matchId || !selfDuelistId) return
+    if (isOfflineMode || !matchId || !selfDuelistId) return
     const supabase = getSupabaseClient()
 
     const pullReadyState = async () => {
@@ -126,7 +127,7 @@ export function useArenaMatchSync({
     return () => {
       void supabase.removeChannel(readyChannel)
     }
-  }, [gameMode, matchId, selfDuelistId])
+  }, [isOfflineMode, matchId, selfDuelistId])
 
   useEffect(() => {
     if (!isOnlineMatch || !matchId) return
@@ -138,14 +139,14 @@ export function useArenaMatchSync({
   }, [expectedOnlinePlayers, isOnlineMatch, matchId, matchStatus, participantIds.length, readyCount])
 
   const markReady = useCallback(async () => {
-    if (!matchId || !selfDuelistId || gameMode === "teste") return
+    if (!matchId || !selfDuelistId || isOfflineMode) return
     const supabase = getSupabaseClient()
     await supabase.from("match_ready_states").upsert(
       { match_id: matchId, player_id: selfDuelistId, is_ready: true, updated_at: new Date().toISOString() },
       { onConflict: "match_id,player_id" }
     )
     setReadyByPlayerId((prev) => ({ ...prev, [selfDuelistId]: true }))
-  }, [gameMode, matchId, selfDuelistId])
+  }, [isOfflineMode, matchId, selfDuelistId])
 
   return {
     isOnlineMatch,

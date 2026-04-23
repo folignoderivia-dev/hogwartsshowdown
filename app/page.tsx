@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import dynamic from "next/dynamic"
+import nextDynamic from "next/dynamic"
 import CommonRoom from "@/components/common-room"
 import { applyMatchElo, getSessionUserId, getUserById } from "@/lib/database"
 import type { DbUser } from "@/lib/database"
@@ -9,7 +9,9 @@ import { useMatchManager, type ExternalMatchState } from "@/hooks/useMatchManage
 import type { RoundAction } from "@/lib/duelActions"
 import type { PlayerBuild } from "@/lib/constants"
 
-const DuelArena = dynamic(() => import("@/components/duel-arena"), {
+export const dynamic = "force-dynamic"
+
+const DuelArena = nextDynamic(() => import("@/components/duel-arena"), {
   ssr: false,
   loading: () => <p>Carregando Arena...</p>,
 })
