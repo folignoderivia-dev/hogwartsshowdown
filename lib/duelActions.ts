@@ -13,6 +13,7 @@ export interface RoundSyncSnapshot {
 export interface RoundAction {
   casterId: string
   type: DuelActionType
+  eventId?: string
   spellName?: string
   targetId?: string
   areaAll?: boolean

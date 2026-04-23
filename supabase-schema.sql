@@ -35,6 +35,7 @@ create table if not exists public.matches (
   status text not null check (status in ('waiting', 'in_progress', 'finished')),
   players_expected int not null,
   players_joined int not null,
+  current_turn_owner text null,
   p1_id text null,
   p2_id text null,
   p3_id text null,
@@ -49,6 +50,7 @@ create table if not exists public.matches (
 alter table public.matches add column if not exists mode text;
 alter table public.matches alter column match_id set default gen_random_uuid()::text;
 alter table public.matches add column if not exists p1_id text;
+alter table public.matches add column if not exists current_turn_owner text;
 alter table public.matches add column if not exists p2_id text;
 alter table public.matches add column if not exists p3_id text;
 alter table public.matches add column if not exists p4_id text;
@@ -60,6 +62,7 @@ alter table public.matches drop constraint if exists matches_mode_check;
 alter table public.matches add constraint matches_mode_check check (mode in ('teste', '1v1', '2v2', 'ffa', 'ffa3'));
 alter table public.matches drop constraint if exists matches_status_check;
 alter table public.matches add constraint matches_status_check check (status in ('waiting', 'in_progress', 'finished'));
+update public.matches set current_turn_owner = coalesce(current_turn_owner, p1_id) where current_turn_owner is null;
 
 alter table public.matches enable row level security;
 
@@ -148,6 +151,7 @@ returns table (
   status text,
   players_expected int,
   players_joined int,
+  current_turn_owner text,
   p1_id text,
   p2_id text,
   p3_id text,
@@ -197,7 +201,7 @@ begin
     on conflict (match_id, player_id) do nothing;
 
     return query
-    select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined,
+    select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined, v_match.current_turn_owner,
            v_match.p1_id, v_match.p2_id, v_match.p3_id, v_match.p4_id,
            v_match.p1_name, v_match.p2_name, v_match.p3_name, v_match.p4_name;
     return;
@@ -240,6 +244,7 @@ begin
       update public.matches
       set players_joined = v_match.players_joined,
           status = v_match.status,
+          current_turn_owner = coalesce(v_match.current_turn_owner, v_match.p1_id),
           p2_id = v_match.p2_id,
           p3_id = v_match.p3_id,
           p4_id = v_match.p4_id,
@@ -255,7 +260,7 @@ begin
       on conflict (match_id, player_id) do nothing;
 
       return query
-      select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined,
+      select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined, v_match.current_turn_owner,
              v_match.p1_id, v_match.p2_id, v_match.p3_id, v_match.p4_id,
              v_match.p1_name, v_match.p2_name, v_match.p3_name, v_match.p4_name;
       return;
@@ -263,8 +268,8 @@ begin
   end if;
 
   -- Nenhuma waiting válida: cria nova sala.
-  insert into public.matches(mode, status, players_expected, players_joined, p1_id, p1_name, updated_at)
-  values (p_mode, 'waiting', v_expected, 1, p_player_id, p_player_name, now())
+  insert into public.matches(mode, status, players_expected, players_joined, current_turn_owner, p1_id, p1_name, updated_at)
+  values (p_mode, 'waiting', v_expected, 1, p_player_id, p_player_id, p_player_name, now())
   returning * into v_match;
 
   insert into public.match_players(match_id, player_id)
@@ -272,7 +277,7 @@ begin
   on conflict (match_id, player_id) do nothing;
 
   return query
-  select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined,
+  select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined, v_match.current_turn_owner,
          v_match.p1_id, v_match.p2_id, v_match.p3_id, v_match.p4_id,
          v_match.p1_name, v_match.p2_name, v_match.p3_name, v_match.p4_name;
 end;
@@ -291,6 +296,7 @@ returns table (
   status text,
   players_expected int,
   players_joined int,
+  current_turn_owner text,
   p1_id text,
   p2_id text,
   p3_id text,
@@ -327,7 +333,7 @@ begin
     on conflict (match_id, player_id) do nothing;
 
     return query
-    select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined,
+    select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined, v_match.current_turn_owner,
            v_match.p1_id, v_match.p2_id, v_match.p3_id, v_match.p4_id,
            v_match.p1_name, v_match.p2_name, v_match.p3_name, v_match.p4_name;
     return;
@@ -357,6 +363,7 @@ begin
   update public.matches
   set players_joined = v_match.players_joined,
       status = v_match.status,
+      current_turn_owner = coalesce(v_match.current_turn_owner, v_match.p1_id),
       p2_id = v_match.p2_id,
       p3_id = v_match.p3_id,
       p4_id = v_match.p4_id,
@@ -372,13 +379,68 @@ begin
   on conflict (match_id, player_id) do nothing;
 
   return query
-  select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined,
+  select v_match.match_id, v_match.mode, v_match.status, v_match.players_expected, v_match.players_joined, v_match.current_turn_owner,
          v_match.p1_id, v_match.p2_id, v_match.p3_id, v_match.p4_id,
          v_match.p1_name, v_match.p2_name, v_match.p3_name, v_match.p4_name;
 end;
 $$;
 
 grant execute on function public.join_specific_room(text, text, text) to authenticated;
+
+create or replace function public.advance_turn_owner(
+  p_match_id text,
+  p_expected_owner text,
+  p_next_owner text
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_match public.matches%rowtype;
+  v_updated public.matches%rowtype;
+begin
+  select * into v_match
+  from public.matches
+  where match_id = p_match_id
+  for update;
+
+  if not found then
+    raise exception 'Partida não encontrada';
+  end if;
+
+  if p_expected_owner is not null and v_match.current_turn_owner is distinct from p_expected_owner then
+    return v_match.current_turn_owner;
+  end if;
+
+  if p_next_owner is null or length(trim(p_next_owner)) = 0 then
+    raise exception 'Próximo dono do turno inválido';
+  end if;
+
+  if p_next_owner <> v_match.p1_id
+    and p_next_owner <> v_match.p2_id
+    and p_next_owner <> v_match.p3_id
+    and p_next_owner <> v_match.p4_id then
+    raise exception 'Próximo dono do turno não participa da partida';
+  end if;
+
+  update public.matches
+  set current_turn_owner = p_next_owner,
+      updated_at = now()
+  where match_id = p_match_id
+    and status in ('waiting', 'in_progress')
+  returning * into v_updated;
+
+  if not found then
+    return v_match.current_turn_owner;
+  end if;
+
+  return v_updated.current_turn_owner;
+end;
+$$;
+
+grant execute on function public.advance_turn_owner(text, text, text) to authenticated;
 
 create table if not exists public.match_ready_states (
   match_id text not null references public.matches(match_id) on delete cascade,

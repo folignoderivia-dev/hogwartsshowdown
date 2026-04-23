@@ -11,9 +11,11 @@ export interface ExternalMatchState {
   participantIds: string[]
   participantNames: string[]
   mode: PlayerBuild["gameMode"]
+  currentTurnOwner?: string
 }
 
 export interface ActionPayload {
+  eventId: string
   matchId: string
   playerId: string
   actionId: string
@@ -32,13 +34,16 @@ export function useMatchManager() {
   }, [])
 
   const buildActionPayload = useCallback((matchId: string, playerId: string, action: RoundAction): ActionPayload => {
+    const eventId = `${matchId}:${playerId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`
+    const normalizedAction: RoundAction = { ...action, eventId }
     return {
+      eventId,
       matchId,
       playerId,
-      actionId: action.spellName || action.type,
-      targetId: action.targetId,
+      actionId: normalizedAction.spellName || normalizedAction.type,
+      targetId: normalizedAction.targetId,
       timestamp: Date.now(),
-      action,
+      action: normalizedAction,
     }
   }, [])
 
@@ -70,6 +75,7 @@ export function useMatchManager() {
       participantIds: ids,
       participantNames: names,
       mode: row.mode,
+      currentTurnOwner: row.current_turn_owner || ids[0],
     }
   }, [])
 
@@ -94,7 +100,7 @@ export function useMatchManager() {
       const playersExpected = expectedPlayersByMode(mode)
       const { data: waitingRows } = await supabase
         .from("matches")
-        .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,updated_at")
+        .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner,updated_at")
         .eq("status", "waiting")
         .eq("mode", mode)
         .order("updated_at", { ascending: true })
@@ -110,6 +116,7 @@ export function useMatchManager() {
         const updatePayload: Record<string, any> = {
           players_joined: oldJoined + 1,
           status: oldJoined + 1 >= playersExpected ? "in_progress" : "waiting",
+          current_turn_owner: row.current_turn_owner || row.p1_id,
           updated_at: new Date().toISOString(),
         }
         if (!row.p2_id) {
@@ -130,7 +137,7 @@ export function useMatchManager() {
           .eq("match_id", row.match_id)
           .eq("status", "waiting")
           .eq("players_joined", oldJoined)
-          .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name")
+          .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner")
           .maybeSingle()
         if (updated) {
           await supabase.from("match_players").upsert({ match_id: updated.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
@@ -147,9 +154,10 @@ export function useMatchManager() {
           players_joined: 1,
           p1_id: playerId,
           p1_name: playerName,
+          current_turn_owner: playerId,
           updated_at: new Date().toISOString(),
         })
-        .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name")
+        .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner")
         .single()
       await supabase.from("match_players").upsert({ match_id: created.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
       return toExternalState(created)
@@ -168,9 +176,10 @@ export function useMatchManager() {
         players_joined: 1,
         p1_id: playerId,
         p1_name: playerName,
+        current_turn_owner: playerId,
         updated_at: new Date().toISOString(),
       })
-      .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name")
+      .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner")
       .single()
     if (error) throw error
     await supabase.from("match_players").upsert({ match_id: data.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
@@ -192,7 +201,7 @@ export function useMatchManager() {
     } catch {
       const { data: row } = await supabase
         .from("matches")
-        .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name")
+        .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner")
         .eq("match_id", matchId)
         .maybeSingle()
       if (!row) throw new Error("Sala não encontrada")
@@ -202,6 +211,7 @@ export function useMatchManager() {
       const payload: Record<string, any> = {
         players_joined: oldJoined + 1,
         status: oldJoined + 1 >= Number(row.players_expected || 0) ? "in_progress" : "waiting",
+        current_turn_owner: row.current_turn_owner || row.p1_id,
         updated_at: new Date().toISOString(),
       }
       if (!row.p2_id) {
@@ -222,7 +232,7 @@ export function useMatchManager() {
         .eq("match_id", matchId)
         .eq("status", "waiting")
         .eq("players_joined", oldJoined)
-        .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name")
+        .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner")
         .maybeSingle()
       if (!updated) throw new Error("Não foi possível entrar na sala")
       await supabase.from("match_players").upsert({ match_id: updated.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
@@ -234,7 +244,7 @@ export function useMatchManager() {
     const supabase = getSupabaseClient()
     let query = supabase
       .from("matches")
-      .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,updated_at")
+      .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner,updated_at")
       .eq("status", "waiting")
       .order("updated_at", { ascending: true })
       .limit(30)
@@ -247,7 +257,7 @@ export function useMatchManager() {
     const supabase = getSupabaseClient()
     const { data } = await supabase
       .from("matches")
-      .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,updated_at")
+      .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner,updated_at")
       .in("status", ["waiting", "in_progress"])
       .or(`p1_id.eq.${playerId},p2_id.eq.${playerId},p3_id.eq.${playerId},p4_id.eq.${playerId}`)
       .order("updated_at", { ascending: false })
@@ -270,6 +280,14 @@ export function useMatchManager() {
 
   const handleAction = useCallback((playerId: string, action: RoundAction, matchId?: string) => {
     const resolvedMatchId = matchId || externalMatchState?.matchId || "local-offline"
+    if (
+      externalMatchState &&
+      externalMatchState.currentTurnOwner &&
+      action.type !== "sync" &&
+      playerId !== externalMatchState.currentTurnOwner
+    ) {
+      return null
+    }
     const payload = buildActionPayload(resolvedMatchId, playerId, action)
     setQueuedPayloads((prev) => [...prev, payload])
     void (async () => {
@@ -278,7 +296,7 @@ export function useMatchManager() {
         await supabase.from("match_actions").insert({
           match_id: payload.matchId,
           player_id: payload.playerId,
-          action_id: payload.actionId,
+          action_id: payload.eventId,
           target_id: payload.targetId ?? null,
           timestamp_ms: payload.timestamp,
           payload,
@@ -288,11 +306,29 @@ export function useMatchManager() {
       }
     })()
     return payload
-  }, [buildActionPayload, externalMatchState?.matchId])
+  }, [buildActionPayload, externalMatchState, externalMatchState?.matchId])
 
   const applyExternalState = useCallback((next: ExternalMatchState) => {
     setExternalMatchState(next)
     // Fonte de verdade passa a ser o banco, então aqui só atualizamos estado local.
+  }, [])
+
+  const setCurrentTurnOwner = useCallback(async (matchId: string, nextOwnerId: string, expectedOwnerId?: string) => {
+    const supabase = getSupabaseClient()
+    const { error } = await supabase.rpc("advance_turn_owner", {
+      p_match_id: matchId,
+      p_expected_owner: expectedOwnerId || null,
+      p_next_owner: nextOwnerId,
+    })
+    if (error) {
+      let query = supabase
+        .from("matches")
+        .update({ current_turn_owner: nextOwnerId, updated_at: new Date().toISOString() })
+        .eq("match_id", matchId)
+        .in("status", ["waiting", "in_progress"])
+      if (expectedOwnerId) query = query.eq("current_turn_owner", expectedOwnerId)
+      await query
+    }
   }, [])
 
   const subscribeToMatch = useCallback(
@@ -325,6 +361,7 @@ export function useMatchManager() {
                 row.p4_id ? (row.p4_name || "Bruxo") : null,
               ].filter(Boolean) as string[],
               mode: row.mode,
+              currentTurnOwner: row.current_turn_owner || row.p1_id,
             })
           }
         )
@@ -358,6 +395,7 @@ export function useMatchManager() {
     fetchInProgressMatches,
     handleAction,
     applyExternalState,
+    setCurrentTurnOwner,
     subscribeToMatch,
   }
 }
