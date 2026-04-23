@@ -460,9 +460,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             )}
           </div>
         </header>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(240px,1fr)_minmax(0,2.5fr)_minmax(240px,1fr)] lg:items-start lg:gap-5">
+        <div className="mx-auto grid w-full max-w-[1120px] grid-cols-1 gap-3 lg:gap-4">
 
-        <Card className={`order-3 min-w-0 border-0 lg:order-none lg:col-start-3 lg:row-start-1 ${showSpectatePanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "w-9 bg-transparent shadow-none"}`}>
+        <Card className={`order-3 min-w-0 border-0 ${showSpectatePanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "mx-auto w-9 bg-transparent shadow-none"}`}>
           <CardHeader className={showSpectatePanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
             <CardTitle className={`flex items-center text-sm text-amber-200 ${showSpectatePanel ? "justify-between" : "justify-center"}`}>
               {showSpectatePanel ? <span>Duelos em Andamento</span> : <span className="sr-only">Duelos em Andamento</span>}
@@ -514,7 +514,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </CardContent>
           )}
         </Card>
-        <Card className="order-3 w-full min-w-0 medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:order-none lg:col-start-3 lg:row-start-2">
+        <Card className="order-3 w-full min-w-0 medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900">
           <CardHeader className="border-b border-amber-900/50 py-2">
             <CardTitle className="flex items-center justify-between text-sm text-amber-200">
               <span>Salas em Aberto</span>
@@ -634,7 +634,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </DialogContent>
         </Dialog>
 
-        <Card className={`order-3 min-w-0 border-0 lg:order-none lg:col-start-3 lg:row-start-3 ${showRankingPanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "w-9 bg-transparent shadow-none"}`}>
+        <Card className={`order-3 min-w-0 border-0 ${showRankingPanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "mx-auto w-9 bg-transparent shadow-none"}`}>
           <CardHeader className={showRankingPanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
             <CardTitle className={`flex items-center text-sm text-amber-200 ${showRankingPanel ? "justify-between" : "justify-center"}`}>
               {showRankingPanel ? (
@@ -673,7 +673,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </CardContent>}
         </Card>
         {currentUser && resumableMatch && onResumeMatch && (
-          <Card className="order-3 w-full min-w-0 medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:order-none lg:col-start-3 lg:row-start-4">
+          <Card className="order-3 w-full min-w-0 medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900">
             <CardContent className="flex items-center justify-between gap-3 pt-4">
               <p className="text-xs text-amber-100">
                 Você possui uma sala ativa: <span className="font-mono text-amber-300">{resumableMatch.matchId}</span> ({resumableMatch.mode} · {resumableMatch.status})
@@ -689,7 +689,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </Card>
         )}
 
-        <Card className={`order-2 min-w-0 border-0 md:col-span-2 lg:order-none lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:row-span-6 ${showFriendsPanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "w-9 bg-transparent shadow-none"}`}>
+        <Card className={`order-2 min-w-0 border-0 ${showFriendsPanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "mx-auto w-9 bg-transparent shadow-none"}`}>
           <CardHeader className={showFriendsPanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
             <CardTitle className={`flex items-center text-sm text-amber-200 ${showFriendsPanel ? "justify-between" : "justify-center"}`}>
               {showFriendsPanel ? <span>Modo Amigos</span> : <span className="sr-only">Modo Amigos</span>}
@@ -812,7 +812,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </CardContent>}
         </Card>
 
-        <div className="order-1 grid min-w-0 gap-3 sm:gap-4 md:col-span-2 md:grid-cols-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:col-span-1 lg:grid-cols-3">
+        <div className="order-1 grid min-w-0 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
           {/* Avatar & Name */}
           <Card className="medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:col-span-1">
             <CardHeader className="border-b border-amber-900/50">
@@ -1121,7 +1121,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         </div>
 
         {/* Game Mode & Start Duel Button */}
-        <div className="order-1 mt-2 flex flex-col items-center gap-3 md:col-span-2 lg:order-none lg:col-start-2 lg:row-start-2 lg:col-span-1">
+        <div className="order-1 mt-2 flex flex-col items-center gap-3">
           {/* Game Mode Selector */}
           <div className="medieval-frame flex w-full max-w-full flex-col items-stretch gap-2 rounded-lg bg-stone-800/90 px-3 py-2.5 sm:px-4 lg:px-5">
             <Swords className="h-5 w-5 text-amber-400" />
