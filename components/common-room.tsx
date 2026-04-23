@@ -117,6 +117,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [showSpectatePanel, setShowSpectatePanel] = useState(false)
   const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
+  const [showRankingPanel, setShowRankingPanel] = useState(true)
   const [shareFeedback, setShareFeedback] = useState("")
 
   const [name, setName] = useState("")
@@ -461,12 +462,18 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         </header>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(240px,1fr)_minmax(0,2.5fr)_minmax(240px,1fr)] lg:items-start lg:gap-5">
 
-        <Card className="order-3 w-full min-w-0 medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:order-none lg:col-start-3 lg:row-start-1">
-          <CardHeader className="border-b border-amber-900/50 py-2">
-            <CardTitle className="flex items-center justify-between text-sm text-amber-200">
-              <span>Duelos em Andamento</span>
-              <Button size="sm" variant="outline" className="h-7 border-amber-700 text-amber-300" onClick={() => setShowSpectatePanel((v) => !v)}>
-                {showSpectatePanel ? "Ocultar" : "Mostrar"}
+        <Card className={`order-3 min-w-0 border-0 lg:order-none lg:col-start-3 lg:row-start-1 ${showSpectatePanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "w-9 bg-transparent shadow-none"}`}>
+          <CardHeader className={showSpectatePanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
+            <CardTitle className={`flex items-center text-sm text-amber-200 ${showSpectatePanel ? "justify-between" : "justify-center"}`}>
+              {showSpectatePanel ? <span>Duelos em Andamento</span> : <span className="sr-only">Duelos em Andamento</span>}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 w-7 border-amber-700 p-0 text-base font-bold leading-none text-amber-300"
+                onClick={() => setShowSpectatePanel((v) => !v)}
+                aria-label={showSpectatePanel ? "Recolher duelos em andamento" : "Expandir duelos em andamento"}
+              >
+                {showSpectatePanel ? "-" : "+"}
               </Button>
             </CardTitle>
           </CardHeader>
@@ -627,14 +634,29 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </DialogContent>
         </Dialog>
 
-        <Card className="order-3 w-full min-w-0 medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:order-none lg:col-start-3 lg:row-start-3">
-          <CardHeader className="border-b border-amber-900/50 py-2">
-            <CardTitle className="flex items-center gap-2 text-sm text-amber-200">
-              <Trophy className="h-4 w-4 text-amber-400" />
-              Ranking global (Top 50)
+        <Card className={`order-3 min-w-0 border-0 lg:order-none lg:col-start-3 lg:row-start-3 ${showRankingPanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "w-9 bg-transparent shadow-none"}`}>
+          <CardHeader className={showRankingPanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
+            <CardTitle className={`flex items-center text-sm text-amber-200 ${showRankingPanel ? "justify-between" : "justify-center"}`}>
+              {showRankingPanel ? (
+                <span className="flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-amber-400" />
+                  Ranking global (Top 50)
+                </span>
+              ) : (
+                <span className="sr-only">Ranking global</span>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 w-7 border-amber-700 p-0 text-base font-bold leading-none text-amber-300"
+                onClick={() => setShowRankingPanel((v) => !v)}
+                aria-label={showRankingPanel ? "Recolher ranking global" : "Expandir ranking global"}
+              >
+                {showRankingPanel ? "-" : "+"}
+              </Button>
             </CardTitle>
           </CardHeader>
-          <CardContent className="max-h-72 overflow-y-auto pt-2">
+          {showRankingPanel && <CardContent className="max-h-72 overflow-y-auto pt-2">
             <ol className="space-y-1 text-xs">
               {ranking.map((u, i) => (
                 <li
@@ -648,7 +670,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 </li>
               ))}
             </ol>
-          </CardContent>
+          </CardContent>}
         </Card>
         {currentUser && resumableMatch && onResumeMatch && (
           <Card className="order-3 w-full min-w-0 medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:order-none lg:col-start-3 lg:row-start-4">
@@ -667,12 +689,18 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </Card>
         )}
 
-        <Card className="order-2 w-full min-w-0 medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900 md:col-span-2 lg:order-none lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:row-span-6">
-          <CardHeader className="border-b border-amber-900/50 py-2">
-            <CardTitle className="flex items-center justify-between text-sm text-amber-200">
-              <span>Modo Amigos</span>
-              <Button size="sm" variant="outline" className="h-7 border-amber-700 text-amber-300" onClick={() => setShowFriendsPanel((v) => !v)}>
-                {showFriendsPanel ? "Ocultar" : "Mostrar"}
+        <Card className={`order-2 min-w-0 border-0 md:col-span-2 lg:order-none lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:row-span-6 ${showFriendsPanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "w-9 bg-transparent shadow-none"}`}>
+          <CardHeader className={showFriendsPanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
+            <CardTitle className={`flex items-center text-sm text-amber-200 ${showFriendsPanel ? "justify-between" : "justify-center"}`}>
+              {showFriendsPanel ? <span>Modo Amigos</span> : <span className="sr-only">Modo Amigos</span>}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 w-7 border-amber-700 p-0 text-base font-bold leading-none text-amber-300"
+                onClick={() => setShowFriendsPanel((v) => !v)}
+                aria-label={showFriendsPanel ? "Recolher modo amigos" : "Expandir modo amigos"}
+              >
+                {showFriendsPanel ? "-" : "+"}
               </Button>
             </CardTitle>
           </CardHeader>
