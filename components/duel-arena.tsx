@@ -6,8 +6,8 @@ import type { PlayerBuild } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { SpellInfo } from "@/components/common-room"
-import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, WAND_PASSIVES } from "@/components/common-room"
+import type { ArenaVfxState, BattleStatus, Duelist, Point } from "@/lib/arena-types"
+import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, type SpellInfo, WAND_PASSIVES } from "@/lib/game-data"
 import { useArenaMatchSync } from "@/hooks/useArenaMatchSync"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
@@ -30,111 +30,8 @@ interface DuelArenaProps {
   participantIds?: string[]
   participantNames?: string[]
   localNetworkId?: string
-  currentTurnOwner?: string
   matchStatus?: "waiting" | "in_progress" | "finished"
 }
-
-type DebuffType =
-  | "burn"
-  | "stun"
-  | "freeze"
-  | "taunt"
-  | "disarm"
-  | "protego"
-  | "slow"
-  | "mark"
-  | "confusion"
-  | "poison"
-  | "paralysis"
-  | "provoke"
-  | "no_potion"
-  | "silence_defense"
-  | "damage_amp"
-  | "arestum_penalty"
-  | "lumus_acc_down"
-  | "spell_disable"
-  | "salvio_reflect"
-  | "anti_debuff"
-  | "crit_boost"
-  | "unforgivable_acc_down"
-  | "protego_maximo"
-type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
-
-interface Debuff {
-  type: DebuffType
-  duration: number
-  /** ex.: id do provocador para Provoke */
-  meta?: string
-}
-interface HPState {
-  bars: number[]
-}
-interface Duelist {
-  id: string
-  name: string
-  house: string
-  wand: string
-  avatar?: string
-  spells: string[]
-  hp: HPState
-  speed: number
-  debuffs: Debuff[]
-  isPlayer?: boolean
-  team: "player" | "enemy"
-  /** Mana por feitiço (todos os duelistas). */
-  spellMana?: Record<string, { current: number; max: number }>
-  lastSpellUsed?: string
-  lastRoundSpellWasProtego?: boolean
-  lastRoundSpellWasLumus?: boolean
-  arrestoStacks?: number
-  cruciusWeakness?: boolean
-  wandPassiveStripped?: boolean
-  circumAura?: number
-  maximosChargePct?: number
-  nextAccBonusPct?: number
-  nextDamagePotionMult?: number
-  destinyBond?: boolean
-  disabledSpells?: Record<string, number>
-  /** Suaviza RNG: sequência de erros aumenta chance no próximo cast. */
-  missStreakBySpell?: Record<string, number>
-  /** Turnos de batalha completos (para passivas acumulativas). */
-  turnsInBattle?: number
-}
-type Point = { x: number; y: number }
-
-/** VFX exibido na arena durante ~1s após a narração central. */
-type ArenaVfxState =
-  | null
-  | {
-      key: number
-      mode:
-        | "beam"
-        | "beam-thin"
-        | "beam-thick"
-        | "beam-huge"
-        | "beam-pulse"
-        | "fireball"
-        | "shockwave"
-        | "x"
-        | "explosion"
-        | "mist"
-        | "lightning"
-        | "shield"
-        | "heal-rise"
-        | "flames-hud"
-        | "marker-bang"
-        | "marker-question"
-      from?: Point
-      to?: Point
-      center?: Point
-      color: string
-      color2?: string
-      casterId?: string
-      targetIds?: string[]
-      lightningBolts?: { x1: number; y1: number; x2: number; y2: number }[]
-      xSize?: "sm" | "md" | "lg"
-      active: boolean
-    }
 
 const HAND_BOTTOM = "https://i.postimg.cc/hPdCk474/varinhaposicao03.png"
 const HAND_TOP = "https://i.postimg.cc/3JvLsrD8/varinhaposicao02.png"
@@ -391,7 +288,7 @@ function Heart({ fillPercent }: { fillPercent: number }) {
 }
 
 const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena(
-  { playerBuild, onReturn, onBattleEnd, matchId, onDispatchAction, isSpectator = false, participantIds = [], participantNames = [], localNetworkId, currentTurnOwner, matchStatus },
+  { playerBuild, onReturn, onBattleEnd, matchId, onDispatchAction, isSpectator = false, participantIds = [], participantNames = [], localNetworkId, matchStatus },
   ref
 ) {
   if (typeof window === "undefined") return null
@@ -574,6 +471,9 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const processCombatAction = useCallback((actionPayload: RoundAction) => {
     setActions((prev) => ({ ...prev, [actionPayload.casterId]: actionPayload }))
   }, [])
+  const addLog = useCallback((line: string) => {
+    setBattleLog((prev) => [...prev, line])
+  }, [])
 
   useImperativeHandle(ref, () => ({
     submitRemoteAction: (casterId: string, action: RoundAction) => {
@@ -630,7 +530,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       if (normalized.casterId === selfDuelistId) setAwaitingServerAck(false)
       processCombatAction(normalized)
     },
-  }), [currentTurnOwner, matchId, matchStatus, participantIds, playerBuild.gameMode, processCombatAction, selfDuelistId])
+  }), [addLog, matchId, matchStatus, onBattleEnd, participantIds, playerBuild.gameMode, playerBuild.userId, processCombatAction, selfDuelistId])
   const arenaRef = useRef<HTMLDivElement | null>(null)
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
@@ -664,8 +564,6 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const isInProgress = !isOnlineMatch || matchStatus === "in_progress"
   const onlineReadyPlayers = Math.max(duelists.length, participantIds.length || 0)
   const participantRoster = participantIds.length > 0 ? participantIds : duelists.map((d) => d.id)
-
-  const addLog = (line: string) => setBattleLog((prev) => [...prev, line])
 
   const playSpellVfx = async (spellName: string, attacker: Duelist, targets: Duelist[]) => {
     const arena = arenaRef.current
@@ -1793,7 +1691,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [actions, awaitingServerAck, battleStatus, currentTurnOwner, duelists, gameOver, isOnlineMatch, matchId, onDispatchAction, player?.name, playerDefeated, selfDuelistId, turnNumber])
+  }, [actions, awaitingServerAck, battleStatus, duelists, gameOver, isOnlineMatch, matchId, onDispatchAction, player?.name, playerDefeated, selfDuelistId, turnNumber])
 
   useEffect(() => {
     if (battleStatus !== "selecting") return
