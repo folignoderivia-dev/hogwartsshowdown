@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import dynamic from "next/dynamic"
 import CommonRoom from "@/components/common-room"
-import type { DuelArenaHandle } from "@/components/duel-arena"
 import { applyMatchElo, getSessionUserId, getUserById } from "@/lib/database"
 import type { DbUser } from "@/lib/database"
 import { useMatchManager, type ExternalMatchState } from "@/hooks/useMatchManager"
@@ -11,6 +10,10 @@ import type { RoundAction } from "@/lib/duelActions"
 import type { PlayerBuild } from "@/lib/types"
 
 const DuelArena = dynamic(() => import("@/components/duel-arena"), { ssr: false })
+
+interface DuelArenaHandle {
+  submitRemoteAction: (casterId: string, action: RoundAction) => void
+}
 
 export default function Home() {
   const [screen, setScreen] = useState<"setup" | "battle">("setup")
