@@ -1,7 +1,4 @@
-/**
- * Camada de persistência mock para usuários e ELO.
- * Migrar para Supabase: substituir funções por chamadas `createClient()` + tabelas `profiles`, `rankings`.
- */
+import { getSupabaseClient } from "@/lib/supabase"
 
 export const ELO_START = 500
 export const ELO_WIN = 15
@@ -10,121 +7,144 @@ export const ELO_LOSS = 25
 export interface DbUser {
   id: string
   email: string
-  passwordHash: string
   username: string
   elo: number
-  createdAt: string
+  createdAt?: string
 }
 
-const STORAGE_KEY = "hp-duel-mock-db-v1"
+interface ProfileRow {
+  id: string
+  username: string
+  elo: number | null
+  created_at?: string | null
+}
 
-function loadStore(): { users: DbUser[] } {
-  if (typeof window === "undefined") return { users: [...seedUsers] }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { users: [...seedUsers] }
-    const parsed = JSON.parse(raw) as { users: DbUser[] }
-    if (!parsed?.users?.length) return { users: [...seedUsers] }
-    return parsed
-  } catch {
-    return { users: [...seedUsers] }
+function mapProfile(profile: ProfileRow, email: string): DbUser {
+  return {
+    id: profile.id,
+    email,
+    username: profile.username,
+    elo: profile.elo ?? ELO_START,
+    createdAt: profile.created_at ?? undefined,
   }
 }
 
-function saveStore(data: { users: DbUser[] }) {
-  if (typeof window === "undefined") return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+async function getProfileById(id: string): Promise<ProfileRow | null> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase.from("profiles").select("id,username,elo,created_at").eq("id", id).maybeSingle()
+  if (error) return null
+  return data as ProfileRow | null
 }
 
-function hashPw(pw: string): string {
-  let h = 0
-  for (let i = 0; i < pw.length; i++) h = (Math.imul(31, h) + pw.charCodeAt(i)) | 0
-  return `mock:${h}:${pw.length}`
+export async function getRankingTop(limit = 50): Promise<DbUser[]> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,username,elo,created_at")
+    .order("elo", { ascending: false })
+    .limit(limit)
+  if (error || !data) return []
+  return (data as ProfileRow[]).map((p) => ({
+    id: p.id,
+    email: "",
+    username: p.username,
+    elo: p.elo ?? ELO_START,
+    createdAt: p.created_at ?? undefined,
+  }))
 }
 
-const seedUsers: DbUser[] = [
-  {
-    id: "seed-1",
-    email: "demo@hogwarts.test",
-    passwordHash: hashPw("demo123"),
-    username: "BruxoDemo",
-    elo: 520,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "seed-2",
-    email: "rival@hogwarts.test",
-    passwordHash: hashPw("rival123"),
-    username: "RivalCorvinal",
-    elo: 495,
-    createdAt: new Date().toISOString(),
-  },
-]
-
-export function listUsers(): DbUser[] {
-  return loadStore().users
-}
-
-export function getRankingTop(limit = 50): DbUser[] {
-  return [...listUsers()].sort((a, b) => b.elo - a.elo).slice(0, limit)
-}
-
-export function registerUser(email: string, password: string, username: string): { ok: true; user: DbUser } | { ok: false; error: string } {
-  const store = loadStore()
+export async function registerUser(
+  email: string,
+  password: string,
+  username: string
+): Promise<{ ok: true; user: DbUser } | { ok: false; error: string }> {
   const e = email.trim().toLowerCase()
   const u = username.trim()
   if (!e || !password || !u) return { ok: false, error: "Preencha e-mail, senha e nome de usuário." }
-  if (store.users.some((x) => x.email === e)) return { ok: false, error: "E-mail já cadastrado." }
-  if (store.users.some((x) => x.username.toLowerCase() === u.toLowerCase())) return { ok: false, error: "Nome de usuário já em uso." }
-  const user: DbUser = {
-    id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    email: e,
-    passwordHash: hashPw(password),
-    username: u,
-    elo: ELO_START,
-    createdAt: new Date().toISOString(),
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase.auth.signUp({ email: e, password })
+  if (error || !data.user) return { ok: false, error: error?.message || "Falha no registro." }
+
+  const userId = data.user.id
+  const { error: profileErr } = await supabase
+    .from("profiles")
+    .upsert({ id: userId, username: u, elo: ELO_START }, { onConflict: "id" })
+  if (profileErr) return { ok: false, error: profileErr.message }
+
+  return {
+    ok: true,
+    user: {
+      id: userId,
+      email: e,
+      username: u,
+      elo: ELO_START,
+      createdAt: new Date().toISOString(),
+    },
   }
-  store.users.push(user)
-  saveStore(store)
-  return { ok: true, user }
 }
 
-export function loginUser(email: string, password: string): { ok: true; user: DbUser } | { ok: false; error: string } {
-  const store = loadStore()
+export async function loginUser(
+  email: string,
+  password: string
+): Promise<{ ok: true; user: DbUser } | { ok: false; error: string }> {
   const e = email.trim().toLowerCase()
-  const u = store.users.find((x) => x.email === e)
-  if (!u || u.passwordHash !== hashPw(password)) return { ok: false, error: "E-mail ou senha inválidos." }
-  return { ok: true, user: u }
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase.auth.signInWithPassword({ email: e, password })
+  if (error || !data.user) return { ok: false, error: "E-mail ou senha inválidos." }
+
+  const profile = await getProfileById(data.user.id)
+  if (!profile) {
+    const fallbackUsername = e.split("@")[0] || "Bruxo"
+    const { error: profileErr } = await supabase
+      .from("profiles")
+      .upsert({ id: data.user.id, username: fallbackUsername, elo: ELO_START }, { onConflict: "id" })
+    if (profileErr) return { ok: false, error: profileErr.message }
+    return {
+      ok: true,
+      user: { id: data.user.id, email: e, username: fallbackUsername, elo: ELO_START, createdAt: new Date().toISOString() },
+    }
+  }
+
+  return { ok: true, user: mapProfile(profile, e) }
 }
 
-export function updateUserElo(userId: string, delta: number): DbUser | null {
-  const store = loadStore()
-  const idx = store.users.findIndex((x) => x.id === userId)
-  if (idx < 0) return null
-  const next = { ...store.users[idx], elo: Math.max(0, store.users[idx].elo + delta) }
-  store.users[idx] = next
-  saveStore(store)
-  return next
+export async function signOutUser(): Promise<void> {
+  const supabase = getSupabaseClient()
+  await supabase.auth.signOut()
 }
 
-export function applyMatchElo(userId: string, outcome: "win" | "lose"): DbUser | null {
+export async function updateUserElo(userId: string, delta: number): Promise<DbUser | null> {
+  const supabase = getSupabaseClient()
+  const profile = await getProfileById(userId)
+  if (!profile) return null
+  const nextElo = Math.max(0, (profile.elo ?? ELO_START) + delta)
+  const { error } = await supabase.from("profiles").update({ elo: nextElo }).eq("id", userId)
+  if (error) return null
+  const session = await supabase.auth.getSession()
+  const email = session.data.session?.user?.email || ""
+  return { id: userId, email, username: profile.username, elo: nextElo, createdAt: profile.created_at ?? undefined }
+}
+
+export async function applyMatchElo(userId: string, outcome: "win" | "lose"): Promise<DbUser | null> {
   const delta = outcome === "win" ? ELO_WIN : -ELO_LOSS
   return updateUserElo(userId, delta)
 }
 
-const SESSION_KEY = "hp-duel-session-user-id"
-
-export function setSessionUserId(userId: string | null) {
-  if (typeof window === "undefined") return
-  if (userId) localStorage.setItem(SESSION_KEY, userId)
-  else localStorage.removeItem(SESSION_KEY)
+export async function setSessionUserId(_userId: string | null): Promise<void> {
+  // Compatibilidade com chamadas antigas: sessão agora é gerenciada pelo Supabase Auth.
 }
 
-export function getSessionUserId(): string | null {
-  if (typeof window === "undefined") return null
-  return localStorage.getItem(SESSION_KEY)
+export async function getSessionUserId(): Promise<string | null> {
+  const supabase = getSupabaseClient()
+  const { data } = await supabase.auth.getSession()
+  return data.session?.user?.id ?? null
 }
 
-export function getUserById(id: string): DbUser | undefined {
-  return loadStore().users.find((u) => u.id === id)
+export async function getUserById(id: string): Promise<DbUser | undefined> {
+  const supabase = getSupabaseClient()
+  const profile = await getProfileById(id)
+  if (!profile) return undefined
+  const session = await supabase.auth.getSession()
+  const email = session.data.session?.user?.id === id ? session.data.session.user.email || "" : ""
+  return mapProfile(profile, email)
 }

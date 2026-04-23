@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge"
 import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug } from "lucide-react"
 import type { PlayerBuild } from "@/app/page"
 import type { DbUser } from "@/lib/database"
-import { getRankingTop, loginUser, registerUser, setSessionUserId } from "@/lib/database"
+import { getRankingTop, loginUser, registerUser, signOutUser } from "@/lib/database"
 
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
@@ -213,7 +213,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     pp: 5,
     cost: 1,
     special: "salvio_reflect",
-    effect: "Self: reflete 50% do dano recebido por 1 turno.",
+    effect: "Self: reflete 100% do dano recebido por 1 turno.",
   },
   {
     name: "Sectumsempra",
@@ -271,7 +271,7 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
   const [authPassword, setAuthPassword] = useState("")
   const [authUsername, setAuthUsername] = useState("")
   const [authError, setAuthError] = useState("")
-  const [ranking, setRanking] = useState<ReturnType<typeof getRankingTop>>([])
+  const [ranking, setRanking] = useState<DbUser[]>([])
 
   const [name, setName] = useState("")
   const [house, setHouse] = useState("")
@@ -331,35 +331,36 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
     gameMode !== "" &&
     totalCost === MAX_SPELL_POINTS
 
-  const refreshRanking = () => setRanking(getRankingTop(50))
+  const refreshRanking = async () => {
+    const list = await getRankingTop(50)
+    setRanking(list)
+  }
 
   useEffect(() => {
-    refreshRanking()
+    void refreshRanking()
   }, [currentUser])
 
-  const handleAuthSubmit = (e: FormEvent) => {
+  const handleAuthSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setAuthError("")
     if (authMode === "register") {
-      const r = registerUser(authEmail, authPassword, authUsername)
+      const r = await registerUser(authEmail, authPassword, authUsername)
       if (!r.ok) {
         setAuthError(r.error)
         return
       }
-      setSessionUserId(r.user.id)
       onAuthChange(r.user)
-      refreshRanking()
+      await refreshRanking()
       setAuthOpen(false)
       return
     }
-    const r = loginUser(authEmail, authPassword)
+    const r = await loginUser(authEmail, authPassword)
     if (!r.ok) {
       setAuthError(r.error)
       return
     }
-    setSessionUserId(r.user.id)
     onAuthChange(r.user)
-    refreshRanking()
+    await refreshRanking()
     setAuthOpen(false)
   }
 
@@ -407,7 +408,7 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
                   size="sm"
                   className="border-amber-700 text-amber-200"
                   onClick={() => {
-                    setSessionUserId(null)
+                    void signOutUser()
                     onAuthChange(null)
                   }}
                 >

@@ -6,6 +6,7 @@ import DuelArena, { type DuelArenaHandle } from "@/components/duel-arena"
 import { applyMatchElo, getSessionUserId, getUserById } from "@/lib/database"
 import type { DbUser } from "@/lib/database"
 import { useMatchManager } from "@/hooks/useMatchManager"
+import type { RoundAction } from "@/lib/duelActions"
 
 export interface PlayerBuild {
   name: string
@@ -23,52 +24,92 @@ export interface PlayerBuild {
 export default function Home() {
   const [screen, setScreen] = useState<"setup" | "battle">("setup")
   const [matchPending, setMatchPending] = useState(false)
+  const [activeMatchId, setActiveMatchId] = useState<string | null>(null)
   const [playerBuild, setPlayerBuild] = useState<PlayerBuild | null>(null)
   const [accountUser, setAccountUser] = useState<DbUser | null>(null)
   /** Ex.: `duelArenaRef.current?.submitRemoteAction(id, createCastAction(...))` quando o WebSocket estiver ativo. */
   const duelArenaRef = useRef<DuelArenaHandle>(null)
-  const { isOnlineMode, applyExternalState, externalMatchState } = useMatchManager()
+  const unsubscribeMatchRef = useRef<null | (() => void)>(null)
+  const { isOnlineMode, applyExternalState, externalMatchState, createOrJoinMatch, subscribeToMatch, handleAction } = useMatchManager()
 
   useEffect(() => {
-    const id = getSessionUserId()
-    if (id) {
-      const u = getUserById(id)
-      if (u) setAccountUser(u)
-    }
+    void (async () => {
+      const id = await getSessionUserId()
+      if (id) {
+        const u = await getUserById(id)
+        if (u) setAccountUser(u)
+      }
+    })()
   }, [])
 
   const handleStartDuel = (build: PlayerBuild) => {
     if (!build.userId) return
     setPlayerBuild(build)
-    if (!isOnlineMode(build)) {
-      setMatchPending(false)
-      setScreen("battle")
-      return
-    }
-    applyExternalState({
-      matchId: `local-${Date.now()}`,
-      status: "pending",
-      playersExpected: build.gameMode === "2v2" ? 4 : build.gameMode === "ffa" ? 4 : 2,
-      playersJoined: 1,
-    })
-    setMatchPending(true)
+    void (async () => {
+      if (!isOnlineMode(build)) {
+        setActiveMatchId(null)
+        setMatchPending(false)
+        setScreen("battle")
+        return
+      }
+
+      const joined = await createOrJoinMatch(build.gameMode, build.userId!)
+      setActiveMatchId(joined.matchId)
+      applyExternalState(joined)
+      setMatchPending(joined.status !== "running")
+      setScreen(joined.status === "running" ? "battle" : "setup")
+
+      unsubscribeMatchRef.current?.()
+      unsubscribeMatchRef.current = subscribeToMatch(joined.matchId, {
+        onState: (st) => {
+          applyExternalState(st)
+          if (st.status === "running" && st.playersJoined >= st.playersExpected) {
+            setMatchPending(false)
+            setScreen("battle")
+          }
+        },
+        onAction: (payload) => {
+          if (!build.userId || payload.playerId === build.userId) return
+          duelArenaRef.current?.submitRemoteAction(payload.playerId, payload.action)
+        },
+      })
+    })()
   }
 
   const handleReturnToCommonRoom = () => {
     setScreen("setup")
     setMatchPending(false)
-    const id = getSessionUserId()
-    if (id) {
-      const u = getUserById(id)
-      if (u) setAccountUser(u)
-    }
+    setActiveMatchId(null)
+    unsubscribeMatchRef.current?.()
+    unsubscribeMatchRef.current = null
+    void (async () => {
+      const id = await getSessionUserId()
+      if (id) {
+        const u = await getUserById(id)
+        if (u) setAccountUser(u)
+      }
+    })()
   }
 
   const handleBattleEnd = (outcome: "win" | "lose", userId?: string) => {
     if (!userId) return
-    applyMatchElo(userId, outcome)
-    const u = getUserById(userId)
-    if (u) setAccountUser(u)
+    void (async () => {
+      await applyMatchElo(userId, outcome)
+      const u = await getUserById(userId)
+      if (u) setAccountUser(u)
+    })()
+  }
+
+  useEffect(() => {
+    return () => {
+      unsubscribeMatchRef.current?.()
+      unsubscribeMatchRef.current = null
+    }
+  }, [])
+
+  const dispatchActionToSupabase = (_playerId: string, action: RoundAction, matchId?: string) => {
+    if (!playerBuild || !playerBuild.userId || playerBuild.gameMode === "teste") return
+    handleAction(playerBuild.userId, action, matchId || activeMatchId || undefined)
   }
 
   return (
@@ -85,6 +126,8 @@ export default function Home() {
           playerBuild={playerBuild!}
           onReturn={handleReturnToCommonRoom}
           onBattleEnd={handleBattleEnd}
+          matchId={activeMatchId || undefined}
+          onDispatchAction={dispatchActionToSupabase}
         />
       )}
       {matchPending && (

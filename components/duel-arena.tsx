@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import type { SpellInfo } from "@/components/common-room"
 import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, WAND_PASSIVES } from "@/components/common-room"
 import type { RoundAction } from "@/lib/duelActions"
-import { useMatchManager } from "@/hooks/useMatchManager"
 
 export type { RoundAction } from "@/lib/duelActions"
 
@@ -23,6 +22,8 @@ interface DuelArenaProps {
   onReturn: () => void
   /** Chamado ao encerrar duelo para atualizar ELO (modo online / conta). */
   onBattleEnd?: (outcome: "win" | "lose", userId?: string) => void
+  matchId?: string
+  onDispatchAction?: (playerId: string, action: RoundAction, matchId?: string) => void
 }
 
 type DebuffType =
@@ -368,8 +369,7 @@ function Heart({ fillPercent }: { fillPercent: number }) {
   )
 }
 
-const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena({ playerBuild, onReturn, onBattleEnd }, ref) {
-  const { handleAction, applyExternalState } = useMatchManager()
+const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena({ playerBuild, onReturn, onBattleEnd, matchId, onDispatchAction }, ref) {
   const [duelists, setDuelists] = useState<Duelist[]>(() => {
     const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
     const enemySpells = ["Bombarda", "Incendio", "Glacius", "Confrigo", "Expelliarmus", "Protego"]
@@ -448,7 +448,6 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
   useImperativeHandle(ref, () => ({
     submitRemoteAction: (casterId: string, action: RoundAction) => {
-      applyExternalState({ matchId: "external", status: "running", playersExpected: 2, playersJoined: 2 })
       setActions((prev) => ({ ...prev, [casterId]: action }))
     },
   }))
@@ -1461,7 +1460,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
     const commitCast = (targetId: string, areaAll?: boolean) => {
       const action: RoundAction = { casterId: "player", type: "cast", spellName, targetId, areaAll }
-      handleAction("player", action)
+      onDispatchAction?.("player", action, matchId)
       setActions((prev) => ({ ...prev, player: action }))
     }
 
@@ -1497,7 +1496,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     const prov = player.debuffs.find((d) => d.type === "provoke")
     if (prov?.meta && targetId !== prov.meta) return
     const action: RoundAction = { casterId: "player", type: "cast", spellName: pendingSpell, targetId }
-    handleAction("player", action)
+    onDispatchAction?.("player", action, matchId)
     setActions((prev) => ({ ...prev, player: action }))
     setPendingSpell(null)
   }
@@ -1507,7 +1506,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     if (player.debuffs.some((d) => d.type === "no_potion")) return
     setPotionUsed(true)
     const action: RoundAction = { casterId: "player", type: "potion", potionType: playerBuild.potion }
-    handleAction("player", action)
+    onDispatchAction?.("player", action, matchId)
     setActions((prev) => ({ ...prev, player: action }))
   }
 
@@ -1606,23 +1605,6 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
   const topDuelists = useMemo(() => duelists.filter((d) => d.team === "enemy"), [duelists])
   const bottomDuelists = useMemo(() => duelists.filter((d) => d.team === "player"), [duelists])
-
-  if (["1v1", "2v2", "ffa"].includes(playerBuild.gameMode)) {
-    return (
-      <div className="min-h-screen bg-stone-900 p-6 text-amber-100">
-        <div className="mx-auto mt-24 max-w-lg rounded-xl border border-amber-700 bg-stone-950/90 p-8 text-center">
-          <h2 className="text-2xl font-bold text-amber-300">Aguardando Oponentes...</h2>
-          <p className="mt-3 text-sm text-amber-100/80">
-            Este modo é online. O combate será inicializado apenas quando a sala estiver completa.
-          </p>
-          <Button onClick={onReturn} className="mt-5 border border-amber-700 bg-amber-900/30 text-amber-100 hover:bg-amber-900/45">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar
-          </Button>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-stone-800 font-serif text-amber-100">
