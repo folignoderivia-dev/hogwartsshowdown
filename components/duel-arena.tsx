@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import type { SpellInfo } from "@/components/common-room"
 import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, WAND_PASSIVES } from "@/components/common-room"
 import type { RoundAction } from "@/lib/duelActions"
+import { getSupabaseClient } from "@/lib/supabase"
 
 export type { RoundAction } from "@/lib/duelActions"
 
@@ -24,6 +25,8 @@ interface DuelArenaProps {
   onBattleEnd?: (outcome: "win" | "lose", userId?: string) => void
   matchId?: string
   onDispatchAction?: (playerId: string, action: RoundAction, matchId?: string) => void
+  isSpectator?: boolean
+  participantIds?: string[]
 }
 
 type DebuffType =
@@ -47,6 +50,7 @@ type DebuffType =
   | "spell_disable"
   | "salvio_reflect"
   | "anti_debuff"
+  | "crit_boost"
 type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 
 interface Debuff {
@@ -184,6 +188,7 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   spell_disable: "🔒 DISABLE",
   salvio_reflect: "🪞 REFLECT",
   anti_debuff: "✨ ANTI-DEBUFF",
+  crit_boost: "🎯 CRIT+",
 }
 /** Mensagem flutuante curta ao aplicar debuff do grimório. */
 const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
@@ -205,6 +210,7 @@ const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
   spell_disable: "DESABILITOU!",
   salvio_reflect: "REFLEXO!",
   anti_debuff: "IMUNIZOU!",
+  crit_boost: "CRÍTICO+!",
 }
 const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
 
@@ -242,6 +248,7 @@ function getCritChance(attacker: Duelist, defender?: Duelist, spellNameNorm?: st
   let c = BASE_CRIT_CHANCE
   if (spellNameNorm && spellNameNorm.includes("rictumsempra")) c += 0.3
   if (attacker.wand === "dragon") c += 0.2
+  if (attacker.debuffs.some((d) => d.type === "crit_boost")) c += 0.25
   if (defender?.house === "slytherin") c += HOUSE_GDD.slytherin.extraCritTakenChance
   return Math.min(0.95, c)
 }
@@ -251,6 +258,8 @@ function isSelfTargetSpell(spellName: string): boolean {
   return (
     n.includes("protego") ||
     n.includes("ferula") ||
+    n.includes("episkey") ||
+    (n.includes("finite") && n.includes("incantatem")) ||
     n.includes("circum") ||
     n.includes("maximos") ||
     (n.includes("aqua") && n.includes("eructo")) ||
@@ -261,7 +270,7 @@ function isSelfTargetSpell(spellName: string): boolean {
 
 function isAreaSpell(spellName: string): boolean {
   const n = normSpell(spellName)
-  return n.includes("bombarda") || (n.includes("desumo") && n.includes("tempestas"))
+  return n.includes("bombarda") || (n.includes("desumo") && n.includes("tempestas")) || n.includes("fumus")
 }
 
 function getSpellMaxPower(spell: SpellInfo): number {
@@ -369,7 +378,10 @@ function Heart({ fillPercent }: { fillPercent: number }) {
   )
 }
 
-const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena({ playerBuild, onReturn, onBattleEnd, matchId, onDispatchAction }, ref) {
+const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena(
+  { playerBuild, onReturn, onBattleEnd, matchId, onDispatchAction, isSpectator = false, participantIds = [] },
+  ref
+) {
   const [duelists, setDuelists] = useState<Duelist[]>(() => {
     const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
     const enemySpells = ["Bombarda", "Incendio", "Glacius", "Confrigo", "Expelliarmus", "Protego"]
@@ -427,6 +439,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const [battleLog, setBattleLog] = useState<string[]>(["[Turno 0]: O duelo começou!"])
   const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "Sistema", text: "Chat ativo." }])
   const [chatInput, setChatInput] = useState("")
+  const isReadOnlySpectator = isSpectator || (!!matchId && !!playerBuild.userId && participantIds.length > 0 && !participantIds.includes(playerBuild.userId))
   const [gameOver, setGameOver] = useState<"win" | "lose" | "timeout" | null>(null)
   /** Mensagem central da fila de resolução (sincronia com acertos/efeitos). */
   const [battleMessage, setBattleMessage] = useState("")
@@ -574,6 +587,10 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     if (spellNorm && WAND_PASSIVES[defender.wand]?.effect === "kelpie_fire_immune") {
       const n = spellNorm
       if (n.includes("incendio") || n.includes("confrigo")) return 0
+    }
+    // Segredo de design: Incendio causa dano dobrado em alvos já queimando.
+    if (spellNorm?.includes("incendio") && defender.debuffs.some((d) => d.type === "burn")) {
+      damage *= 2
     }
     if (attacker.house === "slytherin") damage *= HOUSE_GDD.slytherin.outgoingDamageMult
     if (defender.house === "hufflepuff") damage *= HOUSE_GDD.hufflepuff.incomingDamageMult
@@ -893,12 +910,12 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
             logs.push(`[Efeito]: ${attacker.name} está protegido por Protego.`)
           }
         } else if (n.includes("ferula")) {
-          const healAmt = Math.floor(Math.random() * 16) + 5
+          const healAmt = Math.floor(Math.random() * 141) + 10
           state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d))
           const after = state.find((d) => d.id === attacker.id)!
           setFeedbackText("CURA!")
           setFeedbackTargetId(attacker.id)
-          logs.push(`[Cura]: ${attacker.name} recuperou até meio coração (${healAmt}% HP total, ${Math.max(0, getTotalHP(after.hp))}% HP)`)
+          logs.push(`[Cura]: ${attacker.name} recuperou ${healAmt}% HP total (${Math.max(0, getTotalHP(after.hp))}% HP).`)
         } else if (n.includes("circum")) {
           setCircumFlames((prev) => ({ ...prev, [attacker.id]: 3 }))
           state = state.map((d) => (d.id === attacker.id ? { ...d, circumAura: 3 } : d))
@@ -923,6 +940,22 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           )
           setStatusFloater({ text: "IMUNE A DEBUFF!", targetId: attacker.id, key: Date.now() + Math.random() })
           logs.push(`[Vulnera Sanetur]: ${attacker.name} ficou imune a novos debuffs por 3 turnos.`)
+        } else if (n.includes("episkey")) {
+          state = state.map((d) =>
+            d.id === attacker.id
+              ? {
+                  ...d,
+                  hp: healFlatTotal(d.hp, 50),
+                  debuffs: [...d.debuffs.filter((x) => x.type !== "crit_boost"), { type: "crit_boost", duration: 2 }],
+                }
+              : d
+          )
+          setStatusFloater({ text: "CRÍTICO+ 2T!", targetId: attacker.id, key: Date.now() + Math.random() })
+          logs.push(`[Episkey]: ${attacker.name} curou 50% HP e recebeu buff de crítico por 2 turnos.`)
+        } else if (n.includes("finite") && n.includes("incantatem")) {
+          state = state.map((d) => (d.id === attacker.id ? { ...d, debuffs: [] } : d))
+          setStatusFloater({ text: "CLEANSE TOTAL!", targetId: attacker.id, key: Date.now() + Math.random() })
+          logs.push(`[Finite Incantatem]: ${attacker.name} removeu todos os debuffs ativos.`)
         } else if (n.includes("aqua") && n.includes("eructo")) {
           const splash = rollCombatPower(attacker, spell, sn, attacker)
           state = state.map((d) => (d.id === attacker.id ? { ...d, debuffs: d.debuffs.filter((x) => x.type !== "burn") } : d))
@@ -935,6 +968,20 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           }
           setBattleMessage(`Aqua Eructo — jato ${splash}%`)
         }
+      } else if (n.includes("fumus")) {
+        setCircumFlames({})
+        state = state.map((d) => ({
+          ...d,
+          debuffs: [],
+          disabledSpells: {},
+          nextAccBonusPct: undefined,
+          nextDamagePotionMult: undefined,
+          maximosChargePct: undefined,
+          circumAura: undefined,
+          destinyBond: false,
+        }))
+        logs.push(`[Fumus]: todos os buffs/debuffs em campo foram dissipados.`)
+        setBattleMessage("Fumus — campo purificado")
       } else if (n.includes("arestum") && n.includes("momentum")) {
         const t = targets[0]
         const hit = rollSpellHit(t)
@@ -1448,6 +1495,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   }, [actions, battleStatus, duelists])
 
   const onSpellClick = (spellName: string) => {
+    if (isReadOnlySpectator) return
     if (gameOver || battleStatus !== "selecting" || playerCannotAct || playerDefeated || actions.player) return
     if (!player || isDefeated(player.hp)) return
     const mana = player.spellMana?.[spellName]
@@ -1490,6 +1538,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   }
 
   const onTargetClick = (targetId: string) => {
+    if (isReadOnlySpectator) return
     if (!pendingSpell || !player || playerDefeated || battleStatus !== "selecting" || actions.player) return
     const valid = getValidTargetsForSpell(pendingSpell, player, duelists).some((d) => d.id === targetId && !isDefeated(d.hp))
     if (!valid) return
@@ -1502,6 +1551,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   }
 
   const usePotion = () => {
+    if (isReadOnlySpectator) return
     if (potionUsed || gameOver || !player || playerDefeated || battleStatus !== "selecting" || !!actions.player) return
     if (player.debuffs.some((d) => d.type === "no_potion")) return
     setPotionUsed(true)
@@ -1512,9 +1562,33 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
   const sendChat = () => {
     if (!chatInput.trim()) return
-    setChatMessages((prev) => [...prev, { sender: playerBuild.name, text: chatInput.trim() }])
+    const text = chatInput.trim()
+    setChatMessages((prev) => [...prev, { sender: playerBuild.name, text }])
+    if (matchId) {
+      const supabase = getSupabaseClient()
+      void supabase.channel(`match-chat-${matchId}`).send({
+        type: "broadcast",
+        event: "chat_message",
+        payload: { sender: playerBuild.name, text, senderId: playerBuild.userId || "anon" },
+      })
+    }
     setChatInput("")
   }
+
+  useEffect(() => {
+    if (!matchId) return
+    const supabase = getSupabaseClient()
+    const chatChannel = supabase
+      .channel(`match-chat-${matchId}`)
+      .on("broadcast", { event: "chat_message" }, ({ payload }: any) => {
+        if (!payload?.text || payload.senderId === (playerBuild.userId || "anon")) return
+        setChatMessages((prev) => [...prev, { sender: payload.sender || "Bruxo", text: payload.text }])
+      })
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(chatChannel)
+    }
+  }, [matchId, playerBuild.userId])
 
   const renderHearts = (hp: HPState) => {
     const total = getTotalHP(hp)
@@ -1614,9 +1688,17 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           <div className="flex items-center gap-2">
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">{String(Math.floor(timeLeft / 60)).padStart(2, "0")}:{String(timeLeft % 60).padStart(2, "0")}</Badge>
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">{battleStatus.toUpperCase()}</Badge>
-            <Button onClick={onReturn} className="h-8 w-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 p-0 text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Sair">
-              <X className="h-4 w-4" />
-            </Button>
+            {isReadOnlySpectator && <Badge className="border-blue-700 bg-blue-950/40 text-blue-200">ESPECTADOR</Badge>}
+            {isReadOnlySpectator ? (
+              <Button onClick={onReturn} className="h-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 px-2 text-xs text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Voltar para o Lobby">
+                <ArrowLeft className="mr-1 h-3.5 w-3.5" />
+                Lobby
+              </Button>
+            ) : (
+              <Button onClick={onReturn} className="h-8 w-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 p-0 text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Sair">
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -1865,12 +1947,13 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         </div>
 
         <div className="mt-4 rounded-lg border-2 border-amber-900 bg-stone-900/85 p-3">
+          {isReadOnlySpectator && <p className="mb-2 text-xs text-blue-300">Modo espectador: comandos de combate desabilitados.</p>}
           {playerDefeated && <p className="mb-2 text-xs text-red-300">Você foi derrotado e agora é espectador.</p>}
           {!playerDefeated && battleStatus === "selecting" && actions.player && <p className="mb-2 text-xs text-amber-300">Aguardando outros bruxos...</p>}
           {playerCannotAct && !playerDefeated && !actions.player && <p className="mb-2 text-xs text-red-300">Você está sob Freeze/Stun e não pode agir neste turno.</p>}
           {pendingSpell && <p className="mb-2 text-xs text-amber-300">Feitiço selecionado: {pendingSpell}. Escolha um alvo.</p>}
 
-          {!actions.player && (
+          {!isReadOnlySpectator && !actions.player && (
             <div className="mb-2 flex flex-wrap gap-2">
               {playerBuild.spells.map((spell) => {
                 const mana = player?.spellMana?.[spell]
@@ -1935,7 +2018,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
             <h2 className="text-2xl text-amber-300">{gameOver === "win" ? "Vitoria!" : gameOver === "timeout" ? "Time Out!" : "Derrota"}</h2>
             <Button onClick={onReturn} className="mt-4 border border-red-700 bg-red-900 text-amber-100 hover:bg-red-800">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
+              {isReadOnlySpectator ? "Voltar para o Lobby" : "Voltar"}
             </Button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import CommonRoom from "@/components/common-room"
 import DuelArena, { type DuelArenaHandle } from "@/components/duel-arena"
 import { applyMatchElo, getSessionUserId, getUserById } from "@/lib/database"
@@ -27,10 +27,12 @@ export default function Home() {
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null)
   const [playerBuild, setPlayerBuild] = useState<PlayerBuild | null>(null)
   const [accountUser, setAccountUser] = useState<DbUser | null>(null)
+  const [pendingSpectate, setPendingSpectate] = useState<{ matchId: string; mode: PlayerBuild["gameMode"] } | null>(null)
   /** Ex.: `duelArenaRef.current?.submitRemoteAction(id, createCastAction(...))` quando o WebSocket estiver ativo. */
   const duelArenaRef = useRef<DuelArenaHandle>(null)
   const unsubscribeMatchRef = useRef<null | (() => void)>(null)
-  const { isOnlineMode, applyExternalState, externalMatchState, createOrJoinMatch, subscribeToMatch, handleAction } = useMatchManager()
+  const { isOnlineMode, applyExternalState, externalMatchState, joinMatchmaker, subscribeToMatch, handleAction } = useMatchManager()
+  const [isSpectator, setIsSpectator] = useState(false)
 
   useEffect(() => {
     void (async () => {
@@ -49,21 +51,23 @@ export default function Home() {
       if (!isOnlineMode(build)) {
         setActiveMatchId(null)
         setMatchPending(false)
+        setIsSpectator(false)
         setScreen("battle")
         return
       }
 
-      const joined = await createOrJoinMatch(build.gameMode, build.userId!)
+      const joined = await joinMatchmaker(build.gameMode, build.userId!, build.username || build.name)
       setActiveMatchId(joined.matchId)
       applyExternalState(joined)
-      setMatchPending(joined.status !== "running")
-      setScreen(joined.status === "running" ? "battle" : "setup")
+      setMatchPending(joined.status !== "in_progress")
+      setIsSpectator(false)
+      setScreen(joined.status === "in_progress" ? "battle" : "setup")
 
       unsubscribeMatchRef.current?.()
       unsubscribeMatchRef.current = subscribeToMatch(joined.matchId, {
         onState: (st) => {
           applyExternalState(st)
-          if (st.status === "running" && st.playersJoined >= st.playersExpected) {
+          if (st.status === "in_progress" && st.playersJoined >= st.playersExpected) {
             setMatchPending(false)
             setScreen("battle")
           }
@@ -80,6 +84,7 @@ export default function Home() {
     setScreen("setup")
     setMatchPending(false)
     setActiveMatchId(null)
+    setIsSpectator(false)
     unsubscribeMatchRef.current?.()
     unsubscribeMatchRef.current = null
     void (async () => {
@@ -93,6 +98,7 @@ export default function Home() {
 
   const handleBattleEnd = (outcome: "win" | "lose", userId?: string) => {
     if (!userId) return
+    if (playerBuild?.gameMode === "teste") return
     void (async () => {
       await applyMatchElo(userId, outcome)
       const u = await getUserById(userId)
@@ -108,9 +114,54 @@ export default function Home() {
   }, [])
 
   const dispatchActionToSupabase = (_playerId: string, action: RoundAction, matchId?: string) => {
-    if (!playerBuild || !playerBuild.userId || playerBuild.gameMode === "teste") return
+    if (!playerBuild || !playerBuild.userId || playerBuild.gameMode === "teste" || isSpectator) return
     handleAction(playerBuild.userId, action, matchId || activeMatchId || undefined)
   }
+
+  const handleSpectateMatch = useCallback((matchId: string, mode: PlayerBuild["gameMode"]) => {
+    const spectatorBuild: PlayerBuild = {
+      name: accountUser?.username || "Espectador",
+      house: "ravenclaw",
+      wand: "unicorn",
+      potion: "foco",
+      spells: [],
+      avatar: "bruxo01",
+      gameMode: mode === "teste" ? "1v1" : mode,
+      userId: accountUser?.id,
+      username: accountUser?.username,
+      elo: accountUser?.elo,
+    }
+    setPlayerBuild(spectatorBuild)
+    setActiveMatchId(matchId)
+    setIsSpectator(true)
+    setMatchPending(false)
+    setScreen("battle")
+
+    unsubscribeMatchRef.current?.()
+    unsubscribeMatchRef.current = subscribeToMatch(matchId, {
+      onState: (st) => applyExternalState(st),
+      onAction: (payload) => {
+        if (accountUser?.id && payload.playerId === accountUser.id) return
+        duelArenaRef.current?.submitRemoteAction(payload.playerId, payload.action)
+      },
+    })
+  }, [accountUser, applyExternalState, subscribeToMatch])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const matchId = params.get("spectate")
+    const modeParam = params.get("mode")
+    if (!matchId) return
+    const mode = (modeParam === "2v2" || modeParam === "ffa" || modeParam === "teste" || modeParam === "1v1" ? modeParam : "1v1") as PlayerBuild["gameMode"]
+    setPendingSpectate({ matchId, mode })
+  }, [])
+
+  useEffect(() => {
+    if (!pendingSpectate) return
+    handleSpectateMatch(pendingSpectate.matchId, pendingSpectate.mode)
+    setPendingSpectate(null)
+  }, [pendingSpectate, handleSpectateMatch])
 
   return (
     <main className="min-h-screen bg-background">
@@ -119,6 +170,7 @@ export default function Home() {
           currentUser={accountUser}
           onAuthChange={setAccountUser}
           onStartDuel={handleStartDuel}
+          onSpectateMatch={handleSpectateMatch}
         />
       ) : (
         <DuelArena
@@ -128,6 +180,8 @@ export default function Home() {
           onBattleEnd={handleBattleEnd}
           matchId={activeMatchId || undefined}
           onDispatchAction={dispatchActionToSupabase}
+          isSpectator={isSpectator}
+          participantIds={externalMatchState?.participantIds || []}
         />
       )}
       {matchPending && (

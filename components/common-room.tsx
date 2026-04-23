@@ -16,11 +16,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge"
 import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug } from "lucide-react"
 import type { PlayerBuild } from "@/app/page"
-import type { DbUser } from "@/lib/database"
-import { getRankingTop, loginUser, registerUser, signOutUser } from "@/lib/database"
+import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
+import {
+  addFriendByUsername,
+  getFriendMessages,
+  getFriendsWithStats,
+  getRankingTop,
+  loginUser,
+  registerUser,
+  removeFriend,
+  searchUsersByUsername,
+  sendFriendMessage,
+  signOutUser,
+} from "@/lib/database"
+import { getSupabaseClient } from "@/lib/supabase"
 
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
+  onSpectateMatch: (matchId: string, mode: PlayerBuild["gameMode"]) => void
   /** Conta logada (obrigatória para entrar na arena). */
   currentUser: DbUser | null
   onAuthChange: (user: DbUser | null) => void
@@ -143,7 +156,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
   { name: "Reducto", power: 100, accuracy: 50, pp: 5, cost: 1, debuff: { type: "silence_defense", chance: 100, duration: 2 }, effect: "Desativa defesas 2 turnos" },
   { name: "Desumo Tempestas", powerMin: 50, powerMax: 200, accuracy: 100, pp: 5, cost: 2, effect: "Todos em campo incl. atacante" },
   { name: "Protego", power: 0, accuracy: 100, pp: 10, cost: 1, priority: 4, special: "protego_fail_chain", effect: "Self, falha se consecutivo" },
-  { name: "Ferula", power: 0, accuracy: 100, pp: 10, cost: 1, priority: 1, special: "ferula_rng_heal", effect: "Self, cura RNG leve (máx. meio coração)" },
+  { name: "Ferula", power: 0, accuracy: 100, pp: 10, cost: 1, priority: 1, special: "ferula_rng_heal", effect: "Self, cura RNG de 10 a 150% HP" },
   { name: "Circum Inflamare", power: 0, accuracy: 100, pp: 10, cost: 1, priority: 1, special: "circum_thorns", effect: "Self, atacantes ganham BURN 1t" },
   { name: "Impedimenta", power: 0, accuracy: 100, pp: 10, cost: 1, debuff: { type: "no_potion", chance: 100, duration: 99 }, effect: "Alvo nao usa pocao" },
   { name: "Arestum Momentum", power: 40, accuracy: 100, pp: 5, cost: 1, special: "arestum_penalty", effect: "-5% dano e acerto do alvo (partida)" },
@@ -242,6 +255,33 @@ export const SPELL_DATABASE: SpellInfo[] = [
     special: "vulnera_anti_debuff",
     effect: "Self: imunidade a novos debuffs por 3 turnos.",
   },
+  {
+    name: "Finite Incantatem",
+    power: 0,
+    accuracy: 100,
+    pp: 5,
+    cost: 1,
+    special: "finite_cleanse",
+    effect: "Self: remove todo e qualquer debuff em si mesmo.",
+  },
+  {
+    name: "Fumus",
+    power: 0,
+    accuracy: 100,
+    pp: 10,
+    cost: 1,
+    special: "fumus_cleanse_all",
+    effect: "Limpa buffs e debuffs de todos em campo.",
+  },
+  {
+    name: "Episkey",
+    power: 0,
+    accuracy: 100,
+    pp: 5,
+    cost: 1,
+    special: "episkey_heal_crit",
+    effect: "Self: cura fixa de 50 e ganha buff de crítico por 2 turnos.",
+  },
   { name: "Maximos", power: 0, accuracy: 100, pp: 5, cost: 1, priority: 0, special: "maximos_charge", effect: "Self: proximo feitico +10% a +100% poder" },
 ]
 
@@ -264,7 +304,7 @@ const GAME_MODES = [
 const MAX_SPELL_POINTS = 6
 const MAX_UNFORGIVABLE = 1
 
-export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: CommonRoomProps) {
+export default function CommonRoom({ onStartDuel, onSpectateMatch, currentUser, onAuthChange }: CommonRoomProps) {
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
   const [authEmail, setAuthEmail] = useState("")
@@ -272,6 +312,17 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
   const [authUsername, setAuthUsername] = useState("")
   const [authError, setAuthError] = useState("")
   const [ranking, setRanking] = useState<DbUser[]>([])
+  const [friendSearch, setFriendSearch] = useState("")
+  const [friendSearchResults, setFriendSearchResults] = useState<FriendProfile[]>([])
+  const [friends, setFriends] = useState<FriendProfile[]>([])
+  const [friendFeedback, setFriendFeedback] = useState("")
+  const [activeFriendId, setActiveFriendId] = useState<string | null>(null)
+  const [friendMessages, setFriendMessages] = useState<FriendMessage[]>([])
+  const [friendMessageInput, setFriendMessageInput] = useState("")
+  const [onlineWizards, setOnlineWizards] = useState(0)
+  const [duelsInProgress, setDuelsInProgress] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; p1: string; p2: string }>>([])
+  const [showSpectatePanel, setShowSpectatePanel] = useState(false)
+  const [shareFeedback, setShareFeedback] = useState("")
 
   const [name, setName] = useState("")
   const [house, setHouse] = useState("")
@@ -323,7 +374,6 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
 
   const isReady =
     !!currentUser &&
-    name.trim() !== "" &&
     house !== "" &&
     wand !== "" &&
     potion !== "" &&
@@ -336,9 +386,66 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
     setRanking(list)
   }
 
+  const refreshFriends = async () => {
+    if (!currentUser?.id) {
+      setFriends([])
+      return
+    }
+    const list = await getFriendsWithStats(currentUser.id)
+    setFriends(list)
+  }
+
   useEffect(() => {
     void refreshRanking()
   }, [currentUser])
+
+  useEffect(() => {
+    void refreshFriends()
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    const supabase = getSupabaseClient()
+    const lobby = supabase.channel("room_lobby", { config: { presence: { key: currentUser?.id || `anon-${Math.random().toString(36).slice(2, 7)}` } } })
+    const syncOnline = () => {
+      const state = lobby.presenceState()
+      setOnlineWizards(Object.keys(state).length)
+    }
+    lobby
+      .on("presence", { event: "sync" }, syncOnline)
+      .on("presence", { event: "join" }, syncOnline)
+      .on("presence", { event: "leave" }, syncOnline)
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await lobby.track({ online_at: new Date().toISOString(), username: currentUser?.username || "Visitante" })
+        }
+      })
+
+    const fetchDuels = async () => {
+      const { data } = await supabase
+        .from("matches")
+        .select("match_id,mode,p1_name,p2_name")
+        .eq("status", "in_progress")
+        .order("updated_at", { ascending: false })
+        .limit(20)
+      const rows = (data || []).map((m: any) => ({
+        matchId: m.match_id as string,
+        mode: (m.mode as PlayerBuild["gameMode"]) || "1v1",
+        p1: m.p1_name || "Bruxo 1",
+        p2: m.p2_name || "Bruxo 2",
+      }))
+      setDuelsInProgress(rows)
+    }
+    void fetchDuels()
+    const duelsCh = supabase
+      .channel("duels-in-progress")
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, () => void fetchDuels())
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(lobby)
+      void supabase.removeChannel(duelsCh)
+    }
+  }, [currentUser?.id, currentUser?.username])
 
   const handleAuthSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -368,7 +475,7 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
     if (!currentUser) return
     if (isReady && gameMode) {
       onStartDuel({
-        name: name.trim(),
+        name: currentUser.username,
         house,
         wand,
         potion,
@@ -382,8 +489,61 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
     }
   }
 
+  const handleAddFriend = async () => {
+    if (!currentUser?.id) return
+    setFriendFeedback("")
+    const result = await addFriendByUsername(currentUser.id, friendSearch)
+    if (!result.ok) {
+      setFriendFeedback(result.error)
+      return
+    }
+    setFriendSearch("")
+    setFriendFeedback("Amigo adicionado com sucesso.")
+    await refreshFriends()
+  }
+
+  const handleSearchUsers = async () => {
+    const rows = await searchUsersByUsername(friendSearch, 8)
+    setFriendSearchResults(rows.filter((r) => r.id !== currentUser?.id))
+  }
+
+  const handleRemoveFriend = async (friendId: string) => {
+    if (!currentUser?.id) return
+    const result = await removeFriend(currentUser.id, friendId)
+    if (!result.ok) {
+      setFriendFeedback(result.error)
+      return
+    }
+    if (activeFriendId === friendId) {
+      setActiveFriendId(null)
+      setFriendMessages([])
+    }
+    await refreshFriends()
+    setFriendFeedback("Amigo removido.")
+  }
+
+  const handleOpenFriendChat = async (friendId: string) => {
+    if (!currentUser?.id) return
+    setActiveFriendId(friendId)
+    const rows = await getFriendMessages(currentUser.id, friendId)
+    setFriendMessages(rows)
+  }
+
+  const handleSendFriendMessage = async () => {
+    if (!currentUser?.id || !activeFriendId) return
+    const result = await sendFriendMessage(currentUser.id, activeFriendId, friendMessageInput)
+    if (!result.ok) {
+      setFriendFeedback(result.error)
+      return
+    }
+    setFriendMessageInput("")
+    const rows = await getFriendMessages(currentUser.id, activeFriendId)
+    setFriendMessages(rows)
+  }
+
   const selectedAvatar = AVATARS.find((a) => a.value === avatar)
   const selectedWandCore = WAND_CORES.find((w) => w.value === wand)
+  const effectiveName = currentUser?.username || name
 
   return (
     <div className="min-h-screen wood-bg p-6">
@@ -397,6 +557,9 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
             <p className="mt-1 text-amber-100/70">Monte sua build para o duelo</p>
           </div>
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2">
+            <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
+              🟢 {onlineWizards} Bruxos Online
+            </Badge>
             {currentUser ? (
               <>
                 <Badge className="border-amber-600 bg-stone-900 px-3 py-1 text-amber-200">
@@ -431,6 +594,53 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
             )}
           </div>
         </header>
+
+        <Card className="medieval-frame mb-4 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
+          <CardHeader className="border-b border-amber-900/50 py-2">
+            <CardTitle className="flex items-center justify-between text-sm text-amber-200">
+              <span>Duelos em Andamento</span>
+              <Button size="sm" variant="outline" className="h-7 border-amber-700 text-amber-300" onClick={() => setShowSpectatePanel((v) => !v)}>
+                {showSpectatePanel ? "Ocultar" : "Mostrar"}
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          {showSpectatePanel && (
+            <CardContent className="max-h-48 overflow-y-auto pt-2">
+              {duelsInProgress.length === 0 && <p className="text-xs text-amber-300/80">Nenhum duelo em andamento no momento.</p>}
+              <div className="space-y-2">
+                {duelsInProgress.map((d) => (
+                  <div key={d.matchId} className="flex items-center justify-between gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs">
+                    <span className="text-amber-100">{d.p1} vs {d.p2}</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        className="h-7 border border-amber-700 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50"
+                        onClick={() => onSpectateMatch(d.matchId, d.mode)}
+                      >
+                        Assistir
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 border-amber-700 text-amber-200"
+                        onClick={async () => {
+                          const origin = typeof window !== "undefined" ? window.location.origin : ""
+                          const shareUrl = `${origin}/?spectate=${encodeURIComponent(d.matchId)}&mode=${encodeURIComponent(d.mode)}`
+                          await navigator.clipboard.writeText(shareUrl)
+                          setShareFeedback("Link de espectador copiado.")
+                          window.setTimeout(() => setShareFeedback(""), 1800)
+                        }}
+                      >
+                        Compartilhar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {shareFeedback && <p className="mt-2 text-xs text-amber-300">{shareFeedback}</p>}
+            </CardContent>
+          )}
+        </Card>
 
         <Dialog open={authOpen} onOpenChange={setAuthOpen}>
           <DialogContent className="border-amber-800 bg-stone-900 text-amber-100 sm:max-w-md">
@@ -513,6 +723,118 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
           </CardContent>
         </Card>
 
+        <Card className="medieval-frame mb-6 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
+          <CardHeader className="border-b border-amber-900/50 py-2">
+            <CardTitle className="text-sm text-amber-200">Modo Amigos</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-3">
+            {!currentUser ? (
+              <p className="text-xs text-amber-300/80">Entre na sua conta para adicionar amigos.</p>
+            ) : (
+              <>
+                <div className="mb-3 flex gap-2">
+                  <Input
+                    value={friendSearch}
+                    onChange={(e) => setFriendSearch(e.target.value)}
+                    placeholder="Buscar usuário (mín. 2 letras)"
+                    className="h-9 border-amber-800 bg-stone-800 text-amber-100 placeholder:text-stone-500"
+                  />
+                  <Button type="button" onClick={handleAddFriend} className="border border-amber-700 bg-amber-900/50 text-amber-100 hover:bg-amber-800/60">
+                    Adicionar
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleSearchUsers} className="border-amber-700 text-amber-200">
+                    Buscar
+                  </Button>
+                </div>
+                {friendSearchResults.length > 0 && (
+                  <div className="mb-3 space-y-1 rounded border border-amber-900/50 bg-stone-900/70 p-2 text-xs">
+                    {friendSearchResults.map((u) => (
+                      <div key={u.id} className="flex items-center justify-between">
+                        <span className="text-amber-200">{u.username}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-6 border border-amber-700 bg-amber-900/40 text-[11px] text-amber-100 hover:bg-amber-800/50"
+                          onClick={async () => {
+                            if (!currentUser?.id) return
+                            const result = await addFriendByUsername(currentUser.id, u.username)
+                            setFriendFeedback(result.ok ? "Amigo adicionado com sucesso." : result.error)
+                            if (result.ok) await refreshFriends()
+                          }}
+                        >
+                          Adicionar
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {friendFeedback && <p className="mb-2 text-xs text-amber-300">{friendFeedback}</p>}
+                {friends.length === 0 ? (
+                  <p className="text-xs text-amber-300/80">Você ainda não adicionou amigos.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {friends.map((friend) => (
+                      <div key={friend.id} className="rounded border border-amber-900/60 bg-stone-900/60 px-3 py-2 text-xs text-amber-100">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-semibold text-amber-200">{friend.username}</p>
+                          <div className="flex gap-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-6 border border-amber-700 bg-amber-900/40 px-2 text-[11px] text-amber-100 hover:bg-amber-800/50"
+                              onClick={() => void handleOpenFriendChat(friend.id)}
+                            >
+                              Mensagem
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-6 border border-red-700 bg-red-900/50 px-2 text-[11px] text-red-100 hover:bg-red-800/60"
+                              onClick={() => void handleRemoveFriend(friend.id)}
+                            >
+                              Remover
+                            </Button>
+                          </div>
+                        </div>
+                        <p className="text-amber-300/90">Vitórias: {friend.wins} · Derrotas: {friend.losses}</p>
+                        <p className="text-amber-300/80">Feitiço mais usado: {friend.favoriteSpell || "Sem dados"}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {activeFriendId && (
+                  <div className="mt-3 rounded border border-amber-900/60 bg-stone-900/70 p-2">
+                    <p className="mb-2 text-xs text-amber-300">Mensagens</p>
+                    <div className="mb-2 max-h-28 overflow-y-auto rounded border border-amber-900/50 bg-stone-950/60 p-2 text-xs">
+                      {friendMessages.length === 0 ? (
+                        <p className="text-amber-300/70">Sem mensagens ainda.</p>
+                      ) : (
+                        friendMessages.map((m) => (
+                          <p key={m.id} className="mb-1 text-amber-100/90">
+                            <span className="text-amber-400">{m.senderId === currentUser.id ? "Você" : "Amigo"}:</span> {m.content}
+                          </p>
+                        ))
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={friendMessageInput}
+                        onChange={(e) => setFriendMessageInput(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && void handleSendFriendMessage()}
+                        placeholder="Escreva para seu amigo..."
+                        className="h-8 border-amber-800 bg-stone-800 text-amber-100 placeholder:text-stone-500"
+                      />
+                      <Button type="button" onClick={handleSendFriendMessage} className="h-8 border border-amber-700 bg-amber-900/50 text-amber-100 hover:bg-amber-800/60">
+                        Enviar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="grid gap-6 md:grid-cols-2">
           {/* Avatar & Name */}
           <Card className="medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900">
@@ -529,9 +851,10 @@ export default function CommonRoom({ onStartDuel, currentUser, onAuthChange }: C
                 </Label>
                 <Input
                   id="wizard-name"
-                  placeholder="Digite seu nome..."
-                  value={name}
+                  placeholder={currentUser ? "Nome vinculado à conta" : "Digite seu nome..."}
+                  value={effectiveName}
                   onChange={(e) => setName(e.target.value)}
+                  disabled={!!currentUser}
                   className="mt-1 border-amber-800 bg-stone-800 text-amber-100 placeholder:text-stone-500 focus:border-amber-600"
                 />
               </div>
