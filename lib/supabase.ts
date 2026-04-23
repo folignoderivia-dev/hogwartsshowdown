@@ -36,3 +36,27 @@ export function getSupabaseClient(): SupabaseClient {
   })
   return singleton
 }
+
+/** Encerra sessão PKCE, zera singleton e remove tokens `sb-*` do localStorage (útil em mobile com canal instável). */
+export async function clearSupabaseSessionAndResetClient(): Promise<void> {
+  if (typeof window === "undefined") return
+  try {
+    if (singleton) {
+      await singleton.auth.signOut({ scope: "global" })
+    }
+  } catch (e) {
+    console.warn("[Supabase] signOut:", e)
+  } finally {
+    singleton = null
+    try {
+      const toRemove: string[] = []
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i)
+        if (k && k.startsWith("sb-") && k.includes("-auth-")) toRemove.push(k)
+      }
+      toRemove.forEach((k) => window.localStorage.removeItem(k))
+    } catch {
+      // ignore
+    }
+  }
+}

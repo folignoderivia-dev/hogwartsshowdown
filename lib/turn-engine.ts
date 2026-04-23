@@ -2,6 +2,8 @@ import { HOUSE_GDD, WAND_PASSIVES, rollSpellPower, type SpellInfo } from "@/lib/
 import type { DebuffType, Duelist, HPState } from "@/lib/arena-types"
 import type { RoundAction } from "@/lib/duelActions"
 
+/** Motor puro: recebe `RoundAction` em memória. Persistência Supabase usa `match_turns.action_payload` apenas na Arena. */
+
 export interface EngineAnimation {
   type: "cast" | "skip" | "potion"
   casterId: string

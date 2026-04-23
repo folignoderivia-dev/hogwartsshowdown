@@ -595,9 +595,23 @@ const DuelArena = (
     [isOfflineMode, matchId, processCombatAction]
   )
 
+  /** Backup REST/RPC: coluna obrigatória `action_payload` (jsonb) em `public.match_turns`. */
   const persistTurnBackup = useCallback(
-    async (payload: RoundAction) => {
-      if (!matchId || !selfDuelistId) return
+    async (payload: RoundAction): Promise<boolean> => {
+      if (!matchId || !selfDuelistId) return false
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+      const isTransientSchemaOrCacheError = (err: { code?: string; message?: string } | null) => {
+        if (!err) return false
+        const m = (err.message || "").toLowerCase()
+        return (
+          err.code === "42703" ||
+          err.code === "PGRST204" ||
+          m.includes("action_payload") ||
+          m.includes("schema cache") ||
+          (m.includes("could not find") && m.includes("column"))
+        )
+      }
+
       try {
         const supabase = getSupabaseClient()
         const { data: sessionData, error: sessionErr } = await supabase.auth.getSession()
@@ -605,6 +619,8 @@ const DuelArena = (
         if (!sessionData?.session) {
           console.warn("[Arena] persist: sem sessão JWT (mobile: storage bloqueado ou login expirado).")
         }
+
+        if (turnNumber === 1) await wait(500)
 
         const row = {
           match_id: matchId,
@@ -614,23 +630,30 @@ const DuelArena = (
           updated_at: new Date().toISOString(),
         }
 
-        const { error } = await supabase.from("match_turns").upsert(row, { onConflict: "match_id,turn_number,player_id" })
-        if (error) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (attempt > 0) await wait(500)
+          const { error } = await supabase.from("match_turns").upsert(row, { onConflict: "match_id,turn_number,player_id" })
+          if (!error) return true
           console.warn("[Arena] match_turns upsert:", error.message, error.code, error.details, error.hint, error)
-          const { error: rpcErr } = await supabase.rpc("submit_duel_turn", {
-            p_match_id: matchId,
-            p_turn_number: turnNumber,
-            p_player_id: selfDuelistId,
-            p_action_payload: payload as unknown as Record<string, unknown>,
-          })
-          if (rpcErr) {
-            console.warn("[Arena] submit_duel_turn RPC:", rpcErr.message, rpcErr.code, rpcErr.details, rpcErr)
-            addLog(`[Backup]: falha turno ${turnNumber} (upsert + RPC).`)
-            setChannelSubscribeError((prev) => prev || `DB ${rpcErr.code ?? ""}: ${rpcErr.message}`)
-          }
+          if (!isTransientSchemaOrCacheError(error)) break
         }
+
+        const { error: rpcErr } = await supabase.rpc("submit_duel_turn", {
+          p_match_id: matchId,
+          p_turn_number: turnNumber,
+          p_player_id: selfDuelistId,
+          p_action_payload: payload as unknown as Record<string, unknown>,
+        })
+        if (rpcErr) {
+          console.warn("[Arena] submit_duel_turn RPC:", rpcErr.message, rpcErr.code, rpcErr.details, rpcErr)
+          addLog(`[Backup]: falha turno ${turnNumber} (upsert + RPC).`)
+          setChannelSubscribeError((prev) => prev || `DB ${rpcErr.code ?? ""}: ${rpcErr.message}`)
+          return false
+        }
+        return true
       } catch (e) {
         console.warn("[Arena] persistTurnBackup exception:", e)
+        return false
       }
     },
     [addLog, matchId, selfDuelistId, turnNumber]
@@ -649,7 +672,9 @@ const DuelArena = (
         event: "TURN_ACTION",
         payload: { event: "TURN_ACTION", action: payload } satisfies MatchBroadcastMessage,
       })
-      void persistTurnBackup(payload)
+      void persistTurnBackup(payload).then((ok) => {
+        if (!ok) console.warn("[Arena] persistTurnBackup retornou false (turno", turnNumber, ")")
+      })
     },
     [isOfflineMode, matchId, persistTurnBackup, selfDuelistId, turnNumber]
   )
@@ -1146,14 +1171,49 @@ const DuelArena = (
       setAwaitingServerAck(false)
       setBattleMessage("")
       const snapshot = [...duelistsRef.current]
-      const outcome = calculateTurnOutcome({
-        duelists: snapshot,
-        actions: queuedActions,
-        spellDatabase: SPELL_DATABASE,
-        turnNumber,
-        gameMode: playerBuild.gameMode,
-        circumFlames,
-      })
+      const aliveIds = snapshot.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
+      if (aliveIds.length > 0 && isOnlineMatch) {
+        const byCaster = new Map(queuedActions.map((a) => [a.casterId, a]))
+        const syncBad = aliveIds.some((id) => {
+          const a = byCaster.get(id)
+          return !a || a.turnId !== turnNumber
+        })
+        if (syncBad) {
+          console.warn("[Arena] runResolution: fila de ações incompleta ou turnId divergente", {
+            aliveIds,
+            turnNumber,
+            queued: queuedActions,
+          })
+          addLog(`[Sync]: erro de sincronia no turno ${turnNumber}.`)
+          setBattleMessage("Erro de Sincronia: Tentando novamente...")
+          setPendingActions({})
+          turnActionConfirmedRef.current = new Set()
+          setBattleStatus("selecting")
+          return
+        }
+      }
+
+      let outcome: ReturnType<typeof calculateTurnOutcome>
+      try {
+        outcome = calculateTurnOutcome({
+          duelists: snapshot,
+          actions: queuedActions,
+          spellDatabase: SPELL_DATABASE,
+          turnNumber,
+          gameMode: playerBuild.gameMode,
+          circumFlames,
+        })
+      } catch (engineErr) {
+        console.warn("[Arena] calculateTurnOutcome:", engineErr)
+        addLog(`[Engine]: exceção no turno ${turnNumber} — abortando resolução.`)
+        setBattleMessage("Erro de Sincronia: Tentando novamente...")
+        if (isOnlineMatch) {
+          setPendingActions({})
+          turnActionConfirmedRef.current = new Set()
+        }
+        setBattleStatus("selecting")
+        return
+      }
       let state = outcome.newDuelists
       for (const anim of outcome.animationsToPlay) {
         if (isOnlineMatch && matchStatus === "finished") {

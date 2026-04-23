@@ -3,6 +3,8 @@ import type { PlayerBuild } from "@/lib/types"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
 
+/** PvP: persistência de turno em `public.match_turns.action_payload` (jsonb) — ver `DuelArena` / `persistTurnBackup`. */
+
 export interface ExternalMatchState {
   matchId: string
   status: "waiting" | "in_progress" | "finished"

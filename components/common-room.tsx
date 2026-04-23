@@ -30,7 +30,7 @@ import {
   sendFriendMessage,
   signOutUser,
 } from "@/lib/database"
-import { getSupabaseClient } from "@/lib/supabase"
+import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/supabase"
 
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
@@ -442,6 +442,25 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   }}
                 >
                   Sair
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-red-800/80 bg-red-950/30 text-red-200 hover:bg-red-950/50"
+                  title="Limpa tokens PKCE/localStorage e força novo login (se Realtime ficar Conectado: Não no celular)"
+                  onClick={async () => {
+                    setAuthError("")
+                    try {
+                      await clearSupabaseSessionAndResetClient()
+                      await signOutUser()
+                      onAuthChange(null)
+                    } catch {
+                      setAuthError("Não foi possível limpar a sessão.")
+                    }
+                  }}
+                >
+                  Limpar Sessão e Sair
                 </Button>
               </>
             ) : (
