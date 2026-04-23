@@ -31,7 +31,7 @@ with check (auth.uid() = id);
 
 create table if not exists public.matches (
   match_id text primary key default gen_random_uuid()::text,
-  mode text not null check (mode in ('teste', '1v1', '2v2', 'ffa')),
+  mode text not null check (mode in ('teste', '1v1', '2v2', 'ffa', 'ffa3')),
   status text not null check (status in ('waiting', 'in_progress', 'finished')),
   players_expected int not null,
   players_joined int not null,
@@ -56,6 +56,8 @@ alter table public.matches add column if not exists p1_name text;
 alter table public.matches add column if not exists p2_name text;
 alter table public.matches add column if not exists p3_name text;
 alter table public.matches add column if not exists p4_name text;
+alter table public.matches drop constraint if exists matches_mode_check;
+alter table public.matches add constraint matches_mode_check check (mode in ('teste', '1v1', '2v2', 'ffa', 'ffa3'));
 alter table public.matches drop constraint if exists matches_status_check;
 alter table public.matches add constraint matches_status_check check (status in ('waiting', 'in_progress', 'finished'));
 
@@ -163,7 +165,7 @@ declare
   v_expected int;
   v_match public.matches%rowtype;
 begin
-  if p_mode not in ('teste', '1v1', '2v2', 'ffa') then
+  if p_mode not in ('teste', '1v1', '2v2', 'ffa', 'ffa3') then
     raise exception 'Modo inválido: %', p_mode;
   end if;
 
@@ -171,7 +173,7 @@ begin
     raise exception 'player_id inválido';
   end if;
 
-  v_expected := case when p_mode in ('2v2', 'ffa') then 4 else 2 end;
+  v_expected := case when p_mode in ('2v2', 'ffa') then 4 when p_mode = 'ffa3' then 3 else 2 end;
 
   -- Rejoin idempotente: se já está em sala ativa desse modo, apenas retorna.
   select m.*

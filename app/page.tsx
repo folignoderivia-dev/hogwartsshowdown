@@ -15,7 +15,7 @@ export interface PlayerBuild {
   potion: string
   spells: string[]
   avatar: string
-  gameMode: "teste" | "1v1" | "2v2" | "ffa"
+  gameMode: "teste" | "1v1" | "2v2" | "ffa" | "ffa3"
   userId?: string
   username?: string
   elo?: number
@@ -216,7 +216,7 @@ export default function Home() {
     const matchId = params.get("spectate")
     const modeParam = params.get("mode")
     if (!matchId) return
-    const mode = (modeParam === "2v2" || modeParam === "ffa" || modeParam === "teste" || modeParam === "1v1" ? modeParam : "1v1") as PlayerBuild["gameMode"]
+    const mode = (modeParam === "2v2" || modeParam === "ffa" || modeParam === "ffa3" || modeParam === "teste" || modeParam === "1v1" ? modeParam : "1v1") as PlayerBuild["gameMode"]
     setPendingSpectate({ matchId, mode })
   }, [])
 

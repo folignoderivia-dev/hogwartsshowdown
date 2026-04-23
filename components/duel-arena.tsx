@@ -633,7 +633,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       if (playerAliveCount === 0) return "lose"
       return null
     }
-    if (playerBuild.gameMode === "ffa") {
+    if (playerBuild.gameMode === "ffa" || playerBuild.gameMode === "ffa3") {
       if (totalAliveCount === 1) {
         const winner = state.find((d) => !isDefeated(d.hp))
         return winner?.isPlayer ? "win" : "lose"
@@ -1929,9 +1929,9 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
             </div>
           )}
 
-          {playerBuild.gameMode === "ffa" ? (
+          {playerBuild.gameMode === "ffa" || playerBuild.gameMode === "ffa3" ? (
             <div className="grid h-full min-h-[560px] grid-cols-2 grid-rows-2 gap-3 p-3">
-              {duelists.slice(0, 4).map((duelist, idx) => {
+              {duelists.slice(0, playerBuild.gameMode === "ffa3" ? 3 : 4).map((duelist, idx) => {
                 const isTop = idx < 2
                 return (
                   <div key={duelist.id} className="relative overflow-hidden rounded-lg border border-stone-500 bg-black/30 p-2">

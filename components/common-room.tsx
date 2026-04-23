@@ -309,6 +309,7 @@ const GAME_MODES = [
   { value: "teste", label: "TESTE (BOT)" },
   { value: "1v1", label: "1 VS 1" },
   { value: "2v2", label: "2 VS 2" },
+  { value: "ffa3", label: "ALL IN ONE (3 FFA)" },
   { value: "ffa", label: "ALL IN ONE (4 FFA)" },
 ]
 
@@ -342,7 +343,7 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
   const [avatar, setAvatar] = useState("")
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
-  const [gameMode, setGameMode] = useState<"teste" | "1v1" | "2v2" | "ffa" | "">("")
+  const [gameMode, setGameMode] = useState<"teste" | "1v1" | "2v2" | "ffa" | "ffa3" | "">("")
 
   const { totalCost, unforgivableCount } = useMemo(() => {
     let total = 0
@@ -492,7 +493,7 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
         potion,
         spells: selectedSpells,
         avatar,
-        gameMode: gameMode as "teste" | "1v1" | "2v2" | "ffa",
+        gameMode: gameMode as "teste" | "1v1" | "2v2" | "ffa" | "ffa3",
         userId: currentUser.id,
         username: currentUser.username,
         elo: currentUser.elo,
@@ -1182,7 +1183,7 @@ export default function CommonRoom({ onStartDuel, onSpectateMatch, onResumeMatch
                   key={mode.value}
                   variant="outline"
                   size="sm"
-                  onClick={() => setGameMode(mode.value as "teste" | "1v1" | "2v2" | "ffa")}
+                  onClick={() => setGameMode(mode.value as "teste" | "1v1" | "2v2" | "ffa" | "ffa3")}
                   className={`transition-all ${
                     gameMode === mode.value
                       ? "border-amber-500 bg-amber-700/50 text-amber-200"

@@ -44,6 +44,7 @@ export function useMatchManager() {
 
   const expectedPlayersByMode = useCallback((mode: PlayerBuild["gameMode"]) => {
     if (mode === "2v2" || mode === "ffa") return 4
+    if (mode === "ffa3") return 3
     return 2
   }, [])
 
