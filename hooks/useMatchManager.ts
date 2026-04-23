@@ -293,16 +293,41 @@ export function useMatchManager() {
     void (async () => {
       try {
         const supabase = getSupabaseClient()
-        await supabase.from("match_actions").insert({
-          match_id: payload.matchId,
-          player_id: payload.playerId,
-          action_id: payload.eventId,
-          target_id: payload.targetId ?? null,
-          timestamp_ms: payload.timestamp,
-          payload,
+        const participants = externalMatchState?.participantIds || []
+        const currentOwner = externalMatchState?.currentTurnOwner
+        const idx = currentOwner ? participants.indexOf(currentOwner) : -1
+        const nextOwner =
+          action.type === "sync"
+            ? null
+            : participants.length > 0
+              ? participants[(Math.max(0, idx) + 1) % participants.length] || participants[0]
+              : null
+        const { error } = await supabase.rpc("commit_match_action", {
+          p_match_id: payload.matchId,
+          p_player_id: payload.playerId,
+          p_action_id: payload.eventId,
+          p_target_id: payload.targetId ?? null,
+          p_timestamp_ms: payload.timestamp,
+          p_payload: payload,
+          p_expected_owner: action.type === "sync" ? null : currentOwner || null,
+          p_next_owner: action.type === "sync" ? null : nextOwner,
         })
+        if (error) throw error
       } catch {
-        // Falha de rede/tabela não bloqueia a arena local.
+        // Fallback para ambientes sem RPC aplicada.
+        try {
+          const supabase = getSupabaseClient()
+          await supabase.from("match_actions").insert({
+            match_id: payload.matchId,
+            player_id: payload.playerId,
+            action_id: payload.eventId,
+            target_id: payload.targetId ?? null,
+            timestamp_ms: payload.timestamp,
+            payload,
+          })
+        } catch {
+          // Falha de rede/tabela não bloqueia a arena local.
+        }
       }
     })()
     return payload

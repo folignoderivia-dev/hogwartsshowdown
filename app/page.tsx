@@ -32,7 +32,7 @@ export default function Home() {
   /** Ex.: `duelArenaRef.current?.submitRemoteAction(id, createCastAction(...))` quando o WebSocket estiver ativo. */
   const duelArenaRef = useRef<DuelArenaHandle>(null)
   const unsubscribeMatchRef = useRef<null | (() => void)>(null)
-  const { isOnlineMode, applyExternalState, externalMatchState, joinMatchmaker, createRoom, joinRoomById, fetchOpenRooms, findActiveMatchForPlayer, subscribeToMatch, handleAction, setCurrentTurnOwner } = useMatchManager()
+  const { isOnlineMode, applyExternalState, externalMatchState, joinMatchmaker, createRoom, joinRoomById, fetchOpenRooms, findActiveMatchForPlayer, subscribeToMatch, handleAction } = useMatchManager()
   const [isSpectator, setIsSpectator] = useState(false)
   const [resumableMatch, setResumableMatch] = useState<{ matchId: string; mode: PlayerBuild["gameMode"]; status: "waiting" | "in_progress" } | null>(null)
   const normalizeIncomingAction = useCallback((playerId: string, action: RoundAction): RoundAction => {
@@ -209,16 +209,6 @@ export default function Home() {
     handleAction(playerBuild.userId, action, matchId || activeMatchId || undefined)
   }
 
-  const advanceTurnOwner = useCallback(async (currentOwnerId: string) => {
-    const matchId = activeMatchId || externalMatchState?.matchId
-    if (!matchId || !externalMatchState?.participantIds?.length) return
-    const participants = externalMatchState.participantIds
-    const currentIdx = Math.max(0, participants.indexOf(currentOwnerId))
-    const nextOwner = participants[(currentIdx + 1) % participants.length] || participants[0]
-    if (!nextOwner) return
-    await setCurrentTurnOwner(matchId, nextOwner, currentOwnerId)
-  }, [activeMatchId, externalMatchState, setCurrentTurnOwner])
-
   const handleSpectateMatch = useCallback((matchId: string, mode: PlayerBuild["gameMode"]) => {
     const spectatorBuild: PlayerBuild = {
       name: accountUser?.username || "Espectador",
@@ -334,7 +324,7 @@ export default function Home() {
           participantNames={externalMatchState?.participantNames || []}
           localNetworkId={playerBuild?.userId}
           currentTurnOwner={externalMatchState?.currentTurnOwner}
-          onAdvanceTurnOwner={advanceTurnOwner}
+          matchStatus={externalMatchState?.status}
         />
       )}
       {matchPending && screen === "battle" && (

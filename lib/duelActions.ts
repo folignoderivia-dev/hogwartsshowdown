@@ -15,6 +15,7 @@ export interface RoundAction {
   type: DuelActionType
   eventId?: string
   spellName?: string
+  baseDamage?: number
   targetId?: string
   areaAll?: boolean
   potionType?: string

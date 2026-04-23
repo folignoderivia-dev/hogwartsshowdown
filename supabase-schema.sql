@@ -16,14 +16,17 @@ alter table public.profiles add column if not exists wins int not null default 0
 alter table public.profiles add column if not exists losses int not null default 0;
 alter table public.profiles add column if not exists favorite_spell text null;
 
+drop policy if exists "profiles_select_all" on public.profiles;
 create policy "profiles_select_all"
 on public.profiles for select
 using (true);
 
+drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own"
 on public.profiles for insert
 with check (auth.uid() = id);
 
+drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own"
 on public.profiles for update
 using (auth.uid() = id)
@@ -66,6 +69,7 @@ update public.matches set current_turn_owner = coalesce(current_turn_owner, p1_i
 
 alter table public.matches enable row level security;
 
+drop policy if exists "matches_rw_authenticated" on public.matches;
 create policy "matches_rw_authenticated"
 on public.matches for all
 using (auth.role() = 'authenticated')
@@ -80,6 +84,7 @@ create table if not exists public.match_players (
 
 alter table public.match_players enable row level security;
 
+drop policy if exists "match_players_rw_authenticated" on public.match_players;
 create policy "match_players_rw_authenticated"
 on public.match_players for all
 using (auth.role() = 'authenticated')
@@ -95,9 +100,17 @@ create table if not exists public.match_actions (
   payload jsonb not null,
   created_at timestamptz not null default now()
 );
+-- Migração legada: em versões antigas action_id era nome de feitiço e pode repetir.
+-- Normaliza para um valor único por linha antes de criar índice único.
+update public.match_actions
+set action_id = action_id || ':' || id::text
+where action_id is not null
+  and action_id not like '%:%';
+create unique index if not exists match_actions_action_id_uq on public.match_actions(action_id);
 
 alter table public.match_actions enable row level security;
 
+drop policy if exists "match_actions_rw_authenticated" on public.match_actions;
 create policy "match_actions_rw_authenticated"
 on public.match_actions for all
 using (auth.role() = 'authenticated')
@@ -113,14 +126,17 @@ create table if not exists public.friends (
 
 alter table public.friends enable row level security;
 
+drop policy if exists "friends_select_owner" on public.friends;
 create policy "friends_select_owner"
 on public.friends for select
 using (auth.uid() = owner_id);
 
+drop policy if exists "friends_insert_owner" on public.friends;
 create policy "friends_insert_owner"
 on public.friends for insert
 with check (auth.uid() = owner_id);
 
+drop policy if exists "friends_delete_owner" on public.friends;
 create policy "friends_delete_owner"
 on public.friends for delete
 using (auth.uid() = owner_id);
@@ -135,6 +151,7 @@ create table if not exists public.friend_messages (
 
 alter table public.friend_messages enable row level security;
 
+drop policy if exists "friend_messages_rw_participants" on public.friend_messages;
 create policy "friend_messages_rw_participants"
 on public.friend_messages for all
 using (auth.uid() = sender_id or auth.uid() = receiver_id)
@@ -387,6 +404,69 @@ $$;
 
 grant execute on function public.join_specific_room(text, text, text) to authenticated;
 
+create or replace function public.commit_match_action(
+  p_match_id text,
+  p_player_id text,
+  p_action_id text,
+  p_target_id text,
+  p_timestamp_ms bigint,
+  p_payload jsonb,
+  p_expected_owner text,
+  p_next_owner text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_match public.matches%rowtype;
+begin
+  if p_match_id is null or p_player_id is null or p_action_id is null or p_payload is null then
+    raise exception 'Parâmetros inválidos para commit_match_action';
+  end if;
+
+  select * into v_match
+  from public.matches
+  where match_id = p_match_id
+  for update;
+
+  if not found then
+    raise exception 'Partida não encontrada';
+  end if;
+
+  if v_match.status not in ('waiting', 'in_progress') then
+    return false;
+  end if;
+
+  if p_expected_owner is not null and v_match.current_turn_owner is distinct from p_expected_owner then
+    return false;
+  end if;
+
+  if p_expected_owner is not null and p_player_id is distinct from v_match.current_turn_owner then
+    return false;
+  end if;
+
+  insert into public.match_actions(match_id, player_id, action_id, target_id, timestamp_ms, payload)
+  values (p_match_id, p_player_id, p_action_id, p_target_id, p_timestamp_ms, p_payload)
+  on conflict (action_id) do nothing;
+
+  if p_expected_owner is not null and p_next_owner is not null then
+    if p_next_owner = v_match.p1_id or p_next_owner = v_match.p2_id or p_next_owner = v_match.p3_id or p_next_owner = v_match.p4_id then
+      update public.matches
+      set current_turn_owner = p_next_owner,
+          updated_at = now()
+      where match_id = p_match_id
+        and status in ('waiting', 'in_progress');
+    end if;
+  end if;
+
+  return true;
+end;
+$$;
+
+grant execute on function public.commit_match_action(text, text, text, text, bigint, jsonb, text, text) to authenticated;
+
 create or replace function public.advance_turn_owner(
   p_match_id text,
   p_expected_owner text,
@@ -452,6 +532,7 @@ create table if not exists public.match_ready_states (
 
 alter table public.match_ready_states enable row level security;
 
+drop policy if exists "match_ready_states_rw_authenticated" on public.match_ready_states;
 create policy "match_ready_states_rw_authenticated"
 on public.match_ready_states for all
 using (auth.role() = 'authenticated')
