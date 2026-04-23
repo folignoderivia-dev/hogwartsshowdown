@@ -1,6 +1,6 @@
 "use client"
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, FlaskConical, Send, Wand2, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,11 +13,6 @@ import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
 
 export type { RoundAction } from "@/lib/duelActions"
-
-export interface DuelArenaHandle {
-  /** Injeta ação remota (ex.: mensagem WebSocket do servidor). */
-  submitRemoteAction: (casterId: string, action: RoundAction) => void
-}
 
 interface DuelArenaProps {
   playerBuild: PlayerBuild
@@ -307,10 +302,9 @@ function Heart({ fillPercent }: { fillPercent: number }) {
   )
 }
 
-const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena(
-  { playerBuild, onReturn, onBattleEnd, matchId, isSpectator = false, participantIds = [], participantNames = [], localNetworkId, matchStatus },
-  ref
-) {
+const DuelArena = (
+  { playerBuild, onReturn, onBattleEnd, matchId, isSpectator = false, participantIds = [], participantNames = [], localNetworkId, matchStatus }: DuelArenaProps
+) => {
   if (typeof window === "undefined") return null
   const isOfflineMode = playerBuild.gameMode === "teste" || playerBuild.gameMode === "challenge"
   const localOnlineId = localNetworkId || playerBuild.userId || null
@@ -539,11 +533,9 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const addLog = useCallback((line: string) => {
     setBattleLog((prev) => [...prev, line])
   }, [])
-  useImperativeHandle(ref, () => ({
-    submitRemoteAction: () => {
-      // Fluxo antigo desativado: combate PvP usa exclusivamente match_turns.
-    },
-  }), [])
+  useEffect(() => {
+    alert("Engine Nova Carregada")
+  }, [])
 
   const submitTurnAction = useCallback(async (action: RoundAction) => {
     if (isOfflineMode || !matchId || !selfDuelistId) return
@@ -2459,6 +2451,6 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       )}
     </div>
   )
-})
+}
 
 export default DuelArena
