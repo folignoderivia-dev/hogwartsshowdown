@@ -28,6 +28,7 @@ interface DuelArenaProps {
   isSpectator?: boolean
   participantIds?: string[]
   participantNames?: string[]
+  localNetworkId?: string
 }
 
 type DebuffType =
@@ -387,7 +388,7 @@ function Heart({ fillPercent }: { fillPercent: number }) {
 }
 
 const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena(
-  { playerBuild, onReturn, onBattleEnd, matchId, onDispatchAction, isSpectator = false, participantIds = [], participantNames = [] },
+  { playerBuild, onReturn, onBattleEnd, matchId, onDispatchAction, isSpectator = false, participantIds = [], participantNames = [], localNetworkId },
   ref
 ) {
   const [duelists, setDuelists] = useState<Duelist[]>(() => {
@@ -496,7 +497,14 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "Sistema", text: "Chat ativo." }])
   const [chatInput, setChatInput] = useState("")
   const isReadOnlySpectator = isSpectator || (!!matchId && !!playerBuild.userId && participantIds.length > 0 && !participantIds.includes(playerBuild.userId))
-  const localOnlineId = playerBuild.userId || "player"
+  const localOnlineId = localNetworkId || playerBuild.userId || "player"
+  const toNetworkId = useCallback((internalId: string) => {
+    return internalId === "player" ? localOnlineId : internalId
+  }, [localOnlineId])
+  const fromNetworkId = useCallback((networkId?: string) => {
+    if (!networkId) return undefined
+    return networkId === localOnlineId ? "player" : networkId
+  }, [localOnlineId])
 
   useEffect(() => {
     if (playerBuild.gameMode === "teste") return
@@ -553,9 +561,15 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
   useImperativeHandle(ref, () => ({
     submitRemoteAction: (casterId: string, action: RoundAction) => {
-      setActions((prev) => ({ ...prev, [casterId]: action }))
+      const internalCaster = fromNetworkId(casterId) || casterId
+      const normalized: RoundAction = {
+        ...action,
+        casterId: internalCaster,
+        targetId: fromNetworkId(action.targetId),
+      }
+      setActions((prev) => ({ ...prev, [internalCaster]: normalized }))
     },
-  }))
+  }), [fromNetworkId])
   const arenaRef = useRef<HTMLDivElement | null>(null)
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
@@ -782,17 +796,22 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   }
 
   const applyRapinomonioBlock = useCallback((state: Duelist[]) => {
-    return state.map((d) => {
-      if (WAND_PASSIVES[d.wand]?.effect !== "rapinomonio_random_block_2") return d
-      if (!d.spells || d.spells.length === 0) return d
-      const shuffled = [...d.spells].sort(() => Math.random() - 0.5)
-      const picks = shuffled.slice(0, Math.min(2, shuffled.length))
-      const nextDisabled = { ...(d.disabledSpells || {}) }
-      picks.forEach((s) => {
-        nextDisabled[s] = Math.max(nextDisabled[s] || 0, 999)
-      })
-      return { ...d, disabledSpells: nextDisabled }
-    })
+    let next = [...state]
+    const casters = next.filter((d) => WAND_PASSIVES[d.wand]?.effect === "rapinomonio_random_block_2")
+    for (const caster of casters) {
+      const foes = next.filter((d) => d.id !== caster.id && d.team !== caster.team)
+      for (const foe of foes) {
+        if (!foe.spells || foe.spells.length === 0) continue
+        const shuffled = [...foe.spells].sort(() => Math.random() - 0.5)
+        const picks = shuffled.slice(0, Math.min(2, shuffled.length))
+        const nextDisabled = { ...(foe.disabledSpells || {}) }
+        picks.forEach((s) => {
+          nextDisabled[s] = Math.max(nextDisabled[s] || 0, 999)
+        })
+        next = next.map((d) => (d.id === foe.id ? { ...d, disabledSpells: nextDisabled } : d))
+      }
+    }
+    return next
   }, [])
 
   const beginRoundSelection = (state: Duelist[] = duelists) => {
@@ -1744,9 +1763,10 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     if (taunt && player.lastSpellUsed && spellName !== player.lastSpellUsed) return
 
     const commitCast = (targetId: string, areaAll?: boolean) => {
-      const action: RoundAction = { casterId: "player", type: "cast", spellName, targetId, areaAll }
-      onDispatchAction?.("player", action, matchId)
-      setActions((prev) => ({ ...prev, player: action }))
+      const localAction: RoundAction = { casterId: "player", type: "cast", spellName, targetId, areaAll }
+      const netAction: RoundAction = { ...localAction, casterId: toNetworkId("player"), targetId: toNetworkId(targetId) }
+      onDispatchAction?.(toNetworkId("player") || "player", netAction, matchId)
+      setActions((prev) => ({ ...prev, player: localAction }))
     }
 
     if (isSelfTargetSpell(spellName)) {
@@ -1781,9 +1801,10 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     if (!valid) return
     const prov = player.debuffs.find((d) => d.type === "provoke")
     if (prov?.meta && targetId !== prov.meta) return
-    const action: RoundAction = { casterId: "player", type: "cast", spellName: pendingSpell, targetId }
-    onDispatchAction?.("player", action, matchId)
-    setActions((prev) => ({ ...prev, player: action }))
+    const localAction: RoundAction = { casterId: "player", type: "cast", spellName: pendingSpell, targetId }
+    const netAction: RoundAction = { ...localAction, casterId: toNetworkId("player"), targetId: toNetworkId(targetId) }
+    onDispatchAction?.(toNetworkId("player") || "player", netAction, matchId)
+    setActions((prev) => ({ ...prev, player: localAction }))
     setPendingSpell(null)
   }
 
@@ -1792,9 +1813,10 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     if (potionUsed || gameOver || !player || playerDefeated || battleStatus !== "selecting" || !!actions.player) return
     if (player.debuffs.some((d) => d.type === "no_potion")) return
     setPotionUsed(true)
-    const action: RoundAction = { casterId: "player", type: "potion", potionType: playerBuild.potion }
-    onDispatchAction?.("player", action, matchId)
-    setActions((prev) => ({ ...prev, player: action }))
+    const localAction: RoundAction = { casterId: "player", type: "potion", potionType: playerBuild.potion }
+    const netAction: RoundAction = { ...localAction, casterId: toNetworkId("player") }
+    onDispatchAction?.(toNetworkId("player") || "player", netAction, matchId)
+    setActions((prev) => ({ ...prev, player: localAction }))
   }
 
   const sendChat = () => {
