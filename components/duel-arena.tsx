@@ -36,11 +36,6 @@ interface DuelArenaProps {
   matchStatus?: "waiting" | "in_progress" | "finished"
 }
 
-type MatchBroadcastMessage =
-  | { event: "HERE_I_AM"; userId: string; name?: string }
-  | { event: "GAME_START"; players: string[]; from: string }
-  | { event: "TURN_ACTION"; action: RoundAction }
-
 const HAND_BOTTOM = "https://i.postimg.cc/hPdCk474/varinhaposicao03.png"
 const HAND_TOP = "https://i.postimg.cc/3JvLsrD8/varinhaposicao02.png"
 const SCENARIOS = [
@@ -490,7 +485,7 @@ const DuelArena = (
         nextCount: next.length,
         ids: next.map((d) => d.id),
       })
-      return next
+      return Array.from(new Map(next.map((d) => [d.id, d])).values())
     })
   }, [buildOnlineDuelists, participantIds, playerBuild.gameMode])
 
@@ -520,18 +515,19 @@ const DuelArena = (
   /** Só fica true ao receber `GAME_START` via broadcast (inclui eco self:true). */
   const [gameStartAcknowledged, setGameStartAcknowledged] = useState(isOfflineMode)
   const [knownBroadcastPlayers, setKnownBroadcastPlayers] = useState<string[]>(isOfflineMode ? [selfDuelistId] : [selfDuelistId].filter(Boolean))
-  const [broadcastChannelConnected, setBroadcastChannelConnected] = useState(false)
+  /** Canal `match-${matchId}`: presence + postgres_changes (sem broadcast de turno). */
+  const [matchChannelConnected, setMatchChannelConnected] = useState(false)
   const [channelSubscribeError, setChannelSubscribeError] = useState("")
   const [debugLastEvent, setDebugLastEvent] = useState("")
-  /** Chaves de ingestão (broadcast ∪ backup): Set evita dupla aplicação na mesma tarefa síncrona. */
-  const ingestedActionKeysRef = useRef<Set<string>>(new Set())
-  const broadcastChannelRef = useRef<any | null>(null)
-  const turnActionConfirmedRef = useRef<Set<string>>(new Set())
+  const matchRealtimeChannelRef = useRef<ReturnType<ReturnType<typeof getSupabaseClient>["channel"]> | null>(null)
+  /** PvP Showdown: ações por turno vindas só do ledger `match_turns` (INSERT/UPDATE). */
+  const onlineActionsByTurnRef = useRef<Record<number, Record<string, RoundAction>>>({})
+  const postgresTurnRowDedupeRef = useRef<Set<string>>(new Set())
+  const onlineSelfSubmittedRef = useRef(false)
+  const runResolutionRef = useRef<(actions: RoundAction[]) => Promise<void>>(async () => {})
   const duelistsRef = useRef<Duelist[]>([])
   const turnNumberRef = useRef(turnNumber)
   const battleStatusRef = useRef<BattleStatus>("idle")
-  const gameStartAcknowledgedRef = useRef(isOfflineMode)
-  const peerHereAtRef = useRef<Record<string, number>>({})
   const lastRoundHashRef = useRef<string>("")
 
   useEffect(() => {
@@ -543,10 +539,6 @@ const DuelArena = (
   useEffect(() => {
     battleStatusRef.current = battleStatus
   }, [battleStatus])
-  useEffect(() => {
-    gameStartAcknowledgedRef.current = gameStartAcknowledged
-  }, [gameStartAcknowledged])
-
   const processCombatAction = useCallback((actionPayload: RoundAction) => {
     setPendingActions((prev) => ({ ...prev, [actionPayload.casterId]: actionPayload }))
   }, [])
@@ -560,39 +552,14 @@ const DuelArena = (
       if (unique.length === 0) return
       setDuelists((prev) => {
         const base = buildOnlineDuelists(unique)
-        return base.map((d) => {
+        const merged = base.map((d) => {
           const old = prev.find((p) => p.id === d.id)
           return old ? { ...d, hp: old.hp, debuffs: old.debuffs, spellMana: old.spellMana || d.spellMana } : d
         })
+        return Array.from(new Map(merged.map((d) => [d.id, d])).values())
       })
     },
     [buildOnlineDuelists]
-  )
-
-  const ingestTurnActionFromNetwork = useCallback(
-    (incoming: RoundAction, source: "broadcast" | "backup") => {
-      if (!incoming?.casterId || incoming.turnId == null) return
-      if (incoming.turnId !== turnNumberRef.current) return
-      if (!isOfflineMode && matchId && battleStatusRef.current !== "selecting") return
-      if (!duelistsRef.current.some((d) => d.id === incoming.casterId)) return
-      const dedupeKey =
-        incoming.eventId != null && String(incoming.eventId).length > 0
-          ? `eid:${incoming.eventId}`
-          : `row:${incoming.turnId}:${incoming.casterId}:${incoming.type}:${incoming.spellName ?? ""}:${incoming.targetId ?? ""}:${incoming.potionType ?? ""}`
-      const seen = ingestedActionKeysRef.current
-      if (seen.has(dedupeKey)) return
-      seen.add(dedupeKey)
-      if (seen.size > 400) {
-        const arr = [...seen]
-        ingestedActionKeysRef.current = new Set(arr.slice(-200))
-      }
-      processCombatAction(incoming)
-      turnActionConfirmedRef.current.add(`${incoming.turnId}:${incoming.casterId}`)
-      setDebugLastEvent(
-        source === "broadcast" ? `TURN_ACTION rx ${incoming.casterId.slice(0, 8)}…` : `BACKUP rx ${incoming.casterId.slice(0, 8)}…`
-      )
-    },
-    [isOfflineMode, matchId, processCombatAction]
   )
 
   /** Backup REST/RPC: coluna obrigatória `action_payload` (jsonb) em `public.match_turns`. */
@@ -620,11 +587,12 @@ const DuelArena = (
           console.warn("[Arena] persist: sem sessão JWT (mobile: storage bloqueado ou login expirado).")
         }
 
-        if (turnNumber === 1) await wait(500)
+        const tn = turnNumberRef.current
+        if (tn === 1) await wait(500)
 
         const row = {
           match_id: matchId,
-          turn_number: turnNumber,
+          turn_number: tn,
           player_id: selfDuelistId,
           action_payload: payload as unknown as Record<string, unknown>,
           updated_at: new Date().toISOString(),
@@ -640,13 +608,13 @@ const DuelArena = (
 
         const { error: rpcErr } = await supabase.rpc("submit_duel_turn", {
           p_match_id: matchId,
-          p_turn_number: turnNumber,
+          p_turn_number: tn,
           p_player_id: selfDuelistId,
           p_action_payload: payload as unknown as Record<string, unknown>,
         })
         if (rpcErr) {
           console.warn("[Arena] submit_duel_turn RPC:", rpcErr.message, rpcErr.code, rpcErr.details, rpcErr)
-          addLog(`[Backup]: falha turno ${turnNumber} (upsert + RPC).`)
+          addLog(`[Backup]: falha turno ${tn} (upsert + RPC).`)
           setChannelSubscribeError((prev) => prev || `DB ${rpcErr.code ?? ""}: ${rpcErr.message}`)
           return false
         }
@@ -656,27 +624,30 @@ const DuelArena = (
         return false
       }
     },
-    [addLog, matchId, selfDuelistId, turnNumber]
+    [addLog, matchId, selfDuelistId]
   )
 
   const submitTurnAction = useCallback(
     async (action: RoundAction) => {
       if (isOfflineMode || !matchId || !selfDuelistId) return
-      const eventId = action.eventId || `${selfDuelistId}-${turnNumber}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      const payload: RoundAction = { ...action, casterId: selfDuelistId, turnId: turnNumber, eventId }
+      const tn = turnNumberRef.current
+      const eventId = action.eventId || `${selfDuelistId}-${tn}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const payload: RoundAction = { ...action, casterId: selfDuelistId, turnId: tn, eventId }
       setAwaitingServerAck(true)
-      setBattleMessage("Aguardando confirmação broadcast...")
-      setDebugLastEvent(`TURN_ACTION enviado T${turnNumber}`)
-      await broadcastChannelRef.current?.send({
-        type: "broadcast",
-        event: "TURN_ACTION",
-        payload: { event: "TURN_ACTION", action: payload } satisfies MatchBroadcastMessage,
-      })
+      setBattleMessage("Intenção enviada — aguardando ledger do servidor...")
+      setDebugLastEvent(`TURN_INTENT tx T${tn}`)
       void persistTurnBackup(payload).then((ok) => {
-        if (!ok) console.warn("[Arena] persistTurnBackup retornou false (turno", turnNumber, ")")
+        if (!ok) {
+          console.warn("[Arena] persistTurnBackup retornou false (turno", tn, ")")
+          onlineSelfSubmittedRef.current = false
+          setAwaitingServerAck(false)
+          setBattleMessage("Falha ao gravar turno. Tente de novo.")
+          return
+        }
+        onlineSelfSubmittedRef.current = true
       })
     },
-    [isOfflineMode, matchId, persistTurnBackup, selfDuelistId, turnNumber]
+    [isOfflineMode, matchId, persistTurnBackup, selfDuelistId]
   )
   const arenaRef = useRef<HTMLDivElement | null>(null)
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -701,7 +672,9 @@ const DuelArena = (
     participantIds,
     expectedOnlinePlayers,
   })
-  const onlineReadyPlayers = Math.max(duelists.length, participantIds.length || 0)
+  const onlineReadyPlayers = isOnlineMatch
+    ? Math.max(knownBroadcastPlayers.length, duelists.length)
+    : Math.max(duelists.length, participantIds.length || 0)
   const participantRoster = participantIds.length > 0 ? participantIds : duelists.map((d) => d.id)
 
   useEffect(() => {
@@ -722,239 +695,6 @@ const DuelArena = (
     setGameOver((prev) => prev ?? "timeout")
     setBattleStatus("finished")
   }, [isOnlineMatch, matchStatus])
-
-  useEffect(() => {
-    if (!isOnlineMatch || !matchId || !selfDuelistId) return
-    const supabase = getSupabaseClient()
-    let active = true
-    const known = new Set<string>([selfDuelistId])
-    const expectedPlayers = expectedOnlinePlayers
-    const STALE_HERE_MS = 14_000
-    let lastGameStartEmitAt = 0
-    peerHereAtRef.current[selfDuelistId] = Date.now()
-
-    let liveChannel: ReturnType<typeof supabase.channel> | null = null
-    let heartbeatTimer: ReturnType<typeof window.setInterval> | undefined
-    let gameStartRetryTimer: ReturnType<typeof window.setInterval> | undefined
-
-    const stopIntervals = () => {
-      if (heartbeatTimer !== undefined) {
-        window.clearInterval(heartbeatTimer)
-        heartbeatTimer = undefined
-      }
-      if (gameStartRetryTimer !== undefined) {
-        window.clearInterval(gameStartRetryTimer)
-        gameStartRetryTimer = undefined
-      }
-    }
-
-    const pruneStalePeers = () => {
-      const now = Date.now()
-      for (const id of [...known]) {
-        if (id === selfDuelistId) continue
-        const last = peerHereAtRef.current[id] ?? 0
-        if (last === 0 || now - last > STALE_HERE_MS) known.delete(id)
-      }
-    }
-
-    const coordinator = () => {
-      pruneStalePeers()
-      const alive = Array.from(known).sort()
-      return alive[0] === selfDuelistId
-    }
-
-    const emitGameStart = async (players: string[]) => {
-      const uniquePlayers = players.filter((id, idx) => !!id && players.indexOf(id) === idx)
-      if (uniquePlayers.length < expectedPlayers) return
-      setDebugLastEvent("GAME_START tx")
-      await broadcastChannelRef.current?.send({
-        type: "broadcast",
-        event: "GAME_START",
-        payload: { event: "GAME_START", players: uniquePlayers, from: selfDuelistId } satisfies MatchBroadcastMessage,
-      })
-    }
-
-    const startIntervals = () => {
-      stopIntervals()
-      if (!liveChannel || !active) return
-      heartbeatTimer = window.setInterval(() => {
-        if (!active || !liveChannel) return
-        peerHereAtRef.current[selfDuelistId] = Date.now()
-        void liveChannel.send({
-          type: "broadcast",
-          event: "HERE_I_AM",
-          payload: { event: "HERE_I_AM", userId: selfDuelistId, name: playerBuild.name } satisfies MatchBroadcastMessage,
-        })
-      }, 8000)
-      gameStartRetryTimer = window.setInterval(() => {
-        if (!active || gameStartAcknowledgedRef.current || !liveChannel) return
-        pruneStalePeers()
-        const ids = Array.from(known).sort()
-        setKnownBroadcastPlayers(ids)
-        mergeDuelistsFromPlayerIds(ids)
-        if (known.size < expectedPlayers) return
-        if (!coordinator()) return
-        const now = Date.now()
-        if (now - lastGameStartEmitAt < 4500) return
-        lastGameStartEmitAt = now
-        void emitGameStart(ids)
-      }, 3200)
-    }
-
-    const wireHandlers = (channel: ReturnType<typeof supabase.channel>) =>
-      channel
-        .on("broadcast", { event: "HERE_I_AM" }, async ({ payload }: { payload: MatchBroadcastMessage }) => {
-          if (!active || payload.event !== "HERE_I_AM") return
-          if (!payload.userId) return
-          peerHereAtRef.current[payload.userId] = Date.now()
-          known.add(payload.userId)
-          pruneStalePeers()
-          const ids = Array.from(known).sort()
-          setKnownBroadcastPlayers(ids)
-          setDebugLastEvent(`HERE_I_AM ${payload.userId.slice(0, 8)}…`)
-          mergeDuelistsFromPlayerIds(ids)
-          if (coordinator() && known.size >= expectedPlayers) await emitGameStart(ids)
-        })
-        .on("broadcast", { event: "GAME_START" }, ({ payload }: { payload: MatchBroadcastMessage }) => {
-          if (!active || payload.event !== "GAME_START") return
-          const players = (payload.players || []).filter((id) => !!id)
-          if (players.length < expectedPlayers) return
-          if (!players.includes(selfDuelistId)) return
-          setKnownBroadcastPlayers(players.sort())
-          mergeDuelistsFromPlayerIds(players)
-          setGameStartAcknowledged(true)
-          setBattleMessage("")
-          setDebugLastEvent("GAME_START rx")
-        })
-        .on("broadcast", { event: "TURN_ACTION" }, ({ payload }: { payload: MatchBroadcastMessage }) => {
-          if (!active || payload.event !== "TURN_ACTION") return
-          ingestTurnActionFromNetwork(payload.action, "broadcast")
-        })
-
-    const subscribeWithTimeout = (channel: ReturnType<typeof supabase.channel>) =>
-      new Promise<boolean>((resolve) => {
-        let settled = false
-        let subscribedOk = false
-        const watchdog = window.setTimeout(() => {
-          if (!active || settled) return
-          settled = true
-          setBroadcastChannelConnected(false)
-          const msg = "Timeout 2s sem SUBSCRIBED"
-          setChannelSubscribeError(msg)
-          console.warn("[Arena]", msg)
-          void supabase.removeChannel(channel)
-          if (broadcastChannelRef.current === channel) broadcastChannelRef.current = null
-          liveChannel = null
-          resolve(false)
-        }, 2000)
-
-        channel.subscribe((status, err) => {
-          if (!active) return
-          if (err) {
-            const em = err instanceof Error ? err.message : String(err)
-            setChannelSubscribeError(em)
-            console.warn("[Arena] Realtime subscribe erro:", err)
-          }
-          if (status === "SUBSCRIBED") {
-            if (!active) return
-            if (settled) return
-            settled = true
-            window.clearTimeout(watchdog)
-            subscribedOk = true
-            liveChannel = channel
-            broadcastChannelRef.current = channel
-            setBroadcastChannelConnected(true)
-            setChannelSubscribeError("")
-            setDebugLastEvent("Canal SUBSCRIBED")
-            peerHereAtRef.current[selfDuelistId] = Date.now()
-            void channel.send({
-              type: "broadcast",
-              event: "HERE_I_AM",
-              payload: { event: "HERE_I_AM", userId: selfDuelistId, name: playerBuild.name } satisfies MatchBroadcastMessage,
-            })
-            startIntervals()
-            resolve(true)
-            return
-          }
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || (status === "CLOSED" && !subscribedOk)) {
-            setDebugLastEvent(`Canal: ${status}`)
-            setChannelSubscribeError((prev) => prev || status)
-            if (!subscribedOk) {
-              void supabase.removeChannel(channel)
-              if (broadcastChannelRef.current === channel) broadcastChannelRef.current = null
-              liveChannel = null
-            }
-            if (!settled) {
-              settled = true
-              window.clearTimeout(watchdog)
-              resolve(false)
-            }
-          }
-        })
-      })
-
-    const runLoop = async () => {
-      let attempt = 0
-      while (active && attempt < 50) {
-        attempt += 1
-        stopIntervals()
-        if (liveChannel) {
-          await supabase.removeChannel(liveChannel)
-          liveChannel = null
-          broadcastChannelRef.current = null
-        }
-        setBroadcastChannelConnected(false)
-        setDebugLastEvent(`Canal tentativa ${attempt}`)
-
-        const channel = supabase.channel(`match-${matchId}`, {
-          config: {
-            broadcast: { self: true },
-            presence: { key: selfDuelistId },
-          },
-        })
-        wireHandlers(channel)
-        const ok = await subscribeWithTimeout(channel)
-        if (ok && active) break
-        const backoff = 450 + Math.min(attempt, 10) * 120
-        await new Promise((r) => setTimeout(r, backoff))
-      }
-    }
-
-    void runLoop()
-
-    return () => {
-      active = false
-      stopIntervals()
-      const c = broadcastChannelRef.current
-      if (c) void supabase.removeChannel(c)
-      liveChannel = null
-      broadcastChannelRef.current = null
-      setBroadcastChannelConnected(false)
-    }
-  }, [expectedOnlinePlayers, ingestTurnActionFromNetwork, isOnlineMatch, matchId, mergeDuelistsFromPlayerIds, playerBuild.name, selfDuelistId])
-
-  useEffect(() => {
-    if (!isOnlineMatch || !matchId || battleStatus !== "selecting") return
-    const supabase = getSupabaseClient()
-    const poll = async () => {
-      const tn = turnNumberRef.current
-      const { data, error } = await supabase
-        .from("match_turns")
-        .select("turn_number,player_id,action_payload")
-        .eq("match_id", matchId)
-        .eq("turn_number", tn)
-      if (error) return
-      for (const row of data || []) {
-        const playerId = String((row as { player_id?: string }).player_id || "")
-        const raw = (row as { action_payload?: RoundAction }).action_payload
-        if (!playerId || !raw) continue
-        ingestTurnActionFromNetwork({ ...raw, casterId: playerId, turnId: tn }, "backup")
-      }
-    }
-    const id = window.setInterval(() => void poll(), 1500)
-    void poll()
-    return () => window.clearInterval(id)
-  }, [battleStatus, ingestTurnActionFromNetwork, isOnlineMatch, matchId])
 
   const playSpellVfx = async (spellName: string, attacker: Duelist, targets: Duelist[]) => {
     const arena = arenaRef.current
@@ -1081,9 +821,11 @@ const DuelArena = (
 
   const beginRoundSelection = (state: Duelist[] = duelists) => {
     if (gameOver) return
+    const rt = turnNumberRef.current
     if (isOnlineMatch) {
-      turnActionConfirmedRef.current = new Set()
-      ingestedActionKeysRef.current.clear()
+      onlineActionsByTurnRef.current = {}
+      postgresTurnRowDedupeRef.current.clear()
+      onlineSelfSubmittedRef.current = false
     }
     setCircumFlames((prev) => {
       const next: Record<string, number> = {}
@@ -1118,7 +860,7 @@ const DuelArena = (
         .filter((d) => !d.isPlayer && !isDefeated(d.hp))
         .forEach((bot) => {
         if (bot.debuffs.some((d) => d.type === "stun" || d.type === "freeze")) {
-          initialActions[bot.id] = { casterId: bot.id, type: "skip", turnId: turnNumber }
+          initialActions[bot.id] = { casterId: bot.id, type: "skip", turnId: rt }
           return
         }
         const availableBotSpells = bot.spells.filter((s) => (bot.disabledSpells?.[s] ?? 0) <= 0)
@@ -1147,17 +889,17 @@ const DuelArena = (
           target = targets[Math.floor(Math.random() * targets.length)]
         }
         initialActions[bot.id] = target
-          ? { casterId: bot.id, type: "cast", spellName, targetId: target.id, areaAll: isAreaSpell(spellName), turnId: turnNumber }
-          : { casterId: bot.id, type: "skip", turnId: turnNumber }
+          ? { casterId: bot.id, type: "cast", spellName, targetId: target.id, areaAll: isAreaSpell(spellName), turnId: rt }
+          : { casterId: bot.id, type: "skip", turnId: rt }
         })
     }
 
     const localPlayer = state.find((d) => d.id === selfDuelistId)
     if (!isOnlineMatch) {
       if (!localPlayer || isDefeated(localPlayer.hp)) {
-        initialActions[selfDuelistId] = { casterId: selfDuelistId, type: "skip", turnId: turnNumber }
+        initialActions[selfDuelistId] = { casterId: selfDuelistId, type: "skip", turnId: rt }
       } else if (localPlayer.debuffs.some((d) => d.type === "stun" || d.type === "freeze")) {
-        initialActions[selfDuelistId] = { casterId: selfDuelistId, type: "skip", turnId: turnNumber }
+        initialActions[selfDuelistId] = { casterId: selfDuelistId, type: "skip", turnId: rt }
       }
     }
     setPendingActions(initialActions)
@@ -1166,9 +908,12 @@ const DuelArena = (
   const runResolution = async (queuedActions: RoundAction[]) => {
     if (resolvingRef.current) return
     resolvingRef.current = true
+    const roundTurn = turnNumberRef.current
     try {
       setBattleStatus("resolving")
-      setAwaitingServerAck(false)
+      if (!isOnlineMatch) {
+        setAwaitingServerAck(false)
+      }
       setBattleMessage("")
       const snapshot = [...duelistsRef.current]
       const aliveIds = snapshot.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
@@ -1176,18 +921,19 @@ const DuelArena = (
         const byCaster = new Map(queuedActions.map((a) => [a.casterId, a]))
         const syncBad = aliveIds.some((id) => {
           const a = byCaster.get(id)
-          return !a || a.turnId !== turnNumber
+          return !a || a.turnId !== roundTurn
         })
         if (syncBad) {
           console.warn("[Arena] runResolution: fila de ações incompleta ou turnId divergente", {
             aliveIds,
-            turnNumber,
+            roundTurn,
             queued: queuedActions,
           })
-          addLog(`[Sync]: erro de sincronia no turno ${turnNumber}.`)
+          addLog(`[Sync]: erro de sincronia no turno ${roundTurn}.`)
           setBattleMessage("Erro de Sincronia: Tentando novamente...")
           setPendingActions({})
-          turnActionConfirmedRef.current = new Set()
+          delete onlineActionsByTurnRef.current[roundTurn]
+          setAwaitingServerAck(false)
           setBattleStatus("selecting")
           return
         }
@@ -1199,24 +945,29 @@ const DuelArena = (
           duelists: snapshot,
           actions: queuedActions,
           spellDatabase: SPELL_DATABASE,
-          turnNumber,
+          turnNumber: roundTurn,
           gameMode: playerBuild.gameMode,
           circumFlames,
         })
       } catch (engineErr) {
         console.warn("[Arena] calculateTurnOutcome:", engineErr)
-        addLog(`[Engine]: exceção no turno ${turnNumber} — abortando resolução.`)
+        addLog(`[Engine]: exceção no turno ${roundTurn} — abortando resolução.`)
         setBattleMessage("Erro de Sincronia: Tentando novamente...")
         if (isOnlineMatch) {
           setPendingActions({})
-          turnActionConfirmedRef.current = new Set()
+          delete onlineActionsByTurnRef.current[roundTurn]
+          setAwaitingServerAck(false)
         }
         setBattleStatus("selecting")
         return
       }
       let state = outcome.newDuelists
+      if (isOnlineMatch) {
+        state = Array.from(new Map(state.map((d) => [d.id, d])).values())
+      }
       for (const anim of outcome.animationsToPlay) {
         if (isOnlineMatch && matchStatus === "finished") {
+          setAwaitingServerAck(false)
           setGameOver((prev) => prev ?? "timeout")
           setBattleStatus("finished")
           return
@@ -1242,7 +993,7 @@ const DuelArena = (
 
       setDuelists(state)
       setBattleLog((prev) => [...prev, ...outcome.logs])
-      const resolvedTurn = turnNumber
+      const resolvedTurn = roundTurn
       const roundHash = computeRoundHash(resolvedTurn, state)
       if (lastRoundHashRef.current !== roundHash) {
         console.log("[Engine] roundHash", {
@@ -1253,8 +1004,14 @@ const DuelArena = (
         lastRoundHashRef.current = roundHash
       }
       setPendingActions({})
-      const nextTurn = turnNumber + 1
+      const nextTurn = roundTurn + 1
+      turnNumberRef.current = nextTurn
       setTurnNumber(nextTurn)
+      if (isOnlineMatch) {
+        delete onlineActionsByTurnRef.current[resolvedTurn]
+        setAwaitingServerAck(false)
+        setBattleMessage("")
+      }
       if (outcome.outcome) {
         if (playerBuild.gameMode === "challenge" && outcome.outcome === "win" && challengeStage < CHALLENGE_LABELS.length - 1) {
           const nextStage = challengeStage + 1
@@ -1266,6 +1023,7 @@ const DuelArena = (
           setPotionUsed(false)
           setPendingSpell(null)
           setGameOver(null)
+          turnNumberRef.current = 1
           setTurnNumber(1)
           setBattleStatus("selecting")
           beginRoundSelection(nextRound)
@@ -1285,11 +1043,151 @@ const DuelArena = (
     } catch (e) {
       console.error("[Arena] runResolution", e)
       addLog("[Engine]: erro na resolução do turno; estado revertido para seleção.")
+      if (isOnlineMatch) {
+        setAwaitingServerAck(false)
+        delete onlineActionsByTurnRef.current[roundTurn]
+      }
       setBattleStatus("selecting")
     } finally {
       resolvingRef.current = false
     }
   }
+
+  runResolutionRef.current = runResolution
+
+  const tryFlushOnlineTurnFromServer = useCallback(() => {
+    if (!isOnlineMatch || !matchId || !selfDuelistId) return
+    if (resolvingRef.current) return
+    if (battleStatusRef.current !== "selecting") return
+    const tn = turnNumberRef.current
+    const alive = duelistsRef.current.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
+    if (alive.length === 0) return
+    const buf = onlineActionsByTurnRef.current[tn] || {}
+    const allReady = alive.every((id) => {
+      const a = buf[id]
+      return !!a && a.turnId === tn
+    })
+    if (!allReady) return
+    const actionList = alive.map((id) => buf[id]!)
+    setDebugLastEvent(`SHOWDOWN_FLUSH T${tn}`)
+    void runResolutionRef.current(actionList)
+  }, [isOnlineMatch, matchId, selfDuelistId])
+
+  const ingestMatchTurnRow = useCallback(
+    (row: { id?: number | string; turn_number?: number; player_id?: string; action_payload?: RoundAction }) => {
+      const tn = Number(row.turn_number)
+      const pid = String(row.player_id || "")
+      if (!pid || row.action_payload == null) return
+      const dedupeKey = row.id != null && String(row.id).length > 0 ? `rid:${row.id}` : `tp:${tn}:${pid}`
+      if (postgresTurnRowDedupeRef.current.has(dedupeKey)) return
+      postgresTurnRowDedupeRef.current.add(dedupeKey)
+      if (postgresTurnRowDedupeRef.current.size > 600) {
+        postgresTurnRowDedupeRef.current = new Set([...postgresTurnRowDedupeRef.current].slice(-300))
+      }
+      const raw = row.action_payload as RoundAction
+      const action: RoundAction = { ...raw, casterId: pid, turnId: tn }
+      if (!onlineActionsByTurnRef.current[tn]) onlineActionsByTurnRef.current[tn] = {}
+      onlineActionsByTurnRef.current[tn][pid] = action
+      setDebugLastEvent(`match_turns ${tn} ← ${pid.slice(0, 8)}…`)
+      tryFlushOnlineTurnFromServer()
+    },
+    [tryFlushOnlineTurnFromServer]
+  )
+
+  useEffect(() => {
+    if (!isOnlineMatch || !matchId || !selfDuelistId || isReadOnlySpectator) return
+    const supabase = getSupabaseClient()
+    const presenceKey = playerBuild.userId || selfDuelistId
+    const channel = supabase.channel(`match-${matchId}`, {
+      config: { presence: { key: presenceKey } },
+    })
+
+    const syncPresenceRoster = () => {
+      const raw = channel.presenceState() as Record<string, unknown[]>
+      const uuidRe =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      const merged = Object.keys(raw || {})
+        .filter((k) => uuidRe.test(k))
+        .sort()
+      setKnownBroadcastPlayers(merged.length > 0 ? merged : [selfDuelistId])
+      if (merged.length > 0) mergeDuelistsFromPlayerIds(merged)
+      if (merged.length >= expectedOnlinePlayers) {
+        setGameStartAcknowledged(true)
+        setBattleMessage("")
+        setDebugLastEvent(`presence:${merged.length}`)
+      } else {
+        setGameStartAcknowledged(false)
+      }
+    }
+
+    channel
+      .on("presence", { event: "sync" }, syncPresenceRoster)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "match_turns", filter: `match_id=eq.${matchId}` },
+        (payload: { eventType?: string; new?: Record<string, unknown> }) => {
+          if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") return
+          const row = payload.new as { id?: number | string; match_id?: string; turn_number?: number; player_id?: string; action_payload?: RoundAction }
+          if (!row) return
+          if (row.match_id != null && String(row.match_id) !== matchId) return
+          ingestMatchTurnRow(row)
+        }
+      )
+      .subscribe(async (status, err) => {
+        if (err) {
+          const em = err instanceof Error ? err.message : String(err)
+          setChannelSubscribeError(em)
+          console.warn("[Arena] Realtime:", err)
+        }
+        if (status === "SUBSCRIBED") {
+          setMatchChannelConnected(true)
+          setChannelSubscribeError("")
+          setDebugLastEvent("match channel SUBSCRIBED")
+          try {
+            await channel.track({
+              user_id: selfDuelistId,
+              name: playerBuild.name,
+              online_at: new Date().toISOString(),
+            })
+          } catch (trackErr) {
+            console.warn("[Arena] presence.track", trackErr)
+          }
+          syncPresenceRoster()
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          setMatchChannelConnected(false)
+          setDebugLastEvent(`match channel ${status}`)
+        }
+      })
+
+    matchRealtimeChannelRef.current = channel
+    return () => {
+      matchRealtimeChannelRef.current = null
+      setMatchChannelConnected(false)
+      void supabase.removeChannel(channel)
+    }
+  }, [expectedOnlinePlayers, ingestMatchTurnRow, isOnlineMatch, isReadOnlySpectator, matchId, mergeDuelistsFromPlayerIds, playerBuild.name, playerBuild.userId, selfDuelistId])
+
+  useEffect(() => {
+    if (!isOnlineMatch || !matchId || !gameStartAcknowledged || isReadOnlySpectator) return
+    let cancelled = false
+    const supabase = getSupabaseClient()
+    const tn = turnNumberRef.current
+    void (async () => {
+      const { data, error } = await supabase
+        .from("match_turns")
+        .select("id,turn_number,player_id,action_payload,match_id")
+        .eq("match_id", matchId)
+        .eq("turn_number", tn)
+      if (cancelled || error || !data?.length) return
+      for (const row of data) {
+        ingestMatchTurnRow(row as { id?: number | string; turn_number?: number; player_id?: string; action_payload?: RoundAction })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [gameStartAcknowledged, ingestMatchTurnRow, isOnlineMatch, isReadOnlySpectator, matchId, turnNumber])
 
   useEffect(() => {
     setBackgroundImage(SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)])
@@ -1346,7 +1244,7 @@ const DuelArena = (
       setTimeLeft((prev) => {
         if (prev <= 1) {
           if (isOnlineMatch) {
-            const selfActed = !!pendingActionsRef.current[selfDuelistId]
+            const selfActed = onlineSelfSubmittedRef.current || awaitingServerAck
             if (!selfActed) {
               addLog(`[Turno ${turnNumber}]: tempo esgotado (2 min) — derrota por inatividade.`)
               setGameOver("lose")
@@ -1354,7 +1252,7 @@ const DuelArena = (
               return 0
             }
             if (!awaitingServerAck) {
-              const skipAction: RoundAction = { casterId: selfDuelistId, type: "skip", turnId: turnNumber }
+              const skipAction: RoundAction = { casterId: selfDuelistId, type: "skip", turnId: turnNumberRef.current }
               void submitTurnAction(skipAction)
             }
             return 0
@@ -1386,6 +1284,7 @@ const DuelArena = (
   }, [addLog, awaitingServerAck, battleStatus, duelists, gameOver, isOnlineMatch, pendingActions, player?.name, playerDefeated, selfDuelistId, submitTurnAction, turnNumber])
 
   useEffect(() => {
+    if (isOnlineMatch) return
     if (battleStatus !== "selecting") return
     const aliveIds = duelists.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
     if (aliveIds.length === 0) return
@@ -1394,12 +1293,8 @@ const DuelArena = (
       return !!a && a.turnId === turnNumber
     })
     if (!pendingComplete) return
-    if (isOnlineMatch) {
-      const allConfirmed = aliveIds.every((id) => turnActionConfirmedRef.current.has(`${turnNumber}:${id}`))
-      if (!allConfirmed) return
-    }
     const actionList = Object.values(pendingActions).filter((a) => aliveIds.includes(a.casterId))
-    console.log("[SHOWDOWN] Turno Completo Recebido:", actionList)
+    console.log("[SHOWDOWN] Turno offline completo:", actionList)
     void runResolution(actionList)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [battleStatus, duelists, isOnlineMatch, pendingActions, turnNumber])
@@ -1408,7 +1303,8 @@ const DuelArena = (
     if (isReadOnlySpectator) return
     if (isOnlineMatch && !gameStartAcknowledged) return
     if (!isBattleReady || isInitializing) return
-    if (gameOver || battleStatus !== "selecting" || playerCannotAct || playerDefeated || pendingActions[selfDuelistId] || awaitingServerAck) return
+    if (gameOver || battleStatus !== "selecting" || playerCannotAct || playerDefeated || awaitingServerAck) return
+    if (!isOnlineMatch && pendingActions[selfDuelistId]) return
     if (!player || isDefeated(player.hp)) return
     const mana = player.spellMana?.[spellName]
     if (!mana || mana.current <= 0) return
@@ -1457,7 +1353,8 @@ const DuelArena = (
     if (isReadOnlySpectator) return
     if (isOnlineMatch && !gameStartAcknowledged) return
     if (!isBattleReady || isInitializing) return
-    if (!pendingSpell || !player || playerDefeated || battleStatus !== "selecting" || pendingActions[selfDuelistId] || awaitingServerAck) return
+    if (!pendingSpell || !player || playerDefeated || battleStatus !== "selecting" || awaitingServerAck) return
+    if (!isOnlineMatch && pendingActions[selfDuelistId]) return
     const valid = getValidTargetsForSpell(pendingSpell, player, duelists).some((d) => d.id === targetId && !isDefeated(d.hp))
     if (!valid) return
     const prov = player.debuffs.find((d) => d.type === "provoke")
@@ -1476,7 +1373,8 @@ const DuelArena = (
     if (isReadOnlySpectator) return
     if (isOnlineMatch && !gameStartAcknowledged) return
     if (!isBattleReady || isInitializing) return
-    if (potionUsed || gameOver || !player || playerDefeated || battleStatus !== "selecting" || !!pendingActions[selfDuelistId] || awaitingServerAck) return
+    if (potionUsed || gameOver || !player || playerDefeated || battleStatus !== "selecting" || awaitingServerAck) return
+    if (!isOnlineMatch && !!pendingActions[selfDuelistId]) return
     if (player.debuffs.some((d) => d.type === "no_potion")) return
     setPotionUsed(true)
     const localAction: RoundAction = { casterId: selfDuelistId, type: "potion", potionType: playerBuild.potion, turnId: turnNumber }
@@ -1864,7 +1762,7 @@ const DuelArena = (
             <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-red-950/50">
               <div className="rounded-xl border border-red-600 bg-red-900/80 px-6 py-4 text-center shadow-[0_0_30px_rgba(239,68,68,0.45)]">
                 <p className="text-xl font-bold tracking-wide text-red-100">AGUARDANDO OPONENTE...</p>
-                <p className="mt-1 text-xs text-red-200/90">Conexão via broadcast ativa. A luta começa sem esperar o banco.</p>
+                <p className="mt-1 text-xs text-red-200/90">Supabase Presence: a luta só começa com {expectedOnlinePlayers} UUID(s) reais no canal.</p>
               </div>
             </div>
           )}
@@ -1934,16 +1832,20 @@ const DuelArena = (
             </p>
           )}
           {!isOfflineMode && !isBattleReady && (
-            <p className="mb-2 text-xs text-amber-300">Conectando canal de broadcast da partida...</p>
+            <p className="mb-2 text-xs text-amber-300">Conectando canal Realtime (presence + ledger)...</p>
           )}
           {isReadOnlySpectator && <p className="mb-2 text-xs text-blue-300">Modo espectador: comandos de combate desabilitados.</p>}
           {playerDefeated && <p className="mb-2 text-xs text-red-300">Você foi derrotado e agora é espectador.</p>}
-          {!playerDefeated && battleStatus === "selecting" && pendingActions[selfDuelistId] && <p className="mb-2 text-xs text-amber-300">Aguardando outros bruxos...</p>}
-          {!playerDefeated && awaitingServerAck && <p className="mb-2 text-xs text-amber-300">Enviando ação para o servidor...</p>}
+          {!playerDefeated && battleStatus === "selecting" && !isOnlineMatch && pendingActions[selfDuelistId] && (
+            <p className="mb-2 text-xs text-amber-300">Aguardando outros bruxos...</p>
+          )}
+          {!playerDefeated && awaitingServerAck && (
+            <p className="mb-2 text-xs text-amber-300">Intenção registrada — aguardando oponente e fita do servidor...</p>
+          )}
           {playerCannotAct && !playerDefeated && !pendingActions[selfDuelistId] && <p className="mb-2 text-xs text-red-300">Você está sob Freeze/Stun e não pode agir neste turno.</p>}
           {pendingSpell && <p className="mb-2 text-xs text-amber-300">Feitiço selecionado: {pendingSpell}. Escolha um alvo.</p>}
 
-          {!isReadOnlySpectator && !pendingActions[selfDuelistId] && (
+          {!isReadOnlySpectator && (isOnlineMatch ? !awaitingServerAck : !pendingActions[selfDuelistId]) && (
             <div className="mb-2 flex flex-wrap gap-2">
               {playerBuild.spells.map((spell) => {
                 const mana = player?.spellMana?.[spell]
@@ -1996,7 +1898,7 @@ const DuelArena = (
           className="pointer-events-none fixed bottom-20 right-3 z-[90] max-w-[13rem] rounded border border-stone-600/90 bg-black/85 px-2 py-1 font-mono text-[10px] leading-tight text-stone-300 shadow-md backdrop-blur-sm"
           aria-hidden
         >
-          <p>[Conectado: {broadcastChannelConnected ? "Sim" : "Não"}]</p>
+          <p>[Conectado: {matchChannelConnected ? "Sim" : "Não"}]</p>
           <p>
             [Players: {knownBroadcastPlayers.length}/{expectedOnlinePlayers}]
           </p>
