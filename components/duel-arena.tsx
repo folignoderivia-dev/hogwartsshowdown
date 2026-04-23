@@ -51,6 +51,7 @@ type DebuffType =
   | "salvio_reflect"
   | "anti_debuff"
   | "crit_boost"
+  | "unforgivable_acc_down"
 type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 
 interface Debuff {
@@ -189,6 +190,7 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   salvio_reflect: "🪞 REFLECT",
   anti_debuff: "✨ ANTI-DEBUFF",
   crit_boost: "🎯 CRIT+",
+  unforgivable_acc_down: "🜏 IMPERDOÁVEIS ACC-15%",
 }
 /** Mensagem flutuante curta ao aplicar debuff do grimório. */
 const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
@@ -211,6 +213,7 @@ const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
   salvio_reflect: "REFLEXO!",
   anti_debuff: "IMUNIZOU!",
   crit_boost: "CRÍTICO+!",
+  unforgivable_acc_down: "IMPERDOÁVEIS -15% ACC!",
 }
 const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
 
@@ -270,7 +273,7 @@ function isSelfTargetSpell(spellName: string): boolean {
 
 function isAreaSpell(spellName: string): boolean {
   const n = normSpell(spellName)
-  return n.includes("bombarda") || (n.includes("desumo") && n.includes("tempestas")) || n.includes("fumus")
+  return n.includes("bombarda") || (n.includes("desumo") && n.includes("tempestas")) || n.includes("fumus") || (n.includes("protego") && n.includes("diabol"))
 }
 
 function getSpellMaxPower(spell: SpellInfo): number {
@@ -551,6 +554,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     if (isAreaSpell(spellName)) {
       const n = normSpell(spellName)
       if (n.includes("desumo")) return state.filter((d) => !isDefeated(d.hp))
+      if (n.includes("protego") && n.includes("diabol")) return state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
       return state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
     }
     return state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
@@ -568,6 +572,13 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
     const wandJammed = attacker.wandPassiveStripped || attacker.debuffs.some((d) => d.type === "disarm")
     if (!un && !wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "accuracy_plus10") accuracy += 10
     if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "crit20_acc_minus10") accuracy -= 10
+    const spellNorm = normSpell(spell?.name || "")
+    if (
+      attacker.debuffs.some((d) => d.type === "unforgivable_acc_down") &&
+      (spellNorm.includes("crucius") || spellNorm.includes("avada") || spellNorm.includes("imperio") || spellNorm.includes("imperius"))
+    ) {
+      accuracy -= 15
+    }
     accuracy -= (defender.arrestoStacks ?? 0) * 5
     if (attacker.debuffs.some((d) => d.type === "lumus_acc_down")) accuracy -= 20
     if (attacker.nextAccBonusPct) accuracy += attacker.nextAccBonusPct
@@ -815,6 +826,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         if (!isDefeated(attacker.hp)) targets = [attacker]
       } else if (isAreaSpell(sn)) {
         if (n.includes("desumo")) targets = state.filter((d) => !isDefeated(d.hp))
+        else if (n.includes("protego") && n.includes("diabol")) targets = state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
         else targets = state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
       } else {
         const t = state.find((d) => d.id === action.targetId)
@@ -982,6 +994,20 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         }))
         logs.push(`[Fumus]: todos os buffs/debuffs em campo foram dissipados.`)
         setBattleMessage("Fumus — campo purificado")
+      } else if (n.includes("protego") && n.includes("diabol")) {
+        for (const t of targets) {
+          state = state.map((d) =>
+            d.id === t.id
+              ? {
+                  ...d,
+                  debuffs: [...d.debuffs.filter((x) => x.type !== "unforgivable_acc_down"), { type: "unforgivable_acc_down", duration: 2 }],
+                }
+              : d
+          )
+          setStatusFloater({ text: "IMPERDOÁVEIS -15% ACC!", targetId: t.id, key: Date.now() + Math.random() })
+          logs.push(`[Protego Diabólico]: ${t.name} sofreu -15% de precisão para Crucius/Avada/Imperio por 2 turnos.`)
+        }
+        setBattleMessage("Protego Diabólico — aura de supressão")
       } else if (n.includes("arestum") && n.includes("momentum")) {
         const t = targets[0]
         const hit = rollSpellHit(t)

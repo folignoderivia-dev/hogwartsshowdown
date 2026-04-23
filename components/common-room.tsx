@@ -284,6 +284,15 @@ export const SPELL_DATABASE: SpellInfo[] = [
     special: "episkey_heal_crit",
     effect: "Self: cura fixa de 50 e ganha buff de crítico por 2 turnos.",
   },
+  {
+    name: "Protego Diabólico",
+    power: 0,
+    accuracy: 100,
+    pp: 3,
+    cost: 1,
+    special: "protego_diabolico_unforgivable_acc_down",
+    effect: "Área (exceto em si): reduz em 15% a precisão de Crucius, Avada Kedavra e Imperio por 2 turnos.",
+  },
   { name: "Maximos", power: 0, accuracy: 100, pp: 5, cost: 1, priority: 0, special: "maximos_charge", effect: "Self: proximo feitico +10% a +100% poder" },
 ]
 
