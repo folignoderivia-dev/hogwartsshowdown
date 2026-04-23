@@ -280,28 +280,11 @@ export function useMatchManager() {
 
   const handleAction = useCallback((playerId: string, action: RoundAction, matchId?: string) => {
     const resolvedMatchId = matchId || externalMatchState?.matchId || "local-offline"
-    if (
-      externalMatchState &&
-      externalMatchState.currentTurnOwner &&
-      action.type !== "surrender" &&
-      playerId !== externalMatchState.currentTurnOwner
-    ) {
-      return null
-    }
     const payload = buildActionPayload(resolvedMatchId, playerId, action)
     setQueuedPayloads((prev) => [...prev, payload])
     void (async () => {
       try {
         const supabase = getSupabaseClient()
-        const participants = externalMatchState?.participantIds || []
-        const currentOwner = externalMatchState?.currentTurnOwner
-        const idx = currentOwner ? participants.indexOf(currentOwner) : -1
-        const nextOwner =
-          action.type === "surrender"
-            ? null
-            : participants.length > 0
-              ? participants[(Math.max(0, idx) + 1) % participants.length] || participants[0]
-              : null
         const { error } = await supabase.rpc("commit_match_action", {
           p_match_id: payload.matchId,
           p_player_id: payload.playerId,
@@ -309,8 +292,6 @@ export function useMatchManager() {
           p_target_id: payload.targetId ?? null,
           p_timestamp_ms: payload.timestamp,
           p_payload: payload,
-          p_expected_owner: action.type === "surrender" ? null : currentOwner || null,
-          p_next_owner: action.type === "surrender" ? null : nextOwner,
         })
         if (error) throw error
       } catch {
@@ -331,29 +312,11 @@ export function useMatchManager() {
       }
     })()
     return payload
-  }, [buildActionPayload, externalMatchState, externalMatchState?.matchId])
+  }, [buildActionPayload, externalMatchState?.matchId])
 
   const applyExternalState = useCallback((next: ExternalMatchState) => {
     setExternalMatchState(next)
     // Fonte de verdade passa a ser o banco, então aqui só atualizamos estado local.
-  }, [])
-
-  const setCurrentTurnOwner = useCallback(async (matchId: string, nextOwnerId: string, expectedOwnerId?: string) => {
-    const supabase = getSupabaseClient()
-    const { error } = await supabase.rpc("advance_turn_owner", {
-      p_match_id: matchId,
-      p_expected_owner: expectedOwnerId || null,
-      p_next_owner: nextOwnerId,
-    })
-    if (error) {
-      let query = supabase
-        .from("matches")
-        .update({ current_turn_owner: nextOwnerId, updated_at: new Date().toISOString() })
-        .eq("match_id", matchId)
-        .in("status", ["waiting", "in_progress"])
-      if (expectedOwnerId) query = query.eq("current_turn_owner", expectedOwnerId)
-      await query
-    }
   }, [])
 
   const subscribeToMatch = useCallback(
@@ -420,7 +383,6 @@ export function useMatchManager() {
     fetchInProgressMatches,
     handleAction,
     applyExternalState,
-    setCurrentTurnOwner,
     subscribeToMatch,
   }
 }

@@ -410,9 +410,7 @@ create or replace function public.commit_match_action(
   p_action_id text,
   p_target_id text,
   p_timestamp_ms bigint,
-  p_payload jsonb,
-  p_expected_owner text,
-  p_next_owner text
+  p_payload jsonb
 )
 returns boolean
 language plpgsql
@@ -451,89 +449,13 @@ begin
   values (p_match_id, p_player_id, p_action_id, p_target_id, p_timestamp_ms, p_payload)
   on conflict (action_id) do nothing;
 
-  if p_expected_owner is not null and p_next_owner is not null then
-    if p_next_owner = v_match.p1_id or p_next_owner = v_match.p2_id or p_next_owner = v_match.p3_id or p_next_owner = v_match.p4_id then
-      update public.matches
-      set current_turn_owner = p_next_owner,
-          updated_at = now()
-      where match_id = p_match_id
-        and status in ('waiting', 'in_progress');
-    end if;
-  end if;
-
   return true;
 end;
 $$;
 
-grant execute on function public.commit_match_action(text, text, text, text, bigint, jsonb, text, text) to authenticated;
+grant execute on function public.commit_match_action(text, text, text, text, bigint, jsonb) to authenticated;
 
-create or replace function public.advance_turn_owner(
-  p_match_id text,
-  p_expected_owner text,
-  p_next_owner text
-)
-returns text
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_match public.matches%rowtype;
-  v_updated public.matches%rowtype;
-begin
-  select * into v_match
-  from public.matches
-  where match_id = p_match_id
-  for update;
-
-  if not found then
-    raise exception 'Partida não encontrada';
-  end if;
-
-  if p_expected_owner is not null and v_match.current_turn_owner is distinct from p_expected_owner then
-    return v_match.current_turn_owner;
-  end if;
-
-  if p_next_owner is null or length(trim(p_next_owner)) = 0 then
-    raise exception 'Próximo dono do turno inválido';
-  end if;
-
-  if p_next_owner <> v_match.p1_id
-    and p_next_owner <> v_match.p2_id
-    and p_next_owner <> v_match.p3_id
-    and p_next_owner <> v_match.p4_id then
-    raise exception 'Próximo dono do turno não participa da partida';
-  end if;
-
-  update public.matches
-  set current_turn_owner = p_next_owner,
-      updated_at = now()
-  where match_id = p_match_id
-    and status in ('waiting', 'in_progress')
-  returning * into v_updated;
-
-  if not found then
-    return v_match.current_turn_owner;
-  end if;
-
-  return v_updated.current_turn_owner;
-end;
-$$;
-
-grant execute on function public.advance_turn_owner(text, text, text) to authenticated;
-
-create table if not exists public.match_ready_states (
-  match_id text not null references public.matches(match_id) on delete cascade,
-  player_id text not null,
-  is_ready boolean not null default false,
-  updated_at timestamptz not null default now(),
-  primary key (match_id, player_id)
-);
-
-alter table public.match_ready_states enable row level security;
-
+-- Limpeza de artefatos legados (pipeline antigo de ready/turno).
+drop function if exists public.advance_turn_owner(text, text, text);
 drop policy if exists "match_ready_states_rw_authenticated" on public.match_ready_states;
-create policy "match_ready_states_rw_authenticated"
-on public.match_ready_states for all
-using (auth.role() = 'authenticated')
-with check (auth.role() = 'authenticated');
+drop table if exists public.match_ready_states;
