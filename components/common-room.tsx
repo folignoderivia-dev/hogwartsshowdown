@@ -333,7 +333,7 @@ const GAME_MODES = [
 const MAX_SPELL_POINTS = 6
 const MAX_UNFORGIVABLE = 1
 
-export default function CommonRoom({ onStartDuel, onCreateRoom, onJoinRoom, openRooms = [], onSpectateMatch, onResumeMatch, resumableMatch, currentUser, onAuthChange }: CommonRoomProps) {
+export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, onJoinRoom, openRooms = [], onSpectateMatch, onResumeMatch, resumableMatch, currentUser, onAuthChange }: CommonRoomProps) {
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
   const [authEmail, setAuthEmail] = useState("")
@@ -543,7 +543,7 @@ export default function CommonRoom({ onStartDuel, onCreateRoom, onJoinRoom, open
   const handleStartDuel = () => {
     if (!currentUser) return
     if (isReady && gameMode) {
-      onStartDuel({
+      _onStartDuel({
         name: currentUser.username,
         house,
         wand,

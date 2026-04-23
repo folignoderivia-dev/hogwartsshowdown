@@ -379,3 +379,18 @@ end;
 $$;
 
 grant execute on function public.join_specific_room(text, text, text) to authenticated;
+
+create table if not exists public.match_ready_states (
+  match_id text not null references public.matches(match_id) on delete cascade,
+  player_id text not null,
+  is_ready boolean not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (match_id, player_id)
+);
+
+alter table public.match_ready_states enable row level security;
+
+create policy "match_ready_states_rw_authenticated"
+on public.match_ready_states for all
+using (auth.role() = 'authenticated')
+with check (auth.role() = 'authenticated');

@@ -496,6 +496,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "Sistema", text: "Chat ativo." }])
   const [chatInput, setChatInput] = useState("")
   const isReadOnlySpectator = isSpectator || (!!matchId && !!playerBuild.userId && participantIds.length > 0 && !participantIds.includes(playerBuild.userId))
+  const localOnlineId = playerBuild.userId || "player"
 
   useEffect(() => {
     if (playerBuild.gameMode === "teste") return
@@ -528,6 +529,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       })
     })
   }, [buildOnlineDuelists, participantIds, playerBuild.gameMode])
+
   const [gameOver, setGameOver] = useState<"win" | "lose" | "timeout" | null>(null)
   /** Mensagem central da fila de resolução (sincronia com acertos/efeitos). */
   const [battleMessage, setBattleMessage] = useState("")
@@ -546,6 +548,8 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const arenaVfxKeyRef = useRef(0)
   const resolvingRef = useRef(false)
   const botTimeoutsRef = useRef<number[]>([])
+  const onlineBattleStartedRef = useRef(false)
+  const [readyByPlayerId, setReadyByPlayerId] = useState<Record<string, boolean>>({})
 
   useImperativeHandle(ref, () => ({
     submitRemoteAction: (casterId: string, action: RoundAction) => {
@@ -558,6 +562,53 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const player = duelists.find((d) => d.id === "player")
   const playerDefeated = !player || isDefeated(player.hp)
   const playerCannotAct = !!player?.debuffs.some((d) => d.type === "stun" || d.type === "freeze")
+  const expectedOnlinePlayers =
+    playerBuild.gameMode === "2v2" || playerBuild.gameMode === "ffa"
+      ? 4
+      : playerBuild.gameMode === "ffa3"
+        ? 3
+        : 2
+  const onlineReadyPlayers = Math.max(duelists.length, participantIds.length || 0)
+  const participantRoster = participantIds.length > 0 ? participantIds : duelists.map((d) => d.id)
+  const readyCount = participantRoster.filter((id) => !!readyByPlayerId[id]).length
+  const localIsReady = !!readyByPlayerId[localOnlineId]
+
+  useEffect(() => {
+    if (playerBuild.gameMode === "teste" || !matchId) return
+    const supabase = getSupabaseClient()
+
+    const pullReadyState = async () => {
+      const { data } = await supabase
+        .from("match_ready_states")
+        .select("player_id,is_ready")
+        .eq("match_id", matchId)
+      const next: Record<string, boolean> = {}
+      for (const row of data || []) {
+        const r = row as any
+        next[String(r.player_id)] = !!r.is_ready
+      }
+      setReadyByPlayerId(next)
+    }
+
+    void supabase.from("match_ready_states").upsert(
+      { match_id: matchId, player_id: localOnlineId, is_ready: false, updated_at: new Date().toISOString() },
+      { onConflict: "match_id,player_id" }
+    )
+    void pullReadyState()
+
+    const readyChannel = supabase
+      .channel(`match-ready-db-${matchId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "match_ready_states", filter: `match_id=eq.${matchId}` },
+        () => void pullReadyState()
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(readyChannel)
+    }
+  }, [localOnlineId, matchId, playerBuild.gameMode])
 
   const addLog = (line: string) => setBattleLog((prev) => [...prev, line])
 
@@ -1604,11 +1655,33 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
   useEffect(() => {
     setBackgroundImage(SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)])
+    if (playerBuild.gameMode === "teste") {
+      const seeded = applyRapinomonioBlock(duelists)
+      setDuelists(seeded)
+      beginRoundSelection(seeded)
+      return
+    }
+    setBattleStatus("idle")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (playerBuild.gameMode === "teste") return
+    if (onlineBattleStartedRef.current) return
+    if (onlineReadyPlayers < expectedOnlinePlayers) {
+      setBattleStatus("idle")
+      return
+    }
+    if (readyCount < expectedOnlinePlayers) {
+      setBattleStatus("idle")
+      return
+    }
+    onlineBattleStartedRef.current = true
     const seeded = applyRapinomonioBlock(duelists)
     setDuelists(seeded)
     beginRoundSelection(seeded)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [playerBuild.gameMode, onlineReadyPlayers, readyCount, expectedOnlinePlayers])
 
   useEffect(() => {
     return () => {
@@ -1737,6 +1810,16 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       })
     }
     setChatInput("")
+  }
+
+  const markReady = async () => {
+    if (playerBuild.gameMode === "teste" || !matchId) return
+    const supabase = getSupabaseClient()
+    await supabase.from("match_ready_states").upsert(
+      { match_id: matchId, player_id: localOnlineId, is_ready: true, updated_at: new Date().toISOString() },
+      { onConflict: "match_id,player_id" }
+    )
+    setReadyByPlayerId((prev) => ({ ...prev, [localOnlineId]: true }))
   }
 
   useEffect(() => {
@@ -2111,6 +2194,32 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         </div>
 
         <div className="mt-4 rounded-lg border-2 border-amber-900 bg-stone-900/85 p-3">
+          {playerBuild.gameMode !== "teste" && (
+            <div className="mb-2 rounded border border-amber-900/60 bg-stone-950/60 p-2 text-xs">
+              <p className="mb-1 text-amber-300">Jogadores na sala</p>
+              <div className="flex flex-wrap gap-1">
+                {participantRoster.map((id, idx) => {
+                  const label = id === playerBuild.userId ? `${playerBuild.name} (você)` : participantNames[idx] || `Bruxo ${idx + 1}`
+                  const ready = !!readyByPlayerId[id]
+                  return (
+                    <Badge key={`${id}-${idx}`} className={`${ready ? "border-green-700 bg-green-950/50 text-green-200" : "border-amber-700 bg-stone-800 text-amber-200"}`}>
+                      {label} {ready ? "✓" : "…"}
+                    </Badge>
+                  )
+                })}
+              </div>
+              {onlineReadyPlayers >= expectedOnlinePlayers && !localIsReady && !isReadOnlySpectator && (
+                <Button size="sm" className="mt-2 border border-amber-700 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50" onClick={() => void markReady()}>
+                  Preparar
+                </Button>
+              )}
+            </div>
+          )}
+          {playerBuild.gameMode !== "teste" && onlineReadyPlayers < expectedOnlinePlayers && (
+            <p className="mb-2 text-xs text-amber-300">
+              Aguardando jogadores na sala ({onlineReadyPlayers}/{expectedOnlinePlayers})...
+            </p>
+          )}
           {isReadOnlySpectator && <p className="mb-2 text-xs text-blue-300">Modo espectador: comandos de combate desabilitados.</p>}
           {playerDefeated && <p className="mb-2 text-xs text-red-300">Você foi derrotado e agora é espectador.</p>}
           {!playerDefeated && battleStatus === "selecting" && actions.player && <p className="mb-2 text-xs text-amber-300">Aguardando outros bruxos...</p>}
