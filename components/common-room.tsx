@@ -406,7 +406,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const effectiveName = currentUser?.username || name
 
   return (
-    <div className="min-h-screen wood-bg p-3 sm:p-6">
+    <div className="min-h-screen wood-bg p-2 sm:p-4 lg:p-6">
       <div className="mx-auto max-w-4xl">
         {/* Header with Medieval Style */}
         <header className="mb-8 text-center">
@@ -414,7 +414,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <h1 className="text-4xl font-bold tracking-tight text-amber-200" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>
               Sala Comunal
             </h1>
-            <p className="mt-1 text-amber-100/70">Monte sua build para o duelo</p>
+            <p className="mt-1 text-amber-100/90">Monte sua build para o duelo</p>
           </div>
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2">
             <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
@@ -454,8 +454,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             )}
           </div>
         </header>
+        <div className="grid gap-3 sm:gap-4 lg:grid-cols-[280px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_320px] lg:items-start">
 
-        <Card className="medieval-frame mb-4 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
+        <Card className="medieval-frame mb-4 border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:col-start-3 lg:row-start-1">
           <CardHeader className="border-b border-amber-900/50 py-2">
             <CardTitle className="flex items-center justify-between text-sm text-amber-200">
               <span>Duelos em Andamento</span>
@@ -465,8 +466,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </CardTitle>
           </CardHeader>
           {showSpectatePanel && (
-            <CardContent className="max-h-48 overflow-y-auto pt-2">
-              {duelsInProgress.length === 0 && <p className="text-xs text-amber-300/80">Nenhum duelo em andamento no momento.</p>}
+          <CardContent className="max-h-52 overflow-y-auto pt-2">
+              {duelsInProgress.length === 0 && <p className="text-xs text-amber-200/95">Nenhum duelo em andamento no momento.</p>}
               <div className="space-y-2">
                 {duelsInProgress.map((d) => (
                   <div key={d.matchId} className="flex flex-col items-start justify-between gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs sm:flex-row sm:items-center">
@@ -501,7 +502,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </CardContent>
           )}
         </Card>
-        <Card className="medieval-frame mb-4 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
+        <Card className="medieval-frame mb-4 border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:col-start-3 lg:row-start-2">
           <CardHeader className="border-b border-amber-900/50 py-2">
             <CardTitle className="flex items-center justify-between text-sm text-amber-200">
               <span>Salas em Aberto</span>
@@ -511,9 +512,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </CardTitle>
           </CardHeader>
           {showOpenRoomsPanel && (
-            <CardContent className="max-h-52 overflow-y-auto pt-2">
+          <CardContent className="max-h-56 overflow-y-auto pt-2">
               {openRooms.length === 0 ? (
-                <p className="text-xs text-amber-300/80">Nenhuma sala esperando jogadores.</p>
+                <p className="text-xs text-amber-200/95">Nenhuma sala esperando jogadores.</p>
               ) : (
                 <div className="space-y-2">
                   {openRooms.map((r) => (
@@ -621,14 +622,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </DialogContent>
         </Dialog>
 
-        <Card className="medieval-frame mb-6 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
+        <Card className="medieval-frame mb-6 border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:col-start-3 lg:row-start-3">
           <CardHeader className="border-b border-amber-900/50 py-2">
             <CardTitle className="flex items-center gap-2 text-sm text-amber-200">
               <Trophy className="h-4 w-4 text-amber-400" />
               Ranking global (Top 50)
             </CardTitle>
           </CardHeader>
-          <CardContent className="max-h-56 overflow-y-auto pt-2">
+          <CardContent className="max-h-64 overflow-y-auto pt-2">
             <ol className="space-y-1 text-xs">
               {ranking.map((u, i) => (
                 <li
@@ -645,9 +646,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </CardContent>
         </Card>
         {currentUser && resumableMatch && onResumeMatch && (
-          <Card className="medieval-frame mb-4 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
+          <Card className="medieval-frame mb-4 border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:col-start-3 lg:row-start-4">
             <CardContent className="flex items-center justify-between gap-3 pt-4">
-              <p className="text-xs text-amber-200">
+              <p className="text-xs text-amber-100">
                 Você possui uma sala ativa: <span className="font-mono text-amber-300">{resumableMatch.matchId}</span> ({resumableMatch.mode} · {resumableMatch.status})
               </p>
               <Button
@@ -661,7 +662,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </Card>
         )}
 
-        <Card className="medieval-frame mb-6 border-0 bg-gradient-to-b from-stone-800 to-stone-900">
+        <Card className="medieval-frame mb-6 border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:col-start-1 lg:row-start-1 lg:row-span-6">
           <CardHeader className="border-b border-amber-900/50 py-2">
             <CardTitle className="flex items-center justify-between text-sm text-amber-200">
               <span>Modo Amigos</span>
@@ -670,9 +671,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               </Button>
             </CardTitle>
           </CardHeader>
-          {showFriendsPanel && <CardContent className="pt-3">
+          {showFriendsPanel && <CardContent className="max-h-[70vh] overflow-y-auto pt-3">
             {!currentUser ? (
-              <p className="text-xs text-amber-300/80">Entre na sua conta para adicionar amigos.</p>
+              <p className="text-xs text-amber-200/95">Entre na sua conta para adicionar amigos.</p>
             ) : (
               <>
                 <div className="mb-3 flex gap-2">
@@ -713,7 +714,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 )}
                 {friendFeedback && <p className="mb-2 text-xs text-amber-300">{friendFeedback}</p>}
                 {friends.length === 0 ? (
-                  <p className="text-xs text-amber-300/80">Você ainda não adicionou amigos.</p>
+                  <p className="text-xs text-amber-200/95">Você ainda não adicionou amigos.</p>
                 ) : (
                   <div className="space-y-2">
                     {friends.map((friend) => (
@@ -750,7 +751,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     <p className="mb-2 text-xs text-amber-300">Mensagens</p>
                     <div className="mb-2 max-h-28 overflow-y-auto rounded border border-amber-900/50 bg-stone-950/60 p-2 text-xs">
                       {friendMessages.length === 0 ? (
-                        <p className="text-amber-300/70">Sem mensagens ainda.</p>
+                        <p className="text-amber-200/90">Sem mensagens ainda.</p>
                       ) : (
                         friendMessages.map((m) => (
                           <p key={m.id} className="mb-1 text-amber-100/90">
@@ -778,7 +779,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </CardContent>}
         </Card>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:col-start-2 lg:row-start-1">
           {/* Avatar & Name */}
           <Card className="medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900">
             <CardHeader className="border-b border-amber-900/50">
@@ -821,7 +822,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   ))}
                 </div>
                 {selectedAvatar && (
-                  <p className="mt-2 text-xs text-amber-400/80">Selecionado: {selectedAvatar.label}</p>
+                  <p className="mt-2 text-xs text-amber-300">Selecionado: {selectedAvatar.label}</p>
                 )}
               </div>
             </CardContent>
@@ -1028,18 +1029,18 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                               </Badge>
                             )}
                           </div>
-                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-600">
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-amber-100/90">
                             {(spell.power ?? 0) > 0 || (spell.powerMin != null && spell.powerMax != null) ? (
                               <span>Poder: {formatSpellPower(spell)}</span>
                             ) : null}
                             <span>Acerto: {spell.accuracy}%</span>
                             <span>MANA: {spell.pp}</span>
                             {spell.priority != null && spell.priority !== 0 && (
-                              <span className="text-purple-700">Prio: {spell.priority > 0 ? "+" : ""}{spell.priority}</span>
+                              <span className="text-purple-300">Prio: {spell.priority > 0 ? "+" : ""}{spell.priority}</span>
                             )}
                           </div>
                           {spell.effect && (
-                            <p className="mt-1 text-xs text-amber-700">{spell.effect}</p>
+                            <p className="mt-1 text-xs text-amber-300">{spell.effect}</p>
                           )}
                         </div>
                         <div className={`ml-3 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
@@ -1056,7 +1057,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   })}
                 </div>
                 {filteredSpells.length === 0 && (
-                  <p className="py-4 text-center text-sm text-stone-500">
+                  <p className="py-4 text-center text-sm text-amber-200/90">
                     Nenhum feitico encontrado
                   </p>
                 )}
@@ -1065,7 +1066,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               {/* Selected Spells Preview */}
               {selectedSpells.length > 0 && (
                 <div className="mt-4">
-                  <p className="mb-2 text-xs text-amber-400/70">Feiticos selecionados ({selectedSpells.length}):</p>
+                  <p className="mb-2 text-xs text-amber-300/95">Feiticos selecionados ({selectedSpells.length}):</p>
                   <div className="flex flex-wrap gap-2">
                     {selectedSpells.map((spellName) => {
                       const spell = SPELL_DATABASE.find((s) => s.name === spellName)
@@ -1087,12 +1088,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         </div>
 
         {/* Game Mode & Start Duel Button */}
-        <div className="mt-8 flex flex-col items-center gap-4">
+        <div className="mt-8 flex flex-col items-center gap-4 lg:col-start-2 lg:row-start-2">
           {/* Game Mode Selector */}
-          <div className="medieval-frame flex items-center gap-3 rounded-lg bg-stone-800/90 px-6 py-3">
+          <div className="medieval-frame flex w-full max-w-full flex-wrap items-center justify-center gap-2 rounded-lg bg-stone-800/90 px-3 py-3 sm:px-4 lg:px-6">
             <Swords className="h-5 w-5 text-amber-400" />
             <span className="text-sm text-amber-200">Modo de Jogo:</span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-center gap-2">
               {GAME_MODES.map((mode) => (
                 <Button
                   key={mode.value}
@@ -1116,7 +1117,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               size="lg"
               disabled={!isReady}
               onClick={gameMode === "teste" || gameMode === "challenge" ? handleStartDuel : handleCreateRoomClick}
-              className={`medieval-frame border-0 px-8 py-5 text-base font-bold transition-all ${
+              className={`medieval-frame w-full sm:w-auto border-0 px-6 py-4 text-sm sm:px-8 sm:py-5 sm:text-base font-bold transition-all ${
                 isReady
                   ? "bg-gradient-to-b from-red-800 to-red-900 text-amber-100 shadow-lg shadow-red-900/50 hover:from-red-700 hover:to-red-800"
                   : "cursor-not-allowed bg-stone-700 text-stone-500"
@@ -1133,7 +1134,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   const first = openRooms[0]
                   if (first) handleJoinRoomClick(first.matchId)
                 }}
-                className="medieval-frame border border-amber-700 bg-amber-900/50 px-8 py-5 text-base font-bold text-amber-100 hover:bg-amber-800/60"
+                className="medieval-frame w-full sm:w-auto border border-amber-700 bg-amber-900/50 px-6 py-4 text-sm sm:px-8 sm:py-5 sm:text-base font-bold text-amber-100 hover:bg-amber-800/60"
               >
                 Entrar em Sala
               </Button>
@@ -1142,7 +1143,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         </div>
 
         {!isReady && (
-          <p className="mt-4 text-center text-sm text-amber-400/70">
+          <p className="mt-4 text-center text-sm text-amber-200/95">
             {!currentUser
               ? "Entre ou registre-se para poder ir à Arena."
               : totalCost !== MAX_SPELL_POINTS
@@ -1150,6 +1151,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 : "Complete todas as selecoes para iniciar o duelo"}
           </p>
         )}
+        </div>
       </div>
     </div>
   )
