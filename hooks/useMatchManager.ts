@@ -49,8 +49,19 @@ export function useMatchManager() {
   }, [])
 
   const toExternalState = useCallback((row: any): ExternalMatchState => {
-    const ids = [row.p1_id, row.p2_id, row.p3_id, row.p4_id].filter(Boolean)
-    const names = [row.p1_name, row.p2_name, row.p3_name, row.p4_name].filter(Boolean)
+    const slots: Array<{ id?: string; name?: string }> = [
+      { id: row.p1_id, name: row.p1_name },
+      { id: row.p2_id, name: row.p2_name },
+      { id: row.p3_id, name: row.p3_name },
+      { id: row.p4_id, name: row.p4_name },
+    ]
+    const ids: string[] = []
+    const names: string[] = []
+    for (const slot of slots) {
+      if (!slot.id) continue
+      ids.push(slot.id)
+      names.push(slot.name || "Bruxo")
+    }
     return {
       matchId: row.match_id,
       status: row.status,
@@ -307,7 +318,12 @@ export function useMatchManager() {
               playersExpected: row.players_expected,
               playersJoined: row.players_joined,
               participantIds: [row.p1_id, row.p2_id, row.p3_id, row.p4_id].filter(Boolean),
-              participantNames: [row.p1_name, row.p2_name, row.p3_name, row.p4_name].filter(Boolean),
+              participantNames: [
+                row.p1_id ? (row.p1_name || "Bruxo") : null,
+                row.p2_id ? (row.p2_name || "Bruxo") : null,
+                row.p3_id ? (row.p3_name || "Bruxo") : null,
+                row.p4_id ? (row.p4_name || "Bruxo") : null,
+              ].filter(Boolean) as string[],
               mode: row.mode,
             })
           }

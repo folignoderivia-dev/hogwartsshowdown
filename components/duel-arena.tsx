@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { SpellInfo } from "@/components/common-room"
 import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, WAND_PASSIVES } from "@/components/common-room"
-import type { RoundAction } from "@/lib/duelActions"
+import type { RoundAction, RoundSyncSnapshot } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
 
 export type { RoundAction } from "@/lib/duelActions"
@@ -558,6 +558,27 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const botTimeoutsRef = useRef<number[]>([])
   const onlineBattleStartedRef = useRef(false)
   const [readyByPlayerId, setReadyByPlayerId] = useState<Record<string, boolean>>({})
+  const lastSyncedRoundRef = useRef(0)
+
+  const applyRoundSync = useCallback((snapshot: RoundSyncSnapshot) => {
+    if (snapshot.round <= lastSyncedRoundRef.current) return
+    lastSyncedRoundRef.current = snapshot.round
+    setDuelists(snapshot.duelists as Duelist[])
+    setBattleLog((prev) => [...prev, ...snapshot.logs])
+    setTurnNumber(snapshot.turnNumber)
+    setBattleStatus(snapshot.battleStatus as BattleStatus)
+    setActions({})
+    setPendingSpell(null)
+    setCurrentTargetId(null)
+    setPotionUsed(false)
+    setTimeLeft(60)
+    if (snapshot.gameOver) {
+      setGameOver(snapshot.gameOver)
+      if (snapshot.gameOver === "win" || snapshot.gameOver === "lose") {
+        onBattleEnd?.(snapshot.gameOver, playerBuild.userId)
+      }
+    }
+  }, [onBattleEnd, playerBuild.userId])
 
   useImperativeHandle(ref, () => ({
     submitRemoteAction: (casterId: string, action: RoundAction) => {
@@ -567,9 +588,13 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         casterId: internalCaster,
         targetId: fromNetworkId(action.targetId),
       }
+      if (normalized.type === "sync" && normalized.syncSnapshot) {
+        applyRoundSync(normalized.syncSnapshot)
+        return
+      }
       setActions((prev) => ({ ...prev, [internalCaster]: normalized }))
     },
-  }), [fromNetworkId])
+  }), [applyRoundSync, fromNetworkId])
   const arenaRef = useRef<HTMLDivElement | null>(null)
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
@@ -586,6 +611,9 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const participantRoster = participantIds.length > 0 ? participantIds : duelists.map((d) => d.id)
   const readyCount = participantRoster.filter((id) => !!readyByPlayerId[id]).length
   const localIsReady = !!readyByPlayerId[localOnlineId]
+  const isOnlineMatch = playerBuild.gameMode !== "teste" && !!matchId
+  const hostResolverId = (participantIds.length > 0 ? [...participantIds].sort()[0] : localOnlineId) || localOnlineId
+  const isAuthoritativeResolver = !isOnlineMatch || localOnlineId === hostResolverId
 
   useEffect(() => {
     if (playerBuild.gameMode === "teste" || !matchId) return
@@ -1667,9 +1695,26 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
     setBattleLog((prev) => [...prev, ...logs])
     setActions({})
-    setTurnNumber((prev) => prev + 1)
+    const nextTurn = turnNumber + 1
+    setTurnNumber(nextTurn)
     resolvingRef.current = false
-    if (!evaluateWinConditions(state)) beginRoundSelection(state)
+    const outcome = evaluateWinConditions(state)
+    if (!outcome) beginRoundSelection(state)
+    if (isOnlineMatch && isAuthoritativeResolver) {
+      const syncAction: RoundAction = {
+        casterId: toNetworkId("player"),
+        type: "sync",
+        syncSnapshot: {
+          round: turnNumber,
+          turnNumber: nextTurn,
+          duelists: state,
+          logs,
+          gameOver: outcome,
+          battleStatus: outcome ? "finished" : "selecting",
+        },
+      }
+      onDispatchAction?.(toNetworkId("player"), syncAction, matchId)
+    }
   }
 
   useEffect(() => {
@@ -1711,6 +1756,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
 
   useEffect(() => {
     if (gameOver || battleStatus !== "selecting") return
+    if (!isAuthoritativeResolver) return
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -1738,17 +1784,18 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [gameOver, battleStatus, turnNumber, player?.name, playerDefeated, duelists, actions])
+  }, [actions, battleStatus, duelists, gameOver, isAuthoritativeResolver, player?.name, playerDefeated, turnNumber])
 
   useEffect(() => {
     if (battleStatus !== "selecting") return
+    if (!isAuthoritativeResolver) return
     const aliveIds = duelists.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
     const ready = Object.keys(actions).filter((id) => aliveIds.includes(id)).length
     if (aliveIds.length > 0 && ready >= aliveIds.length) {
       void runResolution(Object.values(actions))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions, battleStatus, duelists])
+  }, [actions, battleStatus, duelists, isAuthoritativeResolver])
 
   const onSpellClick = (spellName: string) => {
     if (isReadOnlySpectator) return

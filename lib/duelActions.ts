@@ -1,4 +1,13 @@
-export type DuelActionType = "cast" | "skip" | "potion"
+export type DuelActionType = "cast" | "skip" | "potion" | "sync"
+
+export interface RoundSyncSnapshot {
+  round: number
+  turnNumber: number
+  duelists: unknown[]
+  logs: string[]
+  gameOver: "win" | "lose" | "timeout" | null
+  battleStatus: "idle" | "selecting" | "resolving" | "finished"
+}
 
 /** Ação enfileirada por duelista (preparado para WebSockets / host remoto). */
 export interface RoundAction {
@@ -8,6 +17,7 @@ export interface RoundAction {
   targetId?: string
   areaAll?: boolean
   potionType?: string
+  syncSnapshot?: RoundSyncSnapshot
 }
 
 /** Monta ação de lançamento (ex.: fila WebSocket → cliente aplica na arena). */
