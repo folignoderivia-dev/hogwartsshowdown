@@ -449,6 +449,7 @@ const DuelArena = (
   const [timeLeft, setTimeLeft] = useState(60)
   const [pendingSpell, setPendingSpell] = useState<string | null>(null)
   const [pendingActions, setPendingActions] = useState<Record<string, RoundAction>>({})
+  const pendingActionsRef = useRef<Record<string, RoundAction>>({})
   const [battleLog, setBattleLog] = useState<string[]>(["[Turno 0]: O duelo começou!"])
   const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "Sistema", text: "Chat ativo." }])
   const [chatInput, setChatInput] = useState("")
@@ -493,6 +494,10 @@ const DuelArena = (
     })
   }, [buildOnlineDuelists, participantIds, playerBuild.gameMode])
 
+  useEffect(() => {
+    pendingActionsRef.current = pendingActions
+  }, [pendingActions])
+
   const [gameOver, setGameOver] = useState<"win" | "lose" | "timeout" | null>(null)
   /** Mensagem central da fila de resolução (sincronia com acertos/efeitos). */
   const [battleMessage, setBattleMessage] = useState("")
@@ -516,6 +521,7 @@ const DuelArena = (
   const [gameStartAcknowledged, setGameStartAcknowledged] = useState(isOfflineMode)
   const [knownBroadcastPlayers, setKnownBroadcastPlayers] = useState<string[]>(isOfflineMode ? [selfDuelistId] : [selfDuelistId].filter(Boolean))
   const [broadcastChannelConnected, setBroadcastChannelConnected] = useState(false)
+  const [channelSubscribeError, setChannelSubscribeError] = useState("")
   const [debugLastEvent, setDebugLastEvent] = useState("")
   /** Chaves de ingestão (broadcast ∪ backup): Set evita dupla aplicação na mesma tarefa síncrona. */
   const ingestedActionKeysRef = useRef<Set<string>>(new Set())
@@ -588,35 +594,65 @@ const DuelArena = (
     },
     [isOfflineMode, matchId, processCombatAction]
   )
-  const submitTurnAction = useCallback(async (action: RoundAction) => {
-    if (isOfflineMode || !matchId || !selfDuelistId) return
-    const supabase = getSupabaseClient()
-    const eventId = action.eventId || `${selfDuelistId}-${turnNumber}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const payload: RoundAction = { ...action, casterId: selfDuelistId, turnId: turnNumber, eventId }
-    setAwaitingServerAck(true)
-    setBattleMessage("Aguardando confirmação broadcast...")
-    setDebugLastEvent(`TURN_ACTION enviado T${turnNumber}`)
-    await broadcastChannelRef.current?.send({
-      type: "broadcast",
-      event: "TURN_ACTION",
-      payload: { event: "TURN_ACTION", action: payload } satisfies MatchBroadcastMessage,
-    })
-    void supabase
-      .from("match_turns")
-      .upsert(
-        {
+
+  const persistTurnBackup = useCallback(
+    async (payload: RoundAction) => {
+      if (!matchId || !selfDuelistId) return
+      try {
+        const supabase = getSupabaseClient()
+        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession()
+        if (sessionErr) console.warn("[Arena] getSession:", sessionErr.message, sessionErr)
+        if (!sessionData?.session) {
+          console.warn("[Arena] persist: sem sessão JWT (mobile: storage bloqueado ou login expirado).")
+        }
+
+        const row = {
           match_id: matchId,
           turn_number: turnNumber,
           player_id: selfDuelistId,
-          action_payload: payload,
+          action_payload: payload as unknown as Record<string, unknown>,
           updated_at: new Date().toISOString(),
-        },
-        { onConflict: "match_id,turn_number,player_id" }
-      )
-      .then(({ error }) => {
-        if (error) addLog(`[Backup]: falha ao persistir ação do turno ${turnNumber}.`)
+        }
+
+        const { error } = await supabase.from("match_turns").upsert(row, { onConflict: "match_id,turn_number,player_id" })
+        if (error) {
+          console.warn("[Arena] match_turns upsert:", error.message, error.code, error.details, error.hint, error)
+          const { error: rpcErr } = await supabase.rpc("submit_duel_turn", {
+            p_match_id: matchId,
+            p_turn_number: turnNumber,
+            p_player_id: selfDuelistId,
+            p_action_payload: payload as unknown as Record<string, unknown>,
+          })
+          if (rpcErr) {
+            console.warn("[Arena] submit_duel_turn RPC:", rpcErr.message, rpcErr.code, rpcErr.details, rpcErr)
+            addLog(`[Backup]: falha turno ${turnNumber} (upsert + RPC).`)
+            setChannelSubscribeError((prev) => prev || `DB ${rpcErr.code ?? ""}: ${rpcErr.message}`)
+          }
+        }
+      } catch (e) {
+        console.warn("[Arena] persistTurnBackup exception:", e)
+      }
+    },
+    [addLog, matchId, selfDuelistId, turnNumber]
+  )
+
+  const submitTurnAction = useCallback(
+    async (action: RoundAction) => {
+      if (isOfflineMode || !matchId || !selfDuelistId) return
+      const eventId = action.eventId || `${selfDuelistId}-${turnNumber}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const payload: RoundAction = { ...action, casterId: selfDuelistId, turnId: turnNumber, eventId }
+      setAwaitingServerAck(true)
+      setBattleMessage("Aguardando confirmação broadcast...")
+      setDebugLastEvent(`TURN_ACTION enviado T${turnNumber}`)
+      await broadcastChannelRef.current?.send({
+        type: "broadcast",
+        event: "TURN_ACTION",
+        payload: { event: "TURN_ACTION", action: payload } satisfies MatchBroadcastMessage,
       })
-  }, [addLog, isOfflineMode, matchId, selfDuelistId, turnNumber])
+      void persistTurnBackup(payload)
+    },
+    [isOfflineMode, matchId, persistTurnBackup, selfDuelistId, turnNumber]
+  )
   const arenaRef = useRef<HTMLDivElement | null>(null)
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
@@ -672,6 +708,21 @@ const DuelArena = (
     let lastGameStartEmitAt = 0
     peerHereAtRef.current[selfDuelistId] = Date.now()
 
+    let liveChannel: ReturnType<typeof supabase.channel> | null = null
+    let heartbeatTimer: ReturnType<typeof window.setInterval> | undefined
+    let gameStartRetryTimer: ReturnType<typeof window.setInterval> | undefined
+
+    const stopIntervals = () => {
+      if (heartbeatTimer !== undefined) {
+        window.clearInterval(heartbeatTimer)
+        heartbeatTimer = undefined
+      }
+      if (gameStartRetryTimer !== undefined) {
+        window.clearInterval(gameStartRetryTimer)
+        gameStartRetryTimer = undefined
+      }
+    }
+
     const pruneStalePeers = () => {
       const now = Date.now()
       for (const id of [...known]) {
@@ -698,83 +749,162 @@ const DuelArena = (
       })
     }
 
-    const ch = supabase
-      .channel(`match-${matchId}`, { config: { broadcast: { self: true } } })
-      .on("broadcast", { event: "HERE_I_AM" }, async ({ payload }: { payload: MatchBroadcastMessage }) => {
-        if (!active || payload.event !== "HERE_I_AM") return
-        if (!payload.userId) return
-        peerHereAtRef.current[payload.userId] = Date.now()
-        known.add(payload.userId)
-        pruneStalePeers()
-        const ids = Array.from(known).sort()
-        setKnownBroadcastPlayers(ids)
-        setDebugLastEvent(`HERE_I_AM ${payload.userId.slice(0, 8)}…`)
-        mergeDuelistsFromPlayerIds(ids)
-        if (coordinator() && known.size >= expectedPlayers) await emitGameStart(ids)
-      })
-      .on("broadcast", { event: "GAME_START" }, ({ payload }: { payload: MatchBroadcastMessage }) => {
-        if (!active || payload.event !== "GAME_START") return
-        const players = (payload.players || []).filter((id) => !!id)
-        if (players.length < expectedPlayers) return
-        if (!players.includes(selfDuelistId)) return
-        setKnownBroadcastPlayers(players.sort())
-        mergeDuelistsFromPlayerIds(players)
-        setGameStartAcknowledged(true)
-        setBattleMessage("")
-        setDebugLastEvent("GAME_START rx")
-      })
-      .on("broadcast", { event: "TURN_ACTION" }, ({ payload }: { payload: MatchBroadcastMessage }) => {
-        if (!active || payload.event !== "TURN_ACTION") return
-        ingestTurnActionFromNetwork(payload.action, "broadcast")
-      })
-      .subscribe(async (status) => {
-        if (!active) return
-        setBroadcastChannelConnected(status === "SUBSCRIBED")
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          setDebugLastEvent(`Canal: ${status}`)
-        }
-        if (status !== "SUBSCRIBED") return
-        setDebugLastEvent("Canal SUBSCRIBED")
+    const startIntervals = () => {
+      stopIntervals()
+      if (!liveChannel || !active) return
+      heartbeatTimer = window.setInterval(() => {
+        if (!active || !liveChannel) return
         peerHereAtRef.current[selfDuelistId] = Date.now()
-        await ch.send({
+        void liveChannel.send({
           type: "broadcast",
           event: "HERE_I_AM",
           payload: { event: "HERE_I_AM", userId: selfDuelistId, name: playerBuild.name } satisfies MatchBroadcastMessage,
         })
+      }, 8000)
+      gameStartRetryTimer = window.setInterval(() => {
+        if (!active || gameStartAcknowledgedRef.current || !liveChannel) return
+        pruneStalePeers()
+        const ids = Array.from(known).sort()
+        setKnownBroadcastPlayers(ids)
+        mergeDuelistsFromPlayerIds(ids)
+        if (known.size < expectedPlayers) return
+        if (!coordinator()) return
+        const now = Date.now()
+        if (now - lastGameStartEmitAt < 4500) return
+        lastGameStartEmitAt = now
+        void emitGameStart(ids)
+      }, 3200)
+    }
+
+    const wireHandlers = (channel: ReturnType<typeof supabase.channel>) =>
+      channel
+        .on("broadcast", { event: "HERE_I_AM" }, async ({ payload }: { payload: MatchBroadcastMessage }) => {
+          if (!active || payload.event !== "HERE_I_AM") return
+          if (!payload.userId) return
+          peerHereAtRef.current[payload.userId] = Date.now()
+          known.add(payload.userId)
+          pruneStalePeers()
+          const ids = Array.from(known).sort()
+          setKnownBroadcastPlayers(ids)
+          setDebugLastEvent(`HERE_I_AM ${payload.userId.slice(0, 8)}…`)
+          mergeDuelistsFromPlayerIds(ids)
+          if (coordinator() && known.size >= expectedPlayers) await emitGameStart(ids)
+        })
+        .on("broadcast", { event: "GAME_START" }, ({ payload }: { payload: MatchBroadcastMessage }) => {
+          if (!active || payload.event !== "GAME_START") return
+          const players = (payload.players || []).filter((id) => !!id)
+          if (players.length < expectedPlayers) return
+          if (!players.includes(selfDuelistId)) return
+          setKnownBroadcastPlayers(players.sort())
+          mergeDuelistsFromPlayerIds(players)
+          setGameStartAcknowledged(true)
+          setBattleMessage("")
+          setDebugLastEvent("GAME_START rx")
+        })
+        .on("broadcast", { event: "TURN_ACTION" }, ({ payload }: { payload: MatchBroadcastMessage }) => {
+          if (!active || payload.event !== "TURN_ACTION") return
+          ingestTurnActionFromNetwork(payload.action, "broadcast")
+        })
+
+    const subscribeWithTimeout = (channel: ReturnType<typeof supabase.channel>) =>
+      new Promise<boolean>((resolve) => {
+        let settled = false
+        let subscribedOk = false
+        const watchdog = window.setTimeout(() => {
+          if (!active || settled) return
+          settled = true
+          setBroadcastChannelConnected(false)
+          const msg = "Timeout 2s sem SUBSCRIBED"
+          setChannelSubscribeError(msg)
+          console.warn("[Arena]", msg)
+          void supabase.removeChannel(channel)
+          if (broadcastChannelRef.current === channel) broadcastChannelRef.current = null
+          liveChannel = null
+          resolve(false)
+        }, 2000)
+
+        channel.subscribe((status, err) => {
+          if (!active) return
+          if (err) {
+            const em = err instanceof Error ? err.message : String(err)
+            setChannelSubscribeError(em)
+            console.warn("[Arena] Realtime subscribe erro:", err)
+          }
+          if (status === "SUBSCRIBED") {
+            if (!active) return
+            if (settled) return
+            settled = true
+            window.clearTimeout(watchdog)
+            subscribedOk = true
+            liveChannel = channel
+            broadcastChannelRef.current = channel
+            setBroadcastChannelConnected(true)
+            setChannelSubscribeError("")
+            setDebugLastEvent("Canal SUBSCRIBED")
+            peerHereAtRef.current[selfDuelistId] = Date.now()
+            void channel.send({
+              type: "broadcast",
+              event: "HERE_I_AM",
+              payload: { event: "HERE_I_AM", userId: selfDuelistId, name: playerBuild.name } satisfies MatchBroadcastMessage,
+            })
+            startIntervals()
+            resolve(true)
+            return
+          }
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || (status === "CLOSED" && !subscribedOk)) {
+            setDebugLastEvent(`Canal: ${status}`)
+            setChannelSubscribeError((prev) => prev || status)
+            if (!subscribedOk) {
+              void supabase.removeChannel(channel)
+              if (broadcastChannelRef.current === channel) broadcastChannelRef.current = null
+              liveChannel = null
+            }
+            if (!settled) {
+              settled = true
+              window.clearTimeout(watchdog)
+              resolve(false)
+            }
+          }
+        })
       })
 
-    const heartbeat = window.setInterval(() => {
-      if (!active) return
-      peerHereAtRef.current[selfDuelistId] = Date.now()
-      void ch.send({
-        type: "broadcast",
-        event: "HERE_I_AM",
-        payload: { event: "HERE_I_AM", userId: selfDuelistId, name: playerBuild.name } satisfies MatchBroadcastMessage,
-      })
-    }, 8000)
+    const runLoop = async () => {
+      let attempt = 0
+      while (active && attempt < 50) {
+        attempt += 1
+        stopIntervals()
+        if (liveChannel) {
+          await supabase.removeChannel(liveChannel)
+          liveChannel = null
+          broadcastChannelRef.current = null
+        }
+        setBroadcastChannelConnected(false)
+        setDebugLastEvent(`Canal tentativa ${attempt}`)
 
-    const gameStartRetry = window.setInterval(() => {
-      if (!active || gameStartAcknowledgedRef.current) return
-      pruneStalePeers()
-      const ids = Array.from(known).sort()
-      setKnownBroadcastPlayers(ids)
-      mergeDuelistsFromPlayerIds(ids)
-      if (known.size < expectedPlayers) return
-      if (!coordinator()) return
-      const now = Date.now()
-      if (now - lastGameStartEmitAt < 4500) return
-      lastGameStartEmitAt = now
-      void emitGameStart(ids)
-    }, 3200)
+        const channel = supabase.channel(`match-${matchId}`, {
+          config: {
+            broadcast: { self: true },
+            presence: { key: selfDuelistId },
+          },
+        })
+        wireHandlers(channel)
+        const ok = await subscribeWithTimeout(channel)
+        if (ok && active) break
+        const backoff = 450 + Math.min(attempt, 10) * 120
+        await new Promise((r) => setTimeout(r, backoff))
+      }
+    }
 
-    broadcastChannelRef.current = ch
+    void runLoop()
+
     return () => {
       active = false
-      window.clearInterval(heartbeat)
-      window.clearInterval(gameStartRetry)
+      stopIntervals()
+      const c = broadcastChannelRef.current
+      if (c) void supabase.removeChannel(c)
+      liveChannel = null
       broadcastChannelRef.current = null
       setBroadcastChannelConnected(false)
-      void supabase.removeChannel(ch)
     }
   }, [expectedOnlinePlayers, ingestTurnActionFromNetwork, isOnlineMatch, matchId, mergeDuelistsFromPlayerIds, playerBuild.name, selfDuelistId])
 
@@ -944,7 +1074,7 @@ const DuelArena = (
       }))
     )
     setBattleStatus("selecting")
-    setTimeLeft(60)
+    setTimeLeft(isOnlineMatch ? 120 : 60)
     setPendingSpell(null)
     setResolutionText("")
     setBattleMessage("")
@@ -1156,6 +1286,13 @@ const DuelArena = (
       setTimeLeft((prev) => {
         if (prev <= 1) {
           if (isOnlineMatch) {
+            const selfActed = !!pendingActionsRef.current[selfDuelistId]
+            if (!selfActed) {
+              addLog(`[Turno ${turnNumber}]: tempo esgotado (2 min) — derrota por inatividade.`)
+              setGameOver("lose")
+              setBattleStatus("finished")
+              return 0
+            }
             if (!awaitingServerAck) {
               const skipAction: RoundAction = { casterId: selfDuelistId, type: "skip", turnId: turnNumber }
               void submitTurnAction(skipAction)
@@ -1186,7 +1323,7 @@ const DuelArena = (
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [awaitingServerAck, battleStatus, duelists, gameOver, isOnlineMatch, pendingActions, player?.name, playerDefeated, selfDuelistId, submitTurnAction, turnNumber])
+  }, [addLog, awaitingServerAck, battleStatus, duelists, gameOver, isOnlineMatch, pendingActions, player?.name, playerDefeated, selfDuelistId, submitTurnAction, turnNumber])
 
   useEffect(() => {
     if (battleStatus !== "selecting") return
@@ -1805,6 +1942,9 @@ const DuelArena = (
           </p>
           <p className="truncate" title={debugLastEvent}>
             [Último Evento: {debugLastEvent || "—"}]
+          </p>
+          <p className="truncate text-amber-400/90" title={channelSubscribeError}>
+            [Canal Erro: {channelSubscribeError || "—"}]
           </p>
         </div>
       )}

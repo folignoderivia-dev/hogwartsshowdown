@@ -27,6 +27,11 @@ export function getSupabaseClient(): SupabaseClient {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      storage: typeof window !== "undefined" ? window.localStorage : undefined,
+      flowType: "pkce",
+    },
+    global: {
+      headers: { "X-Client-Info": "duel-arena" },
     },
   })
   return singleton

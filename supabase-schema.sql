@@ -477,6 +477,36 @@ on public.match_turns for all
 using (auth.role() = 'authenticated')
 with check (auth.role() = 'authenticated');
 
+-- Caminho alternativo (RPC) para persistir turno em redes móveis instáveis.
+create or replace function public.submit_duel_turn(
+  p_match_id text,
+  p_turn_number integer,
+  p_player_id text,
+  p_action_payload jsonb
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+  if p_player_id is distinct from auth.uid()::text then
+    raise exception 'player_id must match auth.uid()';
+  end if;
+
+  insert into public.match_turns (match_id, turn_number, player_id, action_payload, updated_at)
+  values (p_match_id, p_turn_number, p_player_id, p_action_payload, now())
+  on conflict (match_id, turn_number, player_id)
+  do update set
+    action_payload = excluded.action_payload,
+    updated_at = excluded.updated_at;
+end;
+$$;
+
+grant execute on function public.submit_duel_turn(text, integer, text, jsonb) to authenticated;
+
 -- Ready state para sincronizar início da batalha entre todos os participantes.
 create table if not exists public.match_ready_states (
   match_id text not null references public.matches(match_id) on delete cascade,
