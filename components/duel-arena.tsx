@@ -499,15 +499,17 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "Sistema", text: "Chat ativo." }])
   const [chatInput, setChatInput] = useState("")
   const isReadOnlySpectator = isSpectator || (!!matchId && !!playerBuild.userId && participantIds.length > 0 && !participantIds.includes(playerBuild.userId))
-  const localOnlineId = localNetworkId || playerBuild.userId || "player"
-  const selfDuelistId = playerBuild.gameMode === "teste" ? "player" : localOnlineId
+  const localOnlineId = localNetworkId || playerBuild.userId || null
+  const selfDuelistId = playerBuild.gameMode === "teste" ? "player" : (localOnlineId || "")
+  const isIdentityReady = playerBuild.gameMode === "teste" || !!localOnlineId
 
   useEffect(() => {
     if (playerBuild.gameMode === "teste") return
+    console.log("[Arena:init] participantIds update", { participantIds, participantNames })
     const base = buildOnlineDuelists(participantIds)
     if (base.length === 0) return
     setDuelists((prev) => {
-      return base.map((d) => {
+      const next = base.map((d) => {
         const old = prev.find((p) => p.id === d.id)
         if (!old) return d
         return {
@@ -531,6 +533,12 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           turnsInBattle: old.turnsInBattle,
         }
       })
+      console.log("[Arena:init] setDuelists from participants", {
+        prevCount: prev.length,
+        nextCount: next.length,
+        ids: next.map((d) => d.id),
+      })
+      return next
     })
   }, [buildOnlineDuelists, participantIds, playerBuild.gameMode])
 
@@ -650,7 +658,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   }, [isBattlePrepared])
 
   useEffect(() => {
-    if (!isOnlineMatch || !matchId) {
+    if (!isOnlineMatch || !matchId || !isIdentityReady) {
       setIsInitializing(false)
       return
     }
@@ -666,6 +674,16 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         participantIds.length >= expectedOnlinePlayers &&
         duelistsRef.current.length >= expectedOnlinePlayers &&
         duelistsRef.current.every((d) => !!d.hp && Array.isArray(d.hp.bars) && d.hp.bars.length === 5 && getTotalHP(d.hp) > 0)
+      console.log("[Arena:init] checkInit", {
+        matchId,
+        rosterReady,
+        stateReady,
+        expectedOnlinePlayers,
+        participantCount: participantIds.length,
+        duelistsCount: duelistsRef.current.length,
+        status: matchStatus,
+        readyCount,
+      })
       if (mounted) setIsInitializing(!(rosterReady && stateReady && matchStatus === "in_progress" && readyCount >= expectedOnlinePlayers))
     }
     void checkInit()
@@ -674,10 +692,10 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       mounted = false
       window.clearInterval(timer)
     }
-  }, [expectedOnlinePlayers, isOnlineMatch, matchId, matchStatus, participantIds.length, readyCount])
+  }, [expectedOnlinePlayers, isIdentityReady, isOnlineMatch, matchId, matchStatus, participantIds.length, readyCount])
 
   useEffect(() => {
-    if (playerBuild.gameMode === "teste" || !matchId) return
+    if (playerBuild.gameMode === "teste" || !matchId || !selfDuelistId) return
     const supabase = getSupabaseClient()
 
     const pullReadyState = async () => {
@@ -690,6 +708,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
         const r = row as any
         next[String(r.player_id)] = !!r.is_ready
       }
+      console.log("[Arena:ready] pullReadyState", { matchId, next })
       setReadyByPlayerId(next)
     }
 
@@ -697,6 +716,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
       { match_id: matchId, player_id: selfDuelistId, is_ready: false, updated_at: new Date().toISOString() },
       { onConflict: "match_id,player_id" }
     )
+    console.log("[Arena:ready] upsert local ready=false", { matchId, selfDuelistId })
     void pullReadyState()
 
     const readyChannel = supabase
@@ -2097,7 +2117,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
   const topDuelists = useMemo(() => duelists.filter((d) => d.team === "enemy"), [duelists])
   const bottomDuelists = useMemo(() => duelists.filter((d) => d.team === "player"), [duelists])
 
-  if (isOnlineMatch && (!isBattleReady || isInitializing)) {
+  if (isOnlineMatch && (!isIdentityReady || !isBattleReady || isInitializing)) {
     return (
       <div className="min-h-screen bg-stone-800 font-serif text-amber-100">
         <header className="border-b border-amber-900/80 bg-stone-950/80 px-4 py-3">
@@ -2112,7 +2132,7 @@ const DuelArena = forwardRef<DuelArenaHandle, DuelArenaProps>(function DuelArena
           <div className="w-full max-w-lg rounded-xl border border-amber-700 bg-stone-900/90 p-6 text-center">
             <p className="text-lg font-semibold text-amber-200">Sincronizando Bruxos...</p>
             <p className="mt-2 text-sm text-amber-300/90">
-              A batalha inicia somente quando todos os jogadores e HPs forem carregados em tempo real.
+              A batalha inicia somente quando identidade, jogadores e HPs forem carregados em tempo real.
             </p>
           </div>
         </main>
