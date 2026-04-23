@@ -132,11 +132,22 @@ export function useArenaMatchSync({
   useEffect(() => {
     if (!isOnlineMatch || !matchId) return
     if (matchStatus !== "waiting") return
-    if (participantIds.length < expectedOnlinePlayers) return
-    if (readyCount < expectedOnlinePlayers) return
     const supabase = getSupabaseClient()
-    void supabase.from("matches").update({ status: "in_progress", updated_at: new Date().toISOString() }).eq("match_id", matchId).eq("status", "waiting")
-  }, [expectedOnlinePlayers, isOnlineMatch, matchId, matchStatus, participantIds.length, readyCount])
+    let mounted = true
+    void (async () => {
+      const [{ count: playersCount }, { count: readyCountDb }] = await Promise.all([
+        supabase.from("match_players").select("player_id", { count: "exact", head: true }).eq("match_id", matchId),
+        supabase.from("match_ready_states").select("player_id", { count: "exact", head: true }).eq("match_id", matchId).eq("is_ready", true),
+      ])
+      if (!mounted) return
+      if ((playersCount || 0) < expectedOnlinePlayers) return
+      if ((readyCountDb || 0) < expectedOnlinePlayers) return
+      await supabase.from("matches").update({ status: "in_progress", updated_at: new Date().toISOString() }).eq("match_id", matchId).eq("status", "waiting")
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [expectedOnlinePlayers, isOnlineMatch, matchId, matchStatus])
 
   const markReady = useCallback(async () => {
     if (!matchId || !selfDuelistId || isOfflineMode) return

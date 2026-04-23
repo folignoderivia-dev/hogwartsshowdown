@@ -228,6 +228,10 @@ export function useMatchManager() {
         .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner")
         .single()
       await supabase.from("match_players").upsert({ match_id: created.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
+      await supabase.from("match_ready_states").upsert(
+        { match_id: created.match_id, player_id: playerId, is_ready: false, updated_at: new Date().toISOString() },
+        { onConflict: "match_id,player_id" }
+      )
       const opened = toExternalState(created)
       logMatch("joinMatchmaker:fallback-created", {
         matchId: opened.matchId,
@@ -270,6 +274,10 @@ export function useMatchManager() {
       .single()
     if (error) throw error
     await supabase.from("match_players").upsert({ match_id: data.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
+    await supabase.from("match_ready_states").upsert(
+      { match_id: data.match_id, player_id: playerId, is_ready: false, updated_at: new Date().toISOString() },
+      { onConflict: "match_id,player_id" }
+    )
     const created = toExternalState(data)
     logMatch("createRoom:ok", {
       matchId: created.matchId,
@@ -465,7 +473,6 @@ export function useMatchManager() {
       matchId: string,
       handlers: {
         onState?: (state: ExternalMatchState) => void
-        onAction?: (payload: ActionPayload) => void
       }
     ) => {
       const supabase = getSupabaseClient()
@@ -492,14 +499,6 @@ export function useMatchManager() {
               mode: row.mode,
               currentTurnOwner: row.current_turn_owner || row.p1_id,
             })
-          }
-        )
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "match_actions", filter: `match_id=eq.${matchId}` },
-          (evt: any) => {
-            const p = evt.new?.payload as ActionPayload | undefined
-            if (p) handlers.onAction?.(p)
           }
         )
         .subscribe()

@@ -307,7 +307,6 @@ export default function PageClient() {
           isSpectator={isSpectator}
           participantIds={externalMatchState?.participantIds || []}
           participantNames={externalMatchState?.participantNames || []}
-          localNetworkId={playerBuild?.userId}
           matchStatus={externalMatchState?.status}
         />
       )}
