@@ -3,7 +3,7 @@ import type { CapacitorConfig } from "@capacitor/cli"
 const config: CapacitorConfig = {
   appId: "com.hogwartsshowdown.app",
   appName: "Hogwarts Showdown",
-  webDir: "out",
+  webDir: "public",
   // Modo "live reload remoto": o APK abre diretamente o site Vercel.
   // Assim qualquer atualização no site reflete no app sem novo APK.
   server: {

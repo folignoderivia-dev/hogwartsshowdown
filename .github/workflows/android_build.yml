@@ -75,7 +75,13 @@ jobs:
             "platform-tools" 2>/dev/null || \
           echo "sdkmanager nao disponivel, assumindo SDK preinstalado..."
 
-      # ── 9. Capacitor sync ────────────────────────────────────────────────────
+      # ── 9. Garantir que webDir exista (Capacitor exige mesmo em modo remoto) ──
+      - name: Ensure webDir exists
+        run: |
+          mkdir -p public
+          [ -f public/index.html ] || echo '<!DOCTYPE html><html><body></body></html>' > public/index.html
+
+      # ── 10. Capacitor sync ───────────────────────────────────────────────────
       - name: Capacitor sync
         run: npx cap sync android
 
