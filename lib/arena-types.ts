@@ -27,6 +27,7 @@ export type DebuffType =
   | "bloqueio_cura"
   | "damage_reduce"
   | "protego_diabol"
+  | "crit_down"
 
 export type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 

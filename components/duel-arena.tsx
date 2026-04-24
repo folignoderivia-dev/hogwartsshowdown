@@ -138,6 +138,7 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   bloqueio_cura: "🚫 SEM CURA",
   damage_reduce: "⬇️ DANO-25%",
   protego_diabol: "🛡️ DIABÓLICO",
+  crit_down: "⬇️ CRIT-10%",
 }
 /** Mensagem flutuante curta ao aplicar debuff do grimório. */
 const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
