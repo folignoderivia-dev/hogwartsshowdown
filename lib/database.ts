@@ -202,6 +202,31 @@ export async function updateUserElo(userId: string, delta: number): Promise<DbUs
   }
 }
 
+/** Extrai nome de feitiço de uma linha de match_actions (payload ActionPayload ou legado). */
+function spellNameFromMatchActionRow(row: { payload?: unknown; action_id?: string | null }): string | null {
+  const payload = row.payload as Record<string, unknown> | null | undefined
+  if (payload && typeof payload === "object") {
+    const action = payload.action as Record<string, unknown> | undefined
+    if (action && action.type === "cast" && typeof action.spellName === "string") {
+      const s = action.spellName.trim()
+      if (s) return s
+    }
+    // Cliente envia actionId = spellName || tipo (p.ex. potion); só contamos como feitiço se parecer nome de cast
+    if (typeof payload.actionId === "string") {
+      const aid = payload.actionId.trim()
+      const nonSpells = new Set(["potion", "skip", "surrender", "cast"])
+      if (aid && !nonSpells.has(aid.toLowerCase()) && aid.length < 120) return aid
+    }
+  }
+  // Migração antiga do schema: action_id virou "NomeDoFeitiço:123" (uma vez, id da linha).
+  const rawId = row.action_id != null ? String(row.action_id).trim() : ""
+  if (rawId && /^[^:]+:[0-9]+$/.test(rawId)) {
+    const legacy = rawId.replace(/:[0-9]+$/, "").trim()
+    if (legacy.length > 0 && legacy.length < 120) return legacy
+  }
+  return null
+}
+
 export async function applyMatchElo(userId: string, outcome: "win" | "lose", mode?: string): Promise<DbUser | null> {
   const isFfa = mode === "ffa" || mode === "ffa3"
   const winDelta = isFfa ? ELO_WIN_FFA : ELO_WIN
@@ -215,15 +240,16 @@ export async function applyMatchElo(userId: string, outcome: "win" | "lose", mod
   const nextWins = (profile.wins ?? 0) + (outcome === "win" ? 1 : 0)
   const nextLosses = (profile.losses ?? 0) + (outcome === "lose" ? 1 : 0)
 
-  // Melhor esforço para descobrir o feitiço mais usado pelo usuário via histórico de ações.
+  // Feitiço mais usado: contar a partir do JSON payload (action_id na tabela é eventId único, não é o feitiço).
   const { data: spellRows } = await supabase
     .from("match_actions")
-    .select("action_id")
+    .select("payload,action_id")
     .eq("player_id", userId)
-    .limit(1000)
+    .order("created_at", { ascending: false })
+    .limit(2500)
   const counts: Record<string, number> = {}
   for (const row of spellRows || []) {
-    const spell = String((row as any).action_id || "")
+    const spell = spellNameFromMatchActionRow(row as { payload?: unknown; action_id?: string | null })
     if (!spell) continue
     counts[spell] = (counts[spell] || 0) + 1
   }

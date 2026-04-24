@@ -377,9 +377,10 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     void refreshRanking()
   }, [currentUser])
 
+  // Refaz a lista quando o perfil muda (ex.: após duelo applyMatchElo atualiza wins/elo/favorite_spell).
   useEffect(() => {
     void refreshFriends()
-  }, [currentUser?.id])
+  }, [currentUser?.id, currentUser?.wins, currentUser?.losses, currentUser?.favoriteSpell, currentUser?.elo])
 
   // Conecta ao servidor Socket.io para receber duelos ao vivo e resultados recentes
   useEffect(() => {
