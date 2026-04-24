@@ -83,6 +83,53 @@ const recentMatches: RecentResult[] = []
 
 const activeMatches = new Map<string, MatchRoom>()
 
+// ─── Quadribol (completamente isolado do sistema de Duelos) ───────────────────
+
+type QuidditchRole = "attacker" | "defender"
+type QuidditchDirection = "left" | "right" | "center" | "left_high" | "right_high"
+
+interface QuidditchPlayer {
+  socketId: string
+  userId: string
+  name: string
+  role: QuidditchRole
+}
+
+interface QuidditchRoom {
+  matchId: string
+  players: Map<string, QuidditchPlayer>   // userId → player
+  scores: { attacker: number; defender: number }
+  turn: number   // 1–6 (turnos de jogo), 7 = encerrado
+  pendingActions: Map<string, QuidditchDirection>  // userId → escolha
+}
+
+const quidditchRooms = new Map<string, QuidditchRoom>()
+
+function processQuidditchTurn(room: QuidditchRoom) {
+  const players = [...room.players.values()]
+  const attacker = players.find((p) => p.role === "attacker")!
+  const defender = players.find((p) => p.role === "defender")!
+  const attackerChoice = room.pendingActions.get(attacker.userId)!
+  const defenderChoice = room.pendingActions.get(defender.userId)!
+
+  // Turnos 1-3 (Artilheiro vs Goleiro):
+  //   Igual = Defesa (defender pontua). Diferente = Gol (attacker pontua).
+  // Turnos 4-6 (Apanhador vs Batedor):
+  //   Igual = Balaço acerta (defender pontua). Diferente = Esquiva (attacker pontua).
+  const sameChoice = attackerChoice === defenderChoice
+  let scored: QuidditchRole
+  if (room.turn <= 3) {
+    scored = sameChoice ? "defender" : "attacker"
+  } else {
+    scored = sameChoice ? "defender" : "attacker"
+  }
+  room.scores[scored]++
+  room.pendingActions.clear()
+  room.turn++
+
+  return { attackerChoice, defenderChoice, scored, scores: { ...room.scores } }
+}
+
 /** Emite snapshot de salas ativas para todos os sockets conectados. */
 function broadcastActiveMatches() {
   const rooms = [...activeMatches.values()].map((r) => ({
@@ -668,6 +715,69 @@ io.on("connection", (socket: Socket) => {
     if (!room) return
     if (room.gameStarted) {
       socket.to(matchId).emit("OPPONENT_DISCONNECTED", { userId })
+    }
+  })
+
+  // ─── Quadribol: criar/entrar em sala ─────────────────────────────────────
+  socket.on("QUIDDITCH_JOIN", ({ matchId, userId, name }: { matchId: string; userId: string; name: string }) => {
+    socket.join(matchId)
+    ;(socket as any)._quidditchMatchId = matchId
+    ;(socket as any)._quidditchUserId = userId
+
+    if (!quidditchRooms.has(matchId)) {
+      quidditchRooms.set(matchId, {
+        matchId,
+        players: new Map(),
+        scores: { attacker: 0, defender: 0 },
+        turn: 1,
+        pendingActions: new Map(),
+      })
+    }
+    const qRoom = quidditchRooms.get(matchId)!
+    if (qRoom.players.has(userId)) return   // reconexão — ignora
+
+    // Primeiro jogador = atacante, segundo = defensor
+    const role: QuidditchRole = qRoom.players.size === 0 ? "attacker" : "defender"
+    qRoom.players.set(userId, { socketId: socket.id, userId, name, role })
+    console.log(`[Quidditch] ${name} entrou em ${matchId} como ${role}`)
+
+    if (qRoom.players.size === 2) {
+      // Monta mapa userId→role para o cliente
+      const roles: Record<string, QuidditchRole> = {}
+      const playerNames: Record<string, string> = {}
+      for (const [uid, p] of qRoom.players) {
+        roles[uid] = p.role
+        playerNames[uid] = p.name
+      }
+      io.to(matchId).emit("QUIDDITCH_START", { roles, playerNames })
+      console.log(`[Quidditch] Partida iniciada: ${matchId}`)
+    }
+  })
+
+  // ─── Quadribol: submissão de jogada ──────────────────────────────────────
+  socket.on("QUIDDITCH_ACTION", ({ matchId, userId, direction }: { matchId: string; userId: string; direction: QuidditchDirection }) => {
+    const qRoom = quidditchRooms.get(matchId)
+    if (!qRoom) return
+    if (qRoom.turn > 6) return   // jogo já encerrado
+    if (qRoom.pendingActions.has(userId)) return   // já enviou neste turno
+
+    qRoom.pendingActions.set(userId, direction)
+    socket.to(matchId).emit("QUIDDITCH_OPPONENT_READY")
+
+    if (qRoom.pendingActions.size === 2) {
+      const result = processQuidditchTurn(qRoom)
+      const currentTurn = qRoom.turn - 1   // turno que acabou de ser processado
+      io.to(matchId).emit("QUIDDITCH_TURN_RESULT", { ...result, turn: currentTurn })
+
+      if (qRoom.turn > 6) {
+        // Determina vencedor
+        const winner: QuidditchRole = qRoom.scores.attacker > qRoom.scores.defender ? "attacker" : "defender"
+        const players = [...qRoom.players.values()]
+        const winnerName = players.find((p) => p.role === winner)?.name ?? "?"
+        io.to(matchId).emit("QUIDDITCH_GAME_OVER", { winner, winnerName, scores: qRoom.scores })
+        quidditchRooms.delete(matchId)
+        console.log(`[Quidditch] Fim: ${matchId} — vencedor: ${winnerName}`)
+      }
     }
   })
 })

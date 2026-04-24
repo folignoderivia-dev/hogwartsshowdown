@@ -122,6 +122,7 @@ const GAME_MODES = [
   { value: "2v2", label: "2 VS 2" },
   { value: "ffa3", label: "ALL IN ONE (3 FFA)" },
   { value: "ffa", label: "ALL IN ONE (4 FFA)" },
+  { value: "quidditch", label: "🏆 QUADRIBOL 1v1" },
 ]
 
 const MAX_SPELL_POINTS = 6
@@ -163,7 +164,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
   const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
-  const [gameMode, setGameMode] = useState<"teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "">("")
+  const [gameMode, setGameMode] = useState<"teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "">("")
 
   useEffect(() => {
     if (!currentUser?.id) return
@@ -254,14 +255,17 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     return true
   }
 
+  const isQuidditchMode = gameMode === "quidditch"
   const isReady =
     !!currentUser &&
-    house !== "" &&
-    wand !== "" &&
-    potion !== "" &&
-    avatar !== "" &&
     gameMode !== "" &&
-    totalCost === MAX_SPELL_POINTS
+    (isQuidditchMode || (
+      house !== "" &&
+      wand !== "" &&
+      potion !== "" &&
+      avatar !== "" &&
+      totalCost === MAX_SPELL_POINTS
+    ))
 
   const refreshRanking = async () => {
     const list = await getRankingTop(50)
@@ -415,7 +419,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         potion,
         spells: selectedSpells,
         avatar,
-        gameMode: gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3",
+        gameMode: gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch",
         userId: currentUser.id,
         username: currentUser.username,
         elo: currentUser.elo,
@@ -1350,7 +1354,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   key={mode.value}
                   variant="outline"
                   size="sm"
-                  onClick={() => setGameMode(mode.value as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3")}
+                  onClick={() => setGameMode(mode.value as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch")}
                   className={`h-9 w-full justify-center px-2 text-xs sm:text-sm transition-all ${
                     gameMode === mode.value
                       ? "border-amber-500 bg-amber-700/50 text-amber-200"
@@ -1393,13 +1397,20 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </div>
         </div>
 
+        {isQuidditchMode && isReady && (
+          <p className="mt-2 text-center text-xs text-amber-400/80">
+            Quadribol não precisa de build. Clique em Criar Sala e compartilhe o código com seu adversário.
+          </p>
+        )}
         {!isReady && (
           <p className="mt-4 text-center text-sm text-amber-200/95">
             {!currentUser
               ? "Entre ou registre-se para poder ir à Arena."
-              : totalCost !== MAX_SPELL_POINTS
-                ? `Use exatamente ${MAX_SPELL_POINTS} pontos de feitico (atual: ${totalCost})`
-                : "Complete todas as selecoes para iniciar o duelo"}
+              : isQuidditchMode
+                ? "Selecione o modo Quadribol e você estará pronto!"
+                : totalCost !== MAX_SPELL_POINTS
+                  ? `Use exatamente ${MAX_SPELL_POINTS} pontos de feitico (atual: ${totalCost})`
+                  : "Complete todas as selecoes para iniciar o duelo"}
           </p>
         )}
         </div>

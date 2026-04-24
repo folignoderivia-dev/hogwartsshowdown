@@ -7,6 +7,7 @@ import { useMatchManager, type ExternalMatchState } from "@/hooks/useMatchManage
 import type { PlayerBuild } from "@/lib/types"
 import CommonRoom from "@/components/common-room"
 import DuelArena from "@/components/duel-arena"
+import QuidditchArena from "@/components/quidditch-arena"
 
 export default function PageClient() {
   const [isClient, setIsClient] = useState(false)
@@ -39,6 +40,15 @@ export default function PageClient() {
     setPlayerBuild(build)
     if (typeof window !== "undefined") window.localStorage.setItem(`duel:lastBuild:${build.userId}`, JSON.stringify(build))
     void (async () => {
+      // Quadribol gerencia seu próprio socket e matchId — vai direto para a tela
+      if (build.gameMode === "quidditch") {
+        setActiveMatchId(null)
+        setMatchPending(false)
+        setIsSpectator(false)
+        setScreen("battle")
+        return
+      }
+
       if (!isOnlineMode(build)) {
         setActiveMatchId(null)
         setMatchPending(false)
@@ -69,6 +79,11 @@ export default function PageClient() {
     setPlayerBuild(build)
     if (typeof window !== "undefined") window.localStorage.setItem(`duel:lastBuild:${build.userId}`, JSON.stringify(build))
     void (async () => {
+      // Quadribol gerencia seu próprio socket e matchId — vai direto para a tela
+      if (build.gameMode === "quidditch") {
+        handleStartDuel(build)
+        return
+      }
       if (!isOnlineMode(build)) {
         handleStartDuel(build)
         return
@@ -255,6 +270,12 @@ export default function PageClient() {
           onSpectateMatch={handleSpectateMatch}
           resumableMatch={resumableMatch}
           onResumeMatch={handleResumeMatch}
+        />
+      ) : playerBuild?.gameMode === "quidditch" ? (
+        <QuidditchArena
+          playerBuild={playerBuild!}
+          matchId={activeMatchId || undefined}
+          onReturn={handleReturnToCommonRoom}
         />
       ) : (
         <DuelArena
