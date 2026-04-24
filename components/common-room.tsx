@@ -49,10 +49,10 @@ interface CommonRoomProps {
 }
 
 const HOUSES = [
-  { value: "gryffindor", label: "Grifinoria", color: "bg-red-800", modifiers: "+1 prioridade em ataques / mana inicial -2 por magia", icon: "🦁" },
-  { value: "slytherin", label: "Sonserina", color: "bg-green-800", modifiers: "+15% dano / +15% chance de critico recebido", icon: "🐍" },
-  { value: "ravenclaw", label: "Corvinal", color: "bg-blue-800", modifiers: "+3 mana max (nao-imperdoaveis)", icon: "🦅" },
-  { value: "hufflepuff", label: "Lufa-Lufa", color: "bg-yellow-700", modifiers: "-15% dano recebido / -1 prioridade em ataques", icon: "🦡" },
+  { value: "gryffindor", label: "Grifinória",  color: "bg-red-800",    modifiers: "Age primeiro na maioria das situações, mas começa com menos mana em cada magia", icon: "🦁" },
+  { value: "slytherin",  label: "Sonserina",   color: "bg-green-800",  modifiers: "Alta chance de acertos críticos, porém começa com apenas 4 barras de HP",        icon: "🐍" },
+  { value: "ravenclaw",  label: "Corvinal",    color: "bg-blue-800",   modifiers: "Mana extra em todas as magias comuns, permitindo mais lançamentos por batalha",   icon: "🦅" },
+  { value: "hufflepuff", label: "Lufa-Lufa",   color: "bg-yellow-700", modifiers: "Devolve parte do dano recebido ao atacante, mas age por último na maioria dos turnos", icon: "🦡" },
 ]
 
 
@@ -1091,7 +1091,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               {house && (
                 <div className="mt-3 rounded border border-amber-800/50 bg-amber-950/30 p-2">
                   <p className="text-xs text-amber-300">
-                    <strong>Modificadores:</strong> {HOUSES.find(h => h.value === house)?.modifiers}
+                    <strong>Passiva:</strong> {HOUSES.find(h => h.value === house)?.modifiers}
                   </p>
                 </div>
               )}
