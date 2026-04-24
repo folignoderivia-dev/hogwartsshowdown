@@ -1318,6 +1318,10 @@ const DuelArena = (
 
   const handleLeaveRoom = async () => {
     try {
+      // Desistência voluntária durante batalha online → derrota imediata para ELO
+      if (isOnlineMatch && battleStatus !== "finished" && !isReadOnlySpectator && !gameOver) {
+        onBattleEnd?.("lose", playerBuild.userId)
+      }
       // Notifica o servidor socket antes de sair
       if (isOnlineMatch && matchId && selfDuelistId && socketRef.current?.connected) {
         socketRef.current.emit("LEAVE_MATCH", { matchId, userId: selfDuelistId })
@@ -1444,13 +1448,15 @@ const DuelArena = (
   const bottomDuelists = useMemo(() => duelists.filter((d) => d.team === "player"), [duelists])
 
   return (
-    <div className="min-h-screen bg-stone-800 font-serif text-amber-100">
-      <header className="border-b border-amber-900/80 bg-stone-950/80 px-4 py-3">
+    <div className="min-h-screen bg-cover bg-center bg-fixed font-serif text-amber-100" style={{ backgroundImage: "url('https://i.postimg.cc/D0y9DbnS/clube.png')" }}>
+      <header className="border-b-4 border-amber-900 bg-stone-950/90 px-4 py-3">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <h1 className="text-2xl text-amber-300">Arena de Duelo</h1>
+          <h1 className="text-2xl font-bold text-amber-300">⚔️ Arena de Duelo</h1>
           <div className="flex items-center gap-2">
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">{String(Math.floor(timeLeft / 60)).padStart(2, "0")}:{String(timeLeft % 60).padStart(2, "0")}</Badge>
-            <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">{battleStatus.toUpperCase()}</Badge>
+            <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">
+              {{ selecting: "⚔️ Escolhendo", resolving: "✨ Conjurando...", animating: "✨ Conjurando...", finished: "🏁 Finalizado", waiting: "⏳ Aguardando" }[battleStatus] ?? battleStatus}
+            </Badge>
             {playerBuild.gameMode === "challenge" && <Badge className="border-purple-700 bg-purple-950/40 text-purple-200">{CHALLENGE_LABELS[Math.min(challengeStage, CHALLENGE_LABELS.length - 1)]}</Badge>}
             {isReadOnlySpectator && <Badge className="border-blue-700 bg-blue-950/40 text-blue-200">ESPECTADOR</Badge>}
             {isReadOnlySpectator ? (
@@ -1858,12 +1864,30 @@ const DuelArena = (
       )}
 
       {gameOver && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="w-full max-w-md rounded-xl border border-amber-700 bg-stone-900 p-8 text-center">
-            <h2 className="text-2xl text-amber-300">{gameOver === "win" ? "Vitoria!" : gameOver === "timeout" ? "Time Out!" : "Derrota"}</h2>
-            <Button onClick={handleLeaveRoom} className="mt-4 border border-red-700 bg-red-900 text-amber-100 hover:bg-red-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75">
+          <div className="w-full max-w-md rounded-xl border-4 border-amber-900 bg-stone-900/95 p-8 text-center shadow-2xl">
+            {gameOver === "win" ? (
+              <>
+                <div className="mb-2 text-6xl">🏆</div>
+                <h2 className="text-3xl font-bold text-amber-300">Vitória!</h2>
+                <p className="mt-2 text-amber-100/80">O duelo foi vencido com honra.</p>
+              </>
+            ) : gameOver === "timeout" ? (
+              <>
+                <div className="mb-2 text-6xl">⏳</div>
+                <h2 className="text-3xl font-bold text-amber-400">Tempo Esgotado!</h2>
+                <p className="mt-2 text-amber-100/80">O duelo terminou sem um vencedor claro.</p>
+              </>
+            ) : (
+              <>
+                <div className="mb-2 text-6xl">💀</div>
+                <h2 className="text-3xl font-bold text-red-400">Derrota</h2>
+                <p className="mt-2 text-amber-100/80">Você foi derrotado. Treine e volte mais forte.</p>
+              </>
+            )}
+            <Button onClick={handleLeaveRoom} className="mt-6 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 px-6 text-amber-100 hover:from-amber-800 hover:to-amber-900">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              {isReadOnlySpectator ? "Voltar para o Lobby" : "Voltar"}
+              {isReadOnlySpectator ? "Voltar para o Lobby" : "Voltar ao Saguão"}
             </Button>
           </div>
         </div>

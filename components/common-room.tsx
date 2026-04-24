@@ -419,9 +419,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <header className="mb-5 text-center">
           <div className="medieval-frame mx-auto mb-3 inline-block rounded-lg bg-gradient-to-b from-amber-900/80 to-amber-950/90 px-6 py-3">
             <h1 className="text-3xl font-bold tracking-tight text-amber-200" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>
-              Sala Comunal
+              🪄 Hogwarts Showdown 🪄
             </h1>
-            <p className="mt-1 text-amber-100/90">Monte sua build para o duelo</p>
+            <p className="mt-1 text-amber-100/90">Monte sua Build e duele! Pvp Multiplayer</p>
           </div>
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2">
             <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
