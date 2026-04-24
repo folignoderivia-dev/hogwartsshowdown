@@ -523,3 +523,25 @@ create policy "match_ready_states_rw_authenticated"
 on public.match_ready_states for all
 using (auth.role() = 'authenticated')
 with check (auth.role() = 'authenticated');
+
+-- Histórico de partidas (persistente)
+create table if not exists public.match_history (
+  id uuid primary key default gen_random_uuid(),
+  match_id text not null unique,
+  game_mode text not null default '1v1',
+  winner_names text[] not null default '{}',
+  loser_names text[] not null default '{}',
+  finished_at timestamptz not null default now()
+);
+
+alter table public.match_history enable row level security;
+
+drop policy if exists "match_history_read_all" on public.match_history;
+create policy "match_history_read_all"
+on public.match_history for select
+using (true);
+
+drop policy if exists "match_history_insert_authenticated" on public.match_history;
+create policy "match_history_insert_authenticated"
+on public.match_history for insert
+with check (auth.role() = 'authenticated');

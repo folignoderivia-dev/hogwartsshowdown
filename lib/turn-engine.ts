@@ -15,6 +15,8 @@ export interface EngineAnimation {
   delay?: number
   damage?: number
   isBlock?: boolean
+  /** Se true, o cliente deve pular o VFX e apenas exibir o FCT (floating combat text). */
+  fctOnly?: boolean
 }
 
 export interface TurnOutcome {
@@ -403,7 +405,7 @@ export function calculateTurnOutcome(params: {
         const streak = attacker.missStreakBySpell?.[sn] ?? 0
         const hit = rollHit(attacker, t, spell, streak)
         if (!hit) {
-          animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: true, isCrit: false, delay: 900, damage: 0, isBlock: false })
+          animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: true, isCrit: false, delay: 900, damage: 0, isBlock: false, fctOnly: true })
           continue
         }
         let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t), n)
@@ -415,7 +417,7 @@ export function calculateTurnOutcome(params: {
         const bloqueadoArea = protegoBlocks(t)
         if (bloqueadoArea) damage = 0
         applyDamageWithCircum(t.id, damage, attacker.id, n)
-        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900, damage, isBlock: bloqueadoArea })
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900, damage, isBlock: bloqueadoArea, fctOnly: true })
         applySpellDebuffTo(t.id)
       }
     } else {
@@ -432,7 +434,7 @@ export function calculateTurnOutcome(params: {
         const bloqueado = protegoBlocks(target)
         if (bloqueado) damage = 0
         if (damage > 0) applyDamageWithCircum(target.id, damage, attacker.id, n)
-        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000, damage, isBlock: bloqueado })
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000, damage, isBlock: bloqueado, fctOnly: true })
         applySpellDebuffTo(target.id)
       } else if (spell.special === "avada_miss_hp" && n.includes("avada")) {
         state = state.map((d) => {
@@ -446,9 +448,9 @@ export function calculateTurnOutcome(params: {
           }
           return { ...d, hp: { bars } }
         })
-        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 1000, damage: 0, isBlock: false })
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 1000, damage: 0, isBlock: false, fctOnly: true })
       } else {
-        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 900, damage: 0, isBlock: false })
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 900, damage: 0, isBlock: false, fctOnly: true })
       }
     }
 

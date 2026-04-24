@@ -161,7 +161,7 @@ export async function applyMatchElo(userId: string, outcome: "win" | "lose", mod
   const profile = await getProfileById(userId)
   if (!profile) return null
 
-  const nextElo = Math.max(0, (profile.elo ?? ELO_START) + delta)
+  const nextElo = Math.max(ELO_START, (profile.elo ?? ELO_START) + delta)
   const nextWins = (profile.wins ?? 0) + (outcome === "win" ? 1 : 0)
   const nextLosses = (profile.losses ?? 0) + (outcome === "lose" ? 1 : 0)
 
@@ -350,4 +350,41 @@ export async function submitReport(reporterId: string, matchId: string | null, m
     created_at: new Date().toISOString(),
   })
   return !error
+}
+
+export async function saveMatchHistory(data: {
+  matchId: string
+  gameMode: string
+  winnerNames: string[]
+  loserNames: string[]
+}): Promise<void> {
+  const supabase = getSupabaseClient()
+  await supabase.from("match_history").upsert(
+    {
+      match_id: data.matchId,
+      game_mode: data.gameMode,
+      winner_names: data.winnerNames,
+      loser_names: data.loserNames,
+      finished_at: new Date().toISOString(),
+    },
+    { onConflict: "match_id" }
+  )
+}
+
+export async function getRecentMatchHistory(limit = 5): Promise<
+  Array<{ matchId: string; gameMode: string; winnerNames: string[]; loserNames: string[]; finishedAt: string }>
+> {
+  const supabase = getSupabaseClient()
+  const { data } = await supabase
+    .from("match_history")
+    .select("match_id, game_mode, winner_names, loser_names, finished_at")
+    .order("finished_at", { ascending: false })
+    .limit(limit)
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    matchId: String(r.match_id ?? ""),
+    gameMode: String(r.game_mode ?? "1v1"),
+    winnerNames: (r.winner_names as string[]) ?? [],
+    loserNames: (r.loser_names as string[]) ?? [],
+    finishedAt: String(r.finished_at ?? ""),
+  }))
 }

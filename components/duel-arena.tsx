@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { submitReport } from "@/lib/database"
+import { submitReport, saveMatchHistory } from "@/lib/database"
 import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, type SpellInfo, WAND_PASSIVES } from "@/lib/data-store"
 import type { ArenaVfxState, BattleStatus, Duelist, HPState, DebuffType, Point } from "@/lib/arena-types"
 import type { PlayerBuild } from "@/lib/types"
@@ -57,36 +57,38 @@ const SCENARIOS = [
   "https://i.postimg.cc/8zhTzV9Z/cenario12.png",
 ]
 const AVATAR_IMAGES: Record<string, string> = {
+  // Legado (mantidos para compatibilidade)
   bruxo01: "https://i.postimg.cc/x8NHhC8x/bruxo01.png",
   bruxo02: "https://i.postimg.cc/nr97gzrY/bruxo02.png",
   bruxo03: "https://i.postimg.cc/QCK5wtCg/bruxo03.png",
   bruxa01: "https://i.postimg.cc/brSbWJr6/bruxa01.png",
   bruxa02: "https://i.postimg.cc/L5gfwX5D/bruxa02.png",
   bruxa03: "https://i.postimg.cc/1XV62tXH/bruxa03.png",
-  wizard10: "https://i.postimg.cc/LXbFGK31/pngwing-com-(10).png",
-  wizard11: "https://i.postimg.cc/zBcY4ZFb/pngwing-com-(11).png",
-  wizard12: "https://i.postimg.cc/XJz6tSkp/pngwing-com-(12).png",
-  wizard13: "https://i.postimg.cc/bJBf4c9Z/pngwing-com-(13).png",
-  wizard14: "https://i.postimg.cc/k4pPL3vD/pngwing-com-(14).png",
-  wizard15: "https://i.postimg.cc/C1Qp9TsK/pngwing-com-(15).png",
-  wizard16: "https://i.postimg.cc/SsvbHFfS/pngwing-com-(16).png",
-  wizard17: "https://i.postimg.cc/LXbFGK3m/pngwing-com-(17).png",
-  wizard18: "https://i.postimg.cc/RFFzPVKN/pngwing-com-(18).png",
-  wizard19: "https://i.postimg.cc/B66GhQHZ/pngwing-com-(19).png",
-  wizard20: "https://i.postimg.cc/j55r8dPK/pngwing-com-(20).png",
-  wizard21: "https://i.postimg.cc/yddzfYcH/pngwing-com-(21).png",
-  wizard22: "https://i.postimg.cc/9MMjxFZ2/pngwing-com-(22).png",
-  wizard23: "https://i.postimg.cc/d11KWtdg/pngwing-com-(23).png",
-  wizard24: "https://i.postimg.cc/xCCSsTHh/pngwing-com-(24).png",
-  wizard25: "https://i.postimg.cc/C11VvLD6/pngwing-com-(25).png",
-  wizard26: "https://i.postimg.cc/gJJPMkRf/pngwing-com-(26).png",
-  wizard05: "https://i.postimg.cc/SRYbhTgc/pngwing-com-(5).png",
-  wizard06: "https://i.postimg.cc/rsR2knfx/pngwing-com-(6).png",
-  wizard07: "https://i.postimg.cc/vBNwCFt3/pngwing-com-(7).png",
-  wizard08: "https://i.postimg.cc/Y9sBTKzf/pngwing-com-(8).png",
-  wizard09: "https://i.postimg.cc/gJTb1FHD/pngwing-com-(9).png",
+  // Galeria principal (avatar1–avatar22)
+  avatar1:  "https://i.postimg.cc/LXbFGK31/pngwing-com-(10).png",
+  avatar2:  "https://i.postimg.cc/zBcY4ZFb/pngwing-com-(11).png",
+  avatar3:  "https://i.postimg.cc/XJz6tSkp/pngwing-com-(12).png",
+  avatar4:  "https://i.postimg.cc/bJBf4c9Z/pngwing-com-(13).png",
+  avatar5:  "https://i.postimg.cc/k4pPL3vD/pngwing-com-(14).png",
+  avatar6:  "https://i.postimg.cc/C1Qp9TsK/pngwing-com-(15).png",
+  avatar7:  "https://i.postimg.cc/SsvbHFfS/pngwing-com-(16).png",
+  avatar8:  "https://i.postimg.cc/LXbFGK3m/pngwing-com-(17).png",
+  avatar9:  "https://i.postimg.cc/RFFzPVKN/pngwing-com-(18).png",
+  avatar10: "https://i.postimg.cc/B66GhQHZ/pngwing-com-(19).png",
+  avatar11: "https://i.postimg.cc/j55r8dPK/pngwing-com-(20).png",
+  avatar12: "https://i.postimg.cc/yddzfYcH/pngwing-com-(21).png",
+  avatar13: "https://i.postimg.cc/9MMjxFZ2/pngwing-com-(22).png",
+  avatar14: "https://i.postimg.cc/d11KWtdg/pngwing-com-(23).png",
+  avatar15: "https://i.postimg.cc/xCCSsTHh/pngwing-com-(24).png",
+  avatar16: "https://i.postimg.cc/C11VvLD6/pngwing-com-(25).png",
+  avatar17: "https://i.postimg.cc/gJJPMkRf/pngwing-com-(26).png",
+  avatar18: "https://i.postimg.cc/SRYbhTgc/pngwing-com-(5).png",
+  avatar19: "https://i.postimg.cc/rsR2knfx/pngwing-com-(6).png",
+  avatar20: "https://i.postimg.cc/vBNwCFt3/pngwing-com-(7).png",
+  avatar21: "https://i.postimg.cc/Y9sBTKzf/pngwing-com-(8).png",
+  avatar22: "https://i.postimg.cc/gJTb1FHD/pngwing-com-(9).png",
 }
-const DEFAULT_AVATARS = ["wizard10", "wizard11", "wizard12", "wizard13", "wizard14", "wizard15", "wizard16", "wizard17"]
+const DEFAULT_AVATARS = ["avatar1","avatar2","avatar3","avatar4","avatar5","avatar6","avatar7","avatar8"]
 const CHALLENGE_LABELS = ["Oitavas", "Quartas", "Semifinal", "Final"]
 const CHALLENGE_BOTS = [
   { name: "Sentinela de Azkaban", house: "slytherin", wand: "dragon", spells: ["Bombarda", "Confrigo", "Crucius", "Imperio", "Protego", "Expelliarmus"] },
@@ -1015,10 +1017,13 @@ const DuelArena = (
         const targets = stateSnapshot.filter((d) => resolvedTargetIds.includes(d.id))
 
         if (anim.type === "cast" && caster && anim.spellName) {
-          await sleep(300)
-          await playSpellVfx(anim.spellName, caster, targets)
+          if (!anim.fctOnly) {
+            // VFX visual: dispara apenas uma vez (animação geral com todos os alvos)
+            await sleep(300)
+            await playSpellVfx(anim.spellName, caster, targets)
+          }
 
-          // FCT sincronizado com o impacto — inclui nome do feitiço
+          // FCT: aparece para cada alvo com info de dano real (pushes fctOnly)
           const fctTargets = targets.length > 0 ? targets : []
           for (const t of fctTargets) {
             const fctData = getFCTFromAnim(anim)
@@ -1186,6 +1191,29 @@ const DuelArena = (
       setFloatingEmojis((prev) => [...prev, { id, emoji, userId }])
       setTimeout(() => setFloatingEmojis((prev) => prev.filter((e) => e.id !== id)), 2600)
     })
+
+    socket.on(
+      "MATCH_RESULT",
+      ({
+        matchId: mId,
+        gameMode,
+        winnerNames,
+        loserNames,
+        yourDelta,
+      }: {
+        matchId: string
+        gameMode: string
+        winnerNames: string[]
+        loserNames: string[]
+        yourDelta?: number
+      }) => {
+        if (yourDelta !== undefined) {
+          const sign = yourDelta >= 0 ? "+" : ""
+          addLog(`[Ranking] Variação de ELO: ${sign}${yourDelta} pts`)
+        }
+        saveMatchHistory({ matchId: mId, gameMode, winnerNames, loserNames }).catch(() => null)
+      }
+    )
 
     return () => {
       socket.off("connect")
@@ -1825,7 +1853,7 @@ const DuelArena = (
                   {topDuelists.map((d, idx) => (
                     <div key={d.id}>
                       {renderHUD(d)}
-                      {renderWand(d, "top", idx === 0 ? "-top-10 -left-16" : "-top-10 -right-[20px]", idx === 1)}
+                      {renderWand(d, "top", idx === 0 ? "-top-10 -right-[20px]" : "-top-10 -left-16", idx === 0)}
                     </div>
                   ))}
                 </div>

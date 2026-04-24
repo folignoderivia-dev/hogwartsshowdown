@@ -19,6 +19,7 @@ import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTri
 import { formatSpellPower, INITIAL_PLAYER_BUILD, SPELL_DATABASE, type SpellInfo } from "@/lib/data-store"
 import type { PlayerBuild } from "@/lib/types"
 import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
+import { getRecentMatchHistory } from "@/lib/database"
 import {
   addFriendByUsername,
   getFriendMessages,
@@ -79,28 +80,28 @@ const POTIONS = [
 
 
 const AVATARS = [
-  { value: "wizard10", label: "Bruxo I",    image: "https://i.postimg.cc/LXbFGK31/pngwing-com-(10).png" },
-  { value: "wizard11", label: "Bruxo II",   image: "https://i.postimg.cc/zBcY4ZFb/pngwing-com-(11).png" },
-  { value: "wizard12", label: "Bruxo III",  image: "https://i.postimg.cc/XJz6tSkp/pngwing-com-(12).png" },
-  { value: "wizard13", label: "Bruxo IV",   image: "https://i.postimg.cc/bJBf4c9Z/pngwing-com-(13).png" },
-  { value: "wizard14", label: "Bruxo V",    image: "https://i.postimg.cc/k4pPL3vD/pngwing-com-(14).png" },
-  { value: "wizard15", label: "Bruxo VI",   image: "https://i.postimg.cc/C1Qp9TsK/pngwing-com-(15).png" },
-  { value: "wizard16", label: "Bruxo VII",  image: "https://i.postimg.cc/SsvbHFfS/pngwing-com-(16).png" },
-  { value: "wizard17", label: "Bruxo VIII", image: "https://i.postimg.cc/LXbFGK3m/pngwing-com-(17).png" },
-  { value: "wizard18", label: "Bruxo IX",   image: "https://i.postimg.cc/RFFzPVKN/pngwing-com-(18).png" },
-  { value: "wizard19", label: "Bruxo X",    image: "https://i.postimg.cc/B66GhQHZ/pngwing-com-(19).png" },
-  { value: "wizard20", label: "Bruxo XI",   image: "https://i.postimg.cc/j55r8dPK/pngwing-com-(20).png" },
-  { value: "wizard21", label: "Bruxa I",    image: "https://i.postimg.cc/yddzfYcH/pngwing-com-(21).png" },
-  { value: "wizard22", label: "Bruxa II",   image: "https://i.postimg.cc/9MMjxFZ2/pngwing-com-(22).png" },
-  { value: "wizard23", label: "Bruxa III",  image: "https://i.postimg.cc/d11KWtdg/pngwing-com-(23).png" },
-  { value: "wizard24", label: "Bruxa IV",   image: "https://i.postimg.cc/xCCSsTHh/pngwing-com-(24).png" },
-  { value: "wizard25", label: "Bruxa V",    image: "https://i.postimg.cc/C11VvLD6/pngwing-com-(25).png" },
-  { value: "wizard26", label: "Bruxa VI",   image: "https://i.postimg.cc/gJJPMkRf/pngwing-com-(26).png" },
-  { value: "wizard05", label: "Mago I",     image: "https://i.postimg.cc/SRYbhTgc/pngwing-com-(5).png" },
-  { value: "wizard06", label: "Mago II",    image: "https://i.postimg.cc/rsR2knfx/pngwing-com-(6).png" },
-  { value: "wizard07", label: "Mago III",   image: "https://i.postimg.cc/vBNwCFt3/pngwing-com-(7).png" },
-  { value: "wizard08", label: "Mago IV",    image: "https://i.postimg.cc/Y9sBTKzf/pngwing-com-(8).png" },
-  { value: "wizard09", label: "Mago V",     image: "https://i.postimg.cc/gJTb1FHD/pngwing-com-(9).png" },
+  { value: "avatar1",  label: "Avatar 1",  image: "https://i.postimg.cc/LXbFGK31/pngwing-com-(10).png" },
+  { value: "avatar2",  label: "Avatar 2",  image: "https://i.postimg.cc/zBcY4ZFb/pngwing-com-(11).png" },
+  { value: "avatar3",  label: "Avatar 3",  image: "https://i.postimg.cc/XJz6tSkp/pngwing-com-(12).png" },
+  { value: "avatar4",  label: "Avatar 4",  image: "https://i.postimg.cc/bJBf4c9Z/pngwing-com-(13).png" },
+  { value: "avatar5",  label: "Avatar 5",  image: "https://i.postimg.cc/k4pPL3vD/pngwing-com-(14).png" },
+  { value: "avatar6",  label: "Avatar 6",  image: "https://i.postimg.cc/C1Qp9TsK/pngwing-com-(15).png" },
+  { value: "avatar7",  label: "Avatar 7",  image: "https://i.postimg.cc/SsvbHFfS/pngwing-com-(16).png" },
+  { value: "avatar8",  label: "Avatar 8",  image: "https://i.postimg.cc/LXbFGK3m/pngwing-com-(17).png" },
+  { value: "avatar9",  label: "Avatar 9",  image: "https://i.postimg.cc/RFFzPVKN/pngwing-com-(18).png" },
+  { value: "avatar10", label: "Avatar 10", image: "https://i.postimg.cc/B66GhQHZ/pngwing-com-(19).png" },
+  { value: "avatar11", label: "Avatar 11", image: "https://i.postimg.cc/j55r8dPK/pngwing-com-(20).png" },
+  { value: "avatar12", label: "Avatar 12", image: "https://i.postimg.cc/yddzfYcH/pngwing-com-(21).png" },
+  { value: "avatar13", label: "Avatar 13", image: "https://i.postimg.cc/9MMjxFZ2/pngwing-com-(22).png" },
+  { value: "avatar14", label: "Avatar 14", image: "https://i.postimg.cc/d11KWtdg/pngwing-com-(23).png" },
+  { value: "avatar15", label: "Avatar 15", image: "https://i.postimg.cc/xCCSsTHh/pngwing-com-(24).png" },
+  { value: "avatar16", label: "Avatar 16", image: "https://i.postimg.cc/C11VvLD6/pngwing-com-(25).png" },
+  { value: "avatar17", label: "Avatar 17", image: "https://i.postimg.cc/gJJPMkRf/pngwing-com-(26).png" },
+  { value: "avatar18", label: "Avatar 18", image: "https://i.postimg.cc/SRYbhTgc/pngwing-com-(5).png" },
+  { value: "avatar19", label: "Avatar 19", image: "https://i.postimg.cc/rsR2knfx/pngwing-com-(6).png" },
+  { value: "avatar20", label: "Avatar 20", image: "https://i.postimg.cc/vBNwCFt3/pngwing-com-(7).png" },
+  { value: "avatar21", label: "Avatar 21", image: "https://i.postimg.cc/Y9sBTKzf/pngwing-com-(8).png" },
+  { value: "avatar22", label: "Avatar 22", image: "https://i.postimg.cc/gJTb1FHD/pngwing-com-(9).png" },
 ]
 const AVATARS_PER_PAGE = 6
 
@@ -151,6 +152,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [avatarPage, setAvatarPage] = useState(0)
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
+  const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
   const [gameMode, setGameMode] = useState<"teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "">("")
 
   useEffect(() => {
@@ -225,7 +227,15 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
   const filteredSpells = SPELL_DATABASE.filter((spell) =>
     spell.name.toLowerCase().includes(spellSearch.toLowerCase())
-  )
+  ).sort((a, b) => {
+    if (spellSort === "name") return a.name.localeCompare(b.name, "pt")
+    if (spellSort === "power") {
+      const pa = a.powerMax ?? a.powerMin ?? a.power ?? 0
+      const pb = b.powerMax ?? b.powerMin ?? b.power ?? 0
+      return pb - pa
+    }
+    return (a.cost ?? 0) - (b.cost ?? 0)
+  })
 
   const canSelectSpell = (spell: SpellInfo): boolean => {
     if (selectedSpells.includes(spell.name)) return true
@@ -273,7 +283,6 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     lobbySocketRef.current = sock
     sock.on("connect", () => { sock.emit("LIST_ACTIVE_MATCHES") })
     sock.on("active_matches_update", (data: { rooms: any[]; recentMatches: any[] }) => {
-      // Converte formato de rooms do servidor para o formato do state local
       setDuelsInProgress(
         (data.rooms || [])
           .filter((r) => r.gameStarted)
@@ -284,9 +293,31 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             p2: r.playerNames?.[1] || "Bruxo",
           }))
       )
-      setRecentResults(data.recentMatches || [])
+      // Resultados do socket completam o que foi carregado do Supabase
+      setRecentResults((prev) => {
+        const socketResults: Array<{ matchId: string; gameMode: string; winnerNames: string[]; loserNames: string[]; finishedAt: string }> = data.recentMatches || []
+        const merged = [...socketResults]
+        for (const p of prev) {
+          if (!merged.find((r) => r.matchId === p.matchId)) merged.push(p)
+        }
+        return merged.sort((a, b) => (b.finishedAt > a.finishedAt ? 1 : -1)).slice(0, 10)
+      })
     })
     return () => { sock.disconnect(); lobbySocketRef.current = null }
+  }, [])
+
+  // Carrega histórico persistente do Supabase ao montar
+  useEffect(() => {
+    getRecentMatchHistory(10).then((rows) => {
+      if (rows.length === 0) return
+      setRecentResults((prev) => {
+        const merged = [...rows]
+        for (const p of prev) {
+          if (!merged.find((r) => r.matchId === p.matchId)) merged.push(p)
+        }
+        return merged.sort((a, b) => (b.finishedAt > a.finishedAt ? 1 : -1)).slice(0, 10)
+      })
+    }).catch(() => null)
   }, [])
 
   useEffect(() => {
@@ -1166,15 +1197,33 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 </p>
               </div>
               
-              {/* Search Input */}
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
-                <Input
-                  placeholder="Pesquisar feitico..."
-                  value={spellSearch}
-                  onChange={(e) => setSpellSearch(e.target.value)}
-                  className="border-amber-800 bg-stone-800 pl-10 text-amber-100 placeholder:text-stone-500"
-                />
+              {/* Search + Sort */}
+              <div className="mb-3 flex flex-col gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
+                  <Input
+                    placeholder="Pesquisar feitico..."
+                    value={spellSearch}
+                    onChange={(e) => setSpellSearch(e.target.value)}
+                    className="border-amber-800 bg-stone-800 pl-10 text-amber-100 placeholder:text-stone-500"
+                  />
+                </div>
+                <div className="flex gap-1">
+                  <span className="self-center text-xs text-amber-400/70 mr-1">Ordenar:</span>
+                  {(["name", "power", "cost"] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setSpellSort(s)}
+                      className={`rounded px-2 py-0.5 text-xs transition-colors ${
+                        spellSort === s
+                          ? "bg-amber-700 text-amber-100"
+                          : "bg-stone-700 text-stone-300 hover:bg-stone-600"
+                      }`}
+                    >
+                      {s === "name" ? "A–Z" : s === "power" ? "⚔️ Poder" : "💰 Custo"}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Scrollable Spell List */}
