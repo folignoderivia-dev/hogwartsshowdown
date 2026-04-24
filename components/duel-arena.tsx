@@ -972,7 +972,7 @@ const DuelArena = (
   useEffect(() => {
     if (!isOnlineMatch || !matchId || !selfDuelistId || isReadOnlySpectator) return
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001"
+    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001").trim()
     const socket = io(socketUrl, {
       transports: ["polling", "websocket"],
       upgrade: true,

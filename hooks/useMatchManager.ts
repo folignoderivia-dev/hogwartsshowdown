@@ -231,10 +231,6 @@ export function useMatchManager() {
         .single()
       if (!created) throw new Error("Não foi possível criar a sala")
       await supabase.from("match_players").upsert({ match_id: created.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
-      await supabase.from("match_ready_states").upsert(
-        { match_id: created.match_id, player_id: playerId, is_ready: false, updated_at: new Date().toISOString() },
-        { onConflict: "match_id,player_id" }
-      )
       const opened = toExternalState(created)
       logMatch("joinMatchmaker:fallback-created", {
         matchId: opened.matchId,
@@ -277,10 +273,6 @@ export function useMatchManager() {
       .single()
     if (error) throw error
     await supabase.from("match_players").upsert({ match_id: data.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
-    await supabase.from("match_ready_states").upsert(
-      { match_id: data.match_id, player_id: playerId, is_ready: false, updated_at: new Date().toISOString() },
-      { onConflict: "match_id,player_id" }
-    )
     const created = toExternalState(data)
     logMatch("createRoom:ok", {
       matchId: created.matchId,
