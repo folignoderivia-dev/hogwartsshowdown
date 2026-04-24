@@ -272,7 +272,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const isVip = currentUser?.isVip ?? false
 
   const PIX_KEY = "guilhermefoligno@gmail.com"
-  const META_GOAL = 60
+  const META_GOAL = 10
   const META_CURRENT = 0
 
   const handlePixCopy = () => {
@@ -634,29 +634,42 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </div>
         </header>
 
-        {/* ── Card Apoie o Projeto ──────────────────────────────────────────── */}
-        <div className="mx-auto mb-4 max-w-xl rounded-xl border border-amber-700/40 bg-stone-900/80 px-5 py-3 shadow-lg">
-          <div className="flex items-center justify-between gap-3">
+        {/* ── Card Apoie o Projeto + VIP Pitch ────────────────────────────── */}
+        <div className="mx-auto mb-4 w-full max-w-2xl rounded-xl border border-amber-700/40 bg-stone-900/80 px-4 py-3 shadow-lg">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            {/* Barra de meta */}
             <div className="flex-1">
-              <p className="text-xs font-semibold text-amber-300">☕ Meta para Servidor Próprio</p>
-              <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-stone-700">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-amber-300">☕ Meta para Servidor Próprio — R$ {META_GOAL}</p>
+                <span className="text-[10px] text-amber-500">R$ {META_CURRENT}/{META_GOAL}</span>
+              </div>
+              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-stone-700">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all"
                   style={{ width: `${Math.min(100, (META_CURRENT / META_GOAL) * 100)}%` }}
                 />
               </div>
-              <p className="mt-0.5 text-[10px] text-amber-500">
-                R$ {META_CURRENT} / R$ {META_GOAL} — {META_CURRENT === 0 ? "Seja o primeiro a apoiar!" : "Obrigado!"}
-              </p>
             </div>
-            <Button
-              size="sm"
-              onClick={() => setPixModal(true)}
-              className="shrink-0 border border-amber-600 bg-amber-900/60 text-amber-200 hover:bg-amber-800"
-            >
-              💛 Apoiar
-            </Button>
+            {/* Pitch VIP + botão */}
+            <div className="flex items-center gap-2 sm:shrink-0">
+              <p className="hidden text-right text-[11px] leading-tight text-yellow-400/80 sm:block">
+                <Crown className="mr-0.5 inline h-3 w-3 text-yellow-400" />
+                <strong>SEJA VIP</strong> — salas personalizadas,<br />foto própria e feitiços exclusivos
+              </p>
+              <Button
+                size="sm"
+                onClick={() => setPixModal(true)}
+                className="shrink-0 border border-yellow-600/60 bg-yellow-900/40 text-yellow-200 hover:bg-yellow-800/60"
+              >
+                👑 Apoiar
+              </Button>
+            </div>
           </div>
+          {/* Pitch mobile */}
+          <p className="mt-1.5 text-center text-[10px] text-yellow-500/70 sm:hidden">
+            <Crown className="mr-0.5 inline h-2.5 w-2.5" />
+            <strong>SEJA VIP</strong>: salas personalizadas · foto própria · feitiços exclusivos
+          </p>
         </div>
 
         {/* ── Modal PIX ────────────────────────────────────────────────────── */}
@@ -1203,6 +1216,23 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 {selectedAvatar && (
                   <p className="mt-2 text-xs text-amber-300">Selecionado: {selectedAvatar.label}</p>
                 )}
+                {/* Upload VIP dentro do container Identidade */}
+                {isVip ? (
+                  <label className="mt-3 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-yellow-700/50 bg-yellow-900/20 py-2 text-xs text-yellow-300 hover:bg-yellow-900/40 transition-colors">
+                    <Upload className="h-3.5 w-3.5" />
+                    👑 Trocar Avatar (foto personalizada)
+                    <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+                  </label>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPixModal(true)}
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-stone-700 bg-stone-800/50 py-1.5 text-[10px] text-stone-500 hover:border-yellow-800/60 hover:text-yellow-600/70 transition-colors"
+                  >
+                    <Crown className="h-3 w-3" />
+                    VIP: foto personalizada
+                  </button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1498,6 +1528,22 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   </div>
                 </div>
               )}
+
+              {/* Indicador de pontos no fim do grimório */}
+              <div className={`mt-3 rounded-lg border px-3 py-2 text-center text-sm font-medium transition-colors ${
+                totalCost === MAX_SPELL_POINTS
+                  ? "border-green-700/60 bg-green-900/20 text-green-300"
+                  : totalCost > MAX_SPELL_POINTS
+                    ? "border-red-700/60 bg-red-900/20 text-red-300"
+                    : "border-amber-700/40 bg-stone-800/60 text-amber-400"
+              }`}>
+                {totalCost === MAX_SPELL_POINTS
+                  ? `✓ Grimório completo! (${totalCost}/${MAX_SPELL_POINTS} pontos)`
+                  : totalCost > MAX_SPELL_POINTS
+                    ? `⚠ Excedeu! ${totalCost}/${MAX_SPELL_POINTS} pontos (remova ${totalCost - MAX_SPELL_POINTS}pt)`
+                    : `Use exatamente ${MAX_SPELL_POINTS} pontos de feitiço (atual: ${totalCost}/${MAX_SPELL_POINTS})`
+                }
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1558,7 +1604,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         </div>
 
         {/* ── Botão Sala Personalizada (VIP) ─────────────────────────────── */}
-        {isVip && gameMode && gameMode !== "teste" && gameMode !== "challenge" && (
+        {isVip && gameMode !== "teste" && gameMode !== "challenge" && (
           <div className="mt-2">
             <Button
               variant="outline"
@@ -1635,31 +1681,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </p>
         )}
 
-        {/* ── Upload de Avatar VIP ─────────────────────────────────────────── */}
-        {isVip && (
-          <div className="mt-2 flex items-center justify-center gap-2">
-            <label className="flex cursor-pointer items-center gap-1.5 rounded border border-yellow-700/50 bg-stone-800/60 px-3 py-1 text-xs text-yellow-400 hover:bg-yellow-900/20">
-              <Upload className="h-3.5 w-3.5" />
-              👑 Trocar Avatar
-              <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
-            </label>
-          </div>
-        )}
-
         {isQuidditchMode && isReady && (
           <p className="mt-2 text-center text-xs text-amber-400/80">
             Quadribol não precisa de build. Clique em Criar Sala e compartilhe o código com seu adversário.
           </p>
         )}
-        {!isReady && (
+        {!isReady && !currentUser && (
           <p className="mt-4 text-center text-sm text-amber-200/95">
-            {!currentUser
-              ? "Entre ou registre-se para poder ir à Arena."
-              : isQuidditchMode
-                ? "Selecione o modo Quadribol e você estará pronto!"
-                : totalCost !== MAX_SPELL_POINTS
-                  ? `Use exatamente ${MAX_SPELL_POINTS} pontos de feitico (atual: ${totalCost})`
-                  : "Complete todas as selecoes para iniciar o duelo"}
+            Entre ou registre-se para poder ir à Arena.
           </p>
         )}
         </div>
