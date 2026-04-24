@@ -361,7 +361,7 @@ app.get("/health", (_req, res) => {
 })
 
 // ─── Start ────────────────────────────────────────────────────────────────────
-httpServer.listen(PORT, () => {
-  console.log(`\n🟢 Servidor Showdown rodando na porta ${PORT}`)
+httpServer.listen(Number(PORT), "0.0.0.0", () => {
+  console.log(`\n🟢 Servidor Showdown rodando em 0.0.0.0:${PORT}`)
   console.log(`   Health: http://localhost:${PORT}/health`)
 })
