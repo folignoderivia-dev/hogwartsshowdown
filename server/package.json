@@ -7,7 +7,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "echo 'No build step required for tsx'",
+    "build": "echo 'Build skip: using tsx direct execution'",
     "start": "tsx index.ts",
     "dev": "tsx index.ts"
   },

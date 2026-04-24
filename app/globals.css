@@ -146,10 +146,13 @@
   z-index: 200;
   white-space: nowrap;
 }
-.fct-damage  { color: #fca5a5; font-size: 1.6rem; }
-.fct-crit    { color: #fde047; font-size: 1.9rem; animation: fct-crit-rise 2s ease-out forwards;
-               text-shadow: 3px 3px 0 #7c2d12, -2px -2px 0 #7c2d12, 2px -2px 0 #7c2d12, -2px 2px 0 #7c2d12, 0 0 20px rgba(253,224,71,0.8); }
-.fct-miss    { color: #cbd5e1; font-size: 1.2rem; font-style: italic; opacity: 0.9; }
+.fct-damage  { color: #ffffff; font-size: 1.55rem;
+               text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 2px -1px 0 #000, -1px 2px 0 #000, 0 0 10px rgba(255,80,80,0.6); }
+.fct-crit    { color: #fde047; font-size: 1.9rem; animation: fct-crit-rise 2.1s ease-out forwards;
+               text-shadow: 3px 3px 0 #78350f, -2px -2px 0 #78350f, 2px -2px 0 #78350f, -2px 2px 0 #78350f,
+                            0 0 24px rgba(253,224,71,0.95), 0 0 48px rgba(251,191,36,0.5); }
+.fct-miss    { color: #f87171; font-size: 1.2rem; font-style: italic; opacity: 0.85;
+               text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; }
 .fct-heal    { color: #4ade80; font-size: 1.5rem; }
 .fct-block   { color: #93c5fd; font-size: 1.3rem; }
 .fct-skip    { color: #f9a8d4; font-size: 1.2rem; }

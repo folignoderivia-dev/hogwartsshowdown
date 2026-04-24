@@ -467,7 +467,7 @@ const DuelArena = (
   const [battleStatus, setBattleStatus] = useState<BattleStatus>("idle")
   const [turnNumber, setTurnNumber] = useState(1)
   const [challengeStage, setChallengeStage] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(60)
+  const [timeLeft, setTimeLeft] = useState(120)
   const [pendingSpell, setPendingSpell] = useState<string | null>(null)
   const [pendingActions, setPendingActions] = useState<Record<string, RoundAction>>({})
   const pendingActionsRef = useRef<Record<string, RoundAction>>({})
@@ -527,7 +527,6 @@ const DuelArena = (
   const [residualBanner, setResidualBanner] = useState<string | null>(null)
   const [potionUsed, setPotionUsed] = useState(false)
   const [backgroundImage, setBackgroundImage] = useState(SCENARIOS[0])
-  const [resolutionText, setResolutionText] = useState("")
   const [feedbackText, setFeedbackText] = useState("")
   const [feedbackTargetId, setFeedbackTargetId] = useState<string | null>(null)
   const [currentTargetId, setCurrentTargetId] = useState<string | null>(null)
@@ -591,14 +590,16 @@ const DuelArena = (
     setBattleLog((prev) => [...prev, line])
   }, [])
 
-  /** Deriva texto e tipo de FCT a partir de uma EngineAnimation. */
+  /** Deriva texto e tipo de FCT a partir de uma EngineAnimation.
+   *  Inclui o nome do feitiço para que o FCT substitua o overlay central. */
   const getFCTFromAnim = useCallback(
     (anim: EngineAnimation): { text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" } | null => {
-      if (anim.isMiss) return { text: "ERROU!", type: "miss" }
-      if (anim.isBlock) return { text: "🛡 BLOQUEADO!", type: "block" }
+      const spell = anim.spellName ? `${anim.spellName} ` : ""
+      if (anim.isMiss) return { text: `${spell}ERROU!`, type: "miss" }
+      if (anim.isBlock) return { text: `${spell}🛡 BLOQUEADO!`, type: "block" }
       if (!anim.damage || anim.damage <= 0) return null
-      if (anim.isCrit) return { text: `${anim.damage} 💥 CRÍTICO!`, type: "crit" }
-      return { text: `-${anim.damage}`, type: "damage" }
+      if (anim.isCrit) return { text: `${spell}${anim.damage} 💥 CRÍTICO!`, type: "crit" }
+      return { text: `${spell}-${anim.damage}`, type: "damage" }
     },
     []
   )
@@ -811,9 +812,8 @@ const DuelArena = (
       }))
     )
     setBattleStatus("selecting")
-    setTimeLeft(isOnlineMatch ? 120 : 60)
+    setTimeLeft(120)
     setPendingSpell(null)
-    setResolutionText("")
     setBattleMessage("")
     setResidualBanner(null)
     setStatusFloater(null)
@@ -1015,13 +1015,10 @@ const DuelArena = (
         const targets = stateSnapshot.filter((d) => resolvedTargetIds.includes(d.id))
 
         if (anim.type === "cast" && caster && anim.spellName) {
-          const acao = anim.isMiss ? "errou" : "conjurou"
-          const critLabel = anim.isCrit ? " (Crítico!)" : ""
-          setResolutionText(`${caster.name} ${acao} ${anim.spellName}!${critLabel}`)
-          await sleep(400)
+          await sleep(300)
           await playSpellVfx(anim.spellName, caster, targets)
 
-          // Spawna FCT sincronizado com o impacto da animação
+          // FCT sincronizado com o impacto — inclui nome do feitiço
           const fctTargets = targets.length > 0 ? targets : []
           for (const t of fctTargets) {
             const fctData = getFCTFromAnim(anim)
@@ -1029,22 +1026,20 @@ const DuelArena = (
             const pos = getFCTPos(t.id)
             const id = ++fctCounterRef.current
             setFloatingTexts((prev) => [...prev, { id, text: fctData.text, type: fctData.type, x: pos.x, y: pos.y }])
-            setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2000)
+            setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2200)
           }
-
-          setResolutionText("")
         } else if (anim.type === "skip" && caster) {
-          setResolutionText(`${caster.name} perdeu a vez!`)
           const pos = getFCTPos(caster.id)
           const id = ++fctCounterRef.current
-          setFloatingTexts((prev) => [...prev, { id, text: "Atordoado!", type: "skip", x: pos.x, y: pos.y }])
-          setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2000)
-          await sleep(400)
-          setResolutionText("")
+          setFloatingTexts((prev) => [...prev, { id, text: `${caster.name} Atordoado!`, type: "skip", x: pos.x, y: pos.y }])
+          setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2200)
+          await sleep(300)
         } else if (anim.type === "potion" && caster) {
-          setResolutionText(`${caster.name} usou poção!`)
-          await sleep(400)
-          setResolutionText("")
+          const pos = getFCTPos(caster.id)
+          const id = ++fctCounterRef.current
+          setFloatingTexts((prev) => [...prev, { id, text: `🧪 Poção!`, type: "heal", x: pos.x, y: pos.y }])
+          setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2200)
+          await sleep(300)
         }
         await sleep(anim.delay ?? 900)
       }
@@ -1123,7 +1118,6 @@ const DuelArena = (
       setBattleStatus("selecting")
       setTimeLeft(120)
       setPendingSpell(null)
-      setResolutionText("")
       setResidualBanner(null)
       setStatusFloater(null)
       setFeedbackText("")
@@ -1497,31 +1491,43 @@ const DuelArena = (
         className={`relative w-full rounded-lg border-2 bg-stone-900/85 p-2 text-left transition-transform duration-150 ${dead ? "opacity-50 border-stone-600" : targetable ? "border-amber-400 animate-pulse" : "border-amber-900/80"} ${impactTargetId === duelist.id ? "scale-[1.03] ring-2 ring-amber-300" : ""}`}
       >
         {currentTargetId === duelist.id && <div className="absolute -top-2 left-1/2 z-50 -translate-x-1/2 text-xl text-amber-300">⬇</div>}
-        <div className="mb-1 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src={avatar} alt={`Avatar ${duelist.name}`} className={`relative z-50 h-20 w-20 rounded-md border-2 border-amber-700 object-cover ${dead ? "grayscale opacity-50" : ""}`} />
-            <div className="text-xs">
-              <p className="relative z-50 flex items-center gap-1 font-semibold text-amber-100">
-                {duelist.name}
-                {((duelist.circumAura ?? 0) > 0 || (circumFlames[duelist.id] ?? 0) > 0) && (
-                  <span className="inline-block text-red-500 drop-shadow-[0_0_6px_#f87171]" title="Circum Inflamare">🔥</span>
-                )}
-                {HOUSE_CREST[duelist.house] ? (
-                  <img src={HOUSE_CREST[duelist.house]} alt={duelist.house} className="inline-block h-5 w-5 object-contain" />
-                ) : (
-                  <span className="text-amber-300/80">🪄</span>
-                )}
-              </p>
-              <div className="relative z-50 mt-0.5 flex flex-wrap gap-1">
-                {duelist.debuffs.map((db, idx) => (
-                  <Badge key={`${duelist.id}-${idx}`} className="h-5 border border-amber-700 bg-stone-800 px-1 text-[9px] text-amber-200">
-                    {DEBUFF_LABEL[db.type]}
-                  </Badge>
-                ))}
-              </div>
+        <div className="mb-1 flex items-start gap-2">
+          {/* Avatar */}
+          <img
+            src={avatar}
+            alt={`Avatar ${duelist.name}`}
+            className={`relative z-50 h-[88px] w-[72px] flex-shrink-0 rounded-md border-2 border-amber-700 object-contain ${dead ? "grayscale opacity-50" : ""}`}
+          />
+          {/* Info */}
+          <div className="relative z-50 flex min-w-0 flex-1 flex-col gap-1">
+            {/* Nome + chama */}
+            <p
+              className="font-bold leading-tight text-amber-100"
+              style={{ fontSize: "0.85rem", textShadow: "0 1px 3px #000, 0 0 8px rgba(0,0,0,0.8)" }}
+            >
+              {duelist.name}
+              {((duelist.circumAura ?? 0) > 0 || (circumFlames[duelist.id] ?? 0) > 0) && (
+                <span className="ml-1 text-red-500 drop-shadow-[0_0_6px_#f87171]" title="Circum Inflamare">🔥</span>
+              )}
+            </p>
+            {/* Escudo da casa + HP */}
+            <div className="flex items-center justify-between">
+              {HOUSE_CREST[duelist.house] ? (
+                <img src={HOUSE_CREST[duelist.house]} alt={duelist.house} className="h-10 w-10 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]" />
+              ) : (
+                <span className="text-2xl">🪄</span>
+              )}
+              <span className="text-xs font-semibold text-amber-200">{Math.max(0, getTotalHP(duelist.hp))}%</span>
+            </div>
+            {/* Debuffs */}
+            <div className="flex flex-wrap gap-1">
+              {duelist.debuffs.map((db, idx) => (
+                <Badge key={`${duelist.id}-${idx}`} className="h-5 border border-amber-700 bg-stone-800 px-1 text-[9px] text-amber-200">
+                  {DEBUFF_LABEL[db.type]}
+                </Badge>
+              ))}
             </div>
           </div>
-          <span className="relative z-50 text-xs text-amber-200">{Math.max(0, getTotalHP(duelist.hp))}%</span>
         </div>
         {renderHearts(duelist.hp)}
         {statusFloater?.targetId === duelist.id && (
@@ -1557,7 +1563,7 @@ const DuelArena = (
           <div className="flex items-center gap-2">
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">{String(Math.floor(timeLeft / 60)).padStart(2, "0")}:{String(timeLeft % 60).padStart(2, "0")}</Badge>
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">
-              {{ selecting: "⚔️ Escolhendo", resolving: "✨ Conjurando...", animating: "✨ Conjurando...", finished: "🏁 Finalizado", waiting: "⏳ Aguardando" }[battleStatus] ?? battleStatus}
+              {{ selecting: "⚔️ Escolhendo", resolving: "✨ Conjurando...", animating: "✨ Conjurando...", finished: "🏁 Finalizado", waiting: "⏳ Aguardando", idle: "⏸ Parado" }[battleStatus] ?? battleStatus}
             </Badge>
             {playerBuild.gameMode === "challenge" && <Badge className="border-purple-700 bg-purple-950/40 text-purple-200">{CHALLENGE_LABELS[Math.min(challengeStage, CHALLENGE_LABELS.length - 1)]}</Badge>}
             {isReadOnlySpectator && <Badge className="border-blue-700 bg-blue-950/40 text-blue-200">ESPECTADOR</Badge>}
@@ -1577,12 +1583,7 @@ const DuelArena = (
 
       <main className="mx-auto max-w-6xl p-4">
         <div ref={arenaRef} className="relative min-h-[560px] overflow-hidden rounded-xl border-4 border-stone-700 bg-stone-700/80" style={{ backgroundImage: `linear-gradient(rgba(20,20,20,0.35), rgba(20,20,20,0.35)), url(${backgroundImage})`, backgroundSize: "cover", backgroundPosition: "center" }}>
-          {resolutionText && (
-            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-              <p className="rounded bg-black/70 px-5 py-3 text-4xl font-bold text-amber-200 md:text-5xl">{resolutionText}</p>
-            </div>
-          )}
-          {battleMessage && !resolutionText && (
+          {battleMessage && (
             <div className="pointer-events-none absolute inset-x-0 bottom-24 z-[21] flex justify-center px-4">
               <p className="rounded border border-amber-600/80 bg-black/75 px-4 py-2 text-center text-sm font-semibold text-amber-100 shadow-lg md:text-base">
                 {battleMessage}
