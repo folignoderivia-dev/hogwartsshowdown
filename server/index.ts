@@ -14,14 +14,21 @@ import type { Duelist, HPState, DebuffType } from "./lib/arena-types"
 import type { RoundAction } from "./lib/duelActions"
 import type { PlayerBuild, GameMode } from "./lib/types"
 
+const PORT = process.env.PORT || 3001
+
 const app = express()
-app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"], credentials: true }))
+
+// CORS deve vir antes de tudo no Express.
+// origin: true reflete dinamicamente a origem do cliente — única forma válida
+// com credentials: true (origin: "*" + credentials é bloqueado por todos os browsers).
+app.use(cors({ origin: true, credentials: true }))
+app.options("*", cors({ origin: true, credentials: true })) // preflight explícito
 app.use(express.json())
 
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
   cors: {
-    origin: "*",
+    origin: (origin, callback) => callback(null, true), // reflete qualquer origem
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -30,8 +37,6 @@ const io = new Server(httpServer, {
   pingInterval: 25000,
   transports: ["polling", "websocket"],
 })
-
-const PORT = process.env.PORT || 3001
 
 // ─── Tipos internos ────────────────────────────────────────────────────────────
 
@@ -365,6 +370,11 @@ io.on("connection", (socket: Socket) => {
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", rooms: activeMatches.size, ts: new Date().toISOString() })
+})
+
+// ─── Teste de CORS ─────────────────────────────────────────────────────────────
+app.get("/test-cors", (_req, res) => {
+  res.json({ cors: "ok", origin: _req.headers.origin || "no-origin", ts: new Date().toISOString() })
 })
 
 // ─── Start ────────────────────────────────────────────────────────────────────
