@@ -65,6 +65,7 @@ interface MatchRoom {
   pendingActions: Map<string, RoundAction>
   circumFlames: Record<string, number>
   gameStarted: boolean
+  idleTimer?: ReturnType<typeof setTimeout>
 }
 
 const activeMatches = new Map<string, MatchRoom>()
@@ -94,6 +95,8 @@ function buildDuelist(
   seatIndex: number
 ): Duelist {
   const mod = HOUSE_MODIFIERS[build.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
+  const initiative = Math.floor(Math.random() * 10) + 1  // 1–10, oculto
+  const defense = Math.floor(Math.random() * 41) + 10    // 10–50, oculto
   return {
     id: userId,
     name: build.name,
@@ -102,7 +105,8 @@ function buildDuelist(
     avatar: build.avatar,
     spells: build.spells,
     hp: { bars: [100, 100, 100, 100, 100] },
-    speed: Math.round(100 * mod.speed) - seatIndex * 2,
+    speed: Math.round(100 * mod.speed) - seatIndex * 2 + initiative,
+    defense,
     debuffs: [],
     isPlayer: false,
     team,
@@ -113,9 +117,10 @@ function buildDuelist(
   }
 }
 
-/** Retorna os duelistas no ponto de vista de um jogador específico (isPlayer e team corretos). */
-function personalizeDuelists(duelists: Duelist[], forUserId: string): Duelist[] {
-  return duelists.map((d) => ({
+/** Retorna os duelistas no ponto de vista de um jogador específico (isPlayer e team corretos).
+ *  Remove o campo `defense` para manter a defesa como status oculto no cliente. */
+function personalizeDuelists(duelists: Duelist[], forUserId: string): Omit<Duelist, "defense">[] {
+  return duelists.map(({ defense: _hidden, ...d }) => ({
     ...d,
     isPlayer: d.id === forUserId,
     team: d.id === forUserId ? "player" : "enemy",
@@ -145,6 +150,48 @@ function applyRapinomonioBlock(duelists: Duelist[]): Duelist[] {
     }
   }
   return next
+}
+
+// ─── Idle timeout (W.O. por inatividade) ──────────────────────────────────────
+const IDLE_TIMEOUT_MS = 120_000 // 2 minutos
+
+function clearIdleTimer(room: MatchRoom) {
+  if (room.idleTimer) {
+    clearTimeout(room.idleTimer)
+    room.idleTimer = undefined
+  }
+}
+
+function startIdleTimer(room: MatchRoom, matchId: string) {
+  clearIdleTimer(room)
+  room.idleTimer = setTimeout(() => {
+    if (!activeMatches.has(matchId)) return
+    const aliveIds = room.duelists.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
+    const missing = aliveIds.filter((id) => !room.pendingActions.has(id))
+    if (missing.length === 0) return
+
+    const missingNames = missing
+      .map((id) => room.duelists.find((d) => d.id === id)?.name ?? id.slice(0, 8))
+      .join(", ")
+    console.log(`[Server] W.O. por inatividade na sala ${matchId}: ${missingNames}`)
+
+    for (const [uid, slot] of room.players) {
+      const clientSocket = io.sockets.sockets.get(slot.socketId)
+      if (!clientSocket) continue
+      const isInactive = missing.includes(uid)
+      clientSocket.emit("TURN_RESOLVED", {
+        animationsToPlay: [],
+        newDuelists: personalizeDuelists(room.duelists, uid),
+        outcome: isInactive ? "lose" : "win",
+        logs: [`[W.O.]: ${missingNames} perdeu por inatividade (2 min sem agir)!`],
+        nextTurn: room.turnNumber,
+        circumFlames: room.circumFlames,
+      })
+    }
+
+    clearIdleTimer(room)
+    setTimeout(() => activeMatches.delete(matchId), 10_000)
+  }, IDLE_TIMEOUT_MS)
 }
 
 // ─── Lógica do Socket ──────────────────────────────────────────────────────────
@@ -240,6 +287,9 @@ io.on("connection", (socket: Socket) => {
             })
           }
         }
+
+        // Inicia cronômetro de inatividade para o primeiro turno
+        startIdleTimer(room, matchId)
       }
     }
   )
@@ -282,6 +332,9 @@ io.on("connection", (socket: Socket) => {
       const allReady = aliveIds.length > 0 && aliveIds.every((id) => room.pendingActions.has(id))
 
       if (!allReady) return
+
+      // Todos agiram — cancela o cronômetro de inatividade
+      clearIdleTimer(room)
 
       // ─── Resolução autoritativa ─────────────────────────────────────────────
       const actions = aliveIds.map((id) => room.pendingActions.get(id)!)
@@ -332,10 +385,12 @@ io.on("connection", (socket: Socket) => {
         }
       }
 
-      // Limpa sala ao fim do jogo
+      // Fim de jogo ou reinicia cronômetro de inatividade para o próximo turno
       if (outcome.outcome) {
         console.log(`[Server] Fim de jogo sala ${matchId}: ${outcome.outcome}`)
         setTimeout(() => activeMatches.delete(matchId), 60_000)
+      } else {
+        startIdleTimer(room, matchId)
       }
     }
   )
@@ -355,6 +410,7 @@ io.on("connection", (socket: Socket) => {
     if (!room) return
     console.log(`[Server] LEAVE_MATCH: ${userId.slice(0, 8)}… saiu de ${matchId}`)
     if (room.gameStarted && room.players.has(userId)) {
+      clearIdleTimer(room)
       socket.to(matchId).emit("OPPONENT_LEFT", { userId })
     }
   })

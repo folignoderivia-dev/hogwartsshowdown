@@ -62,6 +62,8 @@ export interface Duelist {
   disabledSpells?: Record<string, number>
   missStreakBySpell?: Record<string, number>
   turnsInBattle?: number
+  /** Oculto do frontend: absorção de dano gerada no início da partida (10–50). */
+  defense?: number
 }
 
 export type Point = { x: number; y: number }

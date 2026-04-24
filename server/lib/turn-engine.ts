@@ -147,7 +147,7 @@ const calculateDamage = (attacker: Duelist, defender: Duelist, base: number, spe
 }
 
 const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: string): number => {
-  let c = 0.1
+  let c = 0.25 // taxa crítica base nativa: 25%
   if (spellNameNorm && spellNameNorm.includes("rictumsempra")) c += 0.3
   if (attacker.wand === "dragon") c += 0.2
   if (attacker.debuffs.some((d) => d.type === "crit_boost")) c += 0.25
@@ -402,6 +402,7 @@ export function calculateTurnOutcome(params: {
         const hit = rollHit(attacker, t, spell, streak)
         if (!hit) {
           animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: true, isCrit: false, delay: 900 })
+          logs.push(`→ ${attacker.name} errou ${sn} em ${t.name}!`)
           continue
         }
         let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t), n)
@@ -410,7 +411,14 @@ export function calculateTurnOutcome(params: {
           damage *= 2
           isCrit = true
         }
-        if (protegoBlocks(t)) damage = 0
+        const bloqueadoArea = protegoBlocks(t)
+        if (bloqueadoArea) {
+          damage = 0
+          logs.push(`→ ${sn} foi bloqueado pelo Protego de ${t.name}!`)
+        } else {
+          damage = Math.max(0, damage - (t.defense ?? 0))
+          if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${t.name}!`)
+        }
         applyDamageWithCircum(t.id, damage, attacker.id, n)
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900 })
         applySpellDebuffTo(t.id)
@@ -426,7 +434,14 @@ export function calculateTurnOutcome(params: {
           damage *= 2
           isCrit = true
         }
-        if (protegoBlocks(target)) damage = 0
+        const bloqueado = protegoBlocks(target)
+        if (bloqueado) {
+          damage = 0
+          logs.push(`→ ${sn} foi bloqueado pelo Protego de ${target.name}!`)
+        } else if (damage > 0) {
+          damage = Math.max(0, damage - (target.defense ?? 0))
+          if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${target.name}!`)
+        }
         if (damage > 0) applyDamageWithCircum(target.id, damage, attacker.id, n)
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000 })
         applySpellDebuffTo(target.id)
@@ -444,6 +459,7 @@ export function calculateTurnOutcome(params: {
         })
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 1000 })
       } else {
+        logs.push(`→ ${attacker.name} errou ${sn} em ${target.name}!`)
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 900 })
       }
     }
