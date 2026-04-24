@@ -22,6 +22,10 @@ export type DebuffType =
   | "crit_boost"
   | "unforgivable_acc_down"
   | "protego_maximo"
+  // Novos status effects
+  | "bomba"
+  | "bloqueio_cura"
+  | "damage_reduce"
 
 export type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 

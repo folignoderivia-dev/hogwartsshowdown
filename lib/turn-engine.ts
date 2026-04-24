@@ -143,15 +143,21 @@ const calculateDamage = (attacker: Duelist, defender: Duelist, base: number, spe
   }
   if (attacker.house === "slytherin") damage *= HOUSE_GDD.slytherin.outgoingDamageMult
   if (defender.house === "hufflepuff") damage *= HOUSE_GDD.hufflepuff.incomingDamageMult
-  if (defender.debuffs.some((d) => d.type === "mark")) damage *= 1.2
+  // MARCA agora força critico garantido (getCritChance retorna 1.0) — sem multiplicador aqui
   if (attacker.debuffs.some((d) => d.type === "damage_amp")) damage *= 1.5
+  // DAMAGE_REDUCE: atacante causa 25% menos dano
+  if (attacker.debuffs.some((d) => d.type === "damage_reduce")) damage *= 0.75
   damage *= Math.max(0.2, 1 - (defender.arrestoStacks ?? 0) * 0.05)
   if (attacker.nextDamagePotionMult) damage *= attacker.nextDamagePotionMult
   return Math.round(damage)
 }
 
 const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: string): number => {
-  let c = 0.1
+  // MARCA: critico garantido em qualquer dano recebido
+  if (defender?.debuffs.some((d) => d.type === "mark")) return 1.0
+  // Glacius: critico garantido se alvo estiver congelado
+  if (spellNameNorm?.includes("glacius") && defender?.debuffs.some((d) => d.type === "freeze")) return 1.0
+  let c = 0.25 // taxa crítica base nativa: 25%
   if (spellNameNorm && spellNameNorm.includes("rictumsempra")) c += 0.3
   if (attacker.wand === "dragon") c += 0.2
   if (attacker.debuffs.some((d) => d.type === "crit_boost")) c += 0.25
@@ -160,10 +166,12 @@ const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: st
 }
 
 const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target: Duelist | null): number => {
+  const n = normSpell(sn)
+  // Diffindo: 100 de dano se alvo tiver Protego ativo (o spell ainda ignora o Protego)
+  if (n.includes("diffindo") && target?.debuffs.some((d) => d.type === "protego")) return 100
   let base = rollSpellPower(spell)
-  if (attacker.cruciusWeakness && !normSpell(sn).includes("crucius")) base *= 0.5
+  if (attacker.cruciusWeakness && !n.includes("crucius")) base *= 0.5
   if (attacker.maximosChargePct) base *= 1 + attacker.maximosChargePct / 100
-  if (target && normSpell(sn).includes("subito") && getTotalHP(target.hp) === 500) base *= 1.5
   if (WAND_PASSIVES[attacker.wand]?.effect === "acromantula_power_stack") {
     base += (attacker.turnsInBattle ?? 0) * 20
   }
@@ -314,7 +322,10 @@ export function calculateTurnOutcome(params: {
     logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} lançou ${sn}${isAreaSpell(sn) ? " em área" : ` em ${targets[0].name}`}!`)
 
     const protegoBlocks = (def: Duelist) =>
-      def.debuffs.some((d) => d.type === "protego") && !def.debuffs.some((d) => d.type === "silence_defense") && !n.includes("diffindo")
+      def.debuffs.some((d) => d.type === "protego") &&
+      !def.debuffs.some((d) => d.type === "silence_defense") &&
+      !n.includes("diffindo") &&
+      !(spell?.isUnforgivable ?? false) // Protego não bloqueia Maldições Imperdoáveis
 
     const applySpellDebuffTo = (defenderId: string) => {
       if (!spell.debuff) return
@@ -354,15 +365,25 @@ export function calculateTurnOutcome(params: {
     }
 
     if (isSelfTargetSpell(sn)) {
-      if (n.includes("protego") && !n.includes("maximo") && !n.includes("diabol")) {
+      const isProtectionSpell = n.includes("protego") || (n.includes("salvio") && n.includes("hexia"))
+      const silenceDefense = attacker.debuffs.some((d) => d.type === "silence_defense")
+      const bloqueiosCura = attacker.debuffs.some((d) => d.type === "bloqueio_cura")
+
+      if (isProtectionSpell && silenceDefense) {
+        logs.push(`→ ${attacker.name} tentou usar ${sn}, mas suas defesas estão bloqueadas!`)
+      } else if (n.includes("protego") && !n.includes("maximo") && !n.includes("diabol")) {
         if (!attacker.lastRoundSpellWasProtego) {
           state = state.map((d) =>
             d.id === attacker.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "protego"), { type: "protego", duration: 1 }], lastRoundSpellWasProtego: true } : d
           )
         }
       } else if (n.includes("ferula")) {
-        const healAmt = Math.floor(Math.random() * 141) + 10
-        state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d))
+        if (!bloqueiosCura) {
+          const healAmt = Math.floor(Math.random() * 126) + 25
+          state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d))
+        } else {
+          logs.push(`→ ${attacker.name} tentou usar ${sn}, mas cura está bloqueada!`)
+        }
       } else if (n.includes("circum")) {
         state = state.map((d) => (d.id === attacker.id ? { ...d, circumAura: 3 } : d))
       } else if (n.includes("maximos")) {
@@ -379,7 +400,11 @@ export function calculateTurnOutcome(params: {
       } else if (n.includes("episkey")) {
         state = state.map((d) =>
           d.id === attacker.id
-            ? { ...d, hp: healFlatTotal(d.hp, 50), debuffs: [...d.debuffs.filter((x) => x.type !== "crit_boost"), { type: "crit_boost", duration: 2 }] }
+            ? {
+                ...d,
+                hp: bloqueiosCura ? d.hp : healFlatTotal(d.hp, 50),
+                debuffs: [...d.debuffs.filter((x) => x.type !== "crit_boost"), { type: "crit_boost", duration: 2 }],
+              }
             : d
         )
       } else if (n.includes("protego") && n.includes("maximo")) {
@@ -401,6 +426,7 @@ export function calculateTurnOutcome(params: {
         destinyBond: false,
       }))
     } else if (isAreaSpell(sn) && getSpellMaxPower(spell) > 0) {
+      const ignoresDefense = spell.ignoresDefense === true
       for (const t of targets) {
         const streak = attacker.missStreakBySpell?.[sn] ?? 0
         const hit = rollHit(attacker, t, spell, streak)
@@ -415,12 +441,14 @@ export function calculateTurnOutcome(params: {
           isCrit = true
         }
         const bloqueadoArea = protegoBlocks(t)
+        if (!bloqueadoArea && !ignoresDefense) damage = Math.max(0, damage - (t.defense ?? 0))
         if (bloqueadoArea) damage = 0
         applyDamageWithCircum(t.id, damage, attacker.id, n)
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900, damage, isBlock: bloqueadoArea, fctOnly: true })
         applySpellDebuffTo(t.id)
       }
     } else {
+      const ignoresDefense = spell.ignoresDefense === true
       const target = targets[0]
       const streak = attacker.missStreakBySpell?.[sn] ?? 0
       const hit = rollHit(attacker, target, spell, streak)
@@ -432,6 +460,7 @@ export function calculateTurnOutcome(params: {
           isCrit = true
         }
         const bloqueado = protegoBlocks(target)
+        if (!bloqueado && !ignoresDefense && damage > 0) damage = Math.max(0, damage - (target.defense ?? 0))
         if (bloqueado) damage = 0
         if (damage > 0) applyDamageWithCircum(target.id, damage, attacker.id, n)
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000, damage, isBlock: bloqueado, fctOnly: true })
@@ -482,9 +511,18 @@ export function calculateTurnOutcome(params: {
 
   state = state.map((d) => {
     let hp = d.hp
-    if (d.debuffs.some((x) => x.type === "burn")) hp = applyDamage(hp, 15, { thestral: d.wand === "thestral" })
+    if (d.debuffs.some((x) => x.type === "burn")) hp = applyDamage(hp, 25, { thestral: d.wand === "thestral" })
     if (d.debuffs.some((x) => x.type === "poison")) hp = applyDamage(hp, 10, { thestral: d.wand === "thestral" })
     return hp !== d.hp ? { ...d, hp } : d
+  })
+  // BOMBA: explode quando o contador expira (duration === 1, prestes a ser removido)
+  state = state.map((d) => {
+    const hasBomba = d.debuffs.some((x) => x.type === "bomba" && x.duration === 1)
+    if (!hasBomba) return d
+    const bombDmg = Math.round(((500 - getTotalHP(d.hp)) / 100) * 25)
+    if (bombDmg <= 0) return d
+    logs.push(`💣 BOMBA explodiu em ${d.name}! ${bombDmg} de dano!`)
+    return { ...d, hp: applyDamage(d.hp, bombDmg, { thestral: d.wand === "thestral" }) }
   })
   state = state.map(reduceDebuffs)
   state = state.map((d) => ({
