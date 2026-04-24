@@ -15,12 +15,16 @@ import type { RoundAction } from "./lib/duelActions"
 import type { PlayerBuild, GameMode } from "./lib/types"
 
 const app = express()
-app.use(cors())
+app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"], credentials: true }))
 app.use(express.json())
 
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
   transports: ["websocket", "polling"],
 })
 
