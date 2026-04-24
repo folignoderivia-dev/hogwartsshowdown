@@ -13,6 +13,8 @@ export interface EngineAnimation {
   isMiss?: boolean
   isCrit?: boolean
   delay?: number
+  damage?: number
+  isBlock?: boolean
 }
 
 export interface TurnOutcome {
@@ -428,7 +430,7 @@ export function calculateTurnOutcome(params: {
           if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${t.name}!`)
         }
         applyDamageWithCircum(t.id, damage, attacker.id, n)
-        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900 })
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900, damage, isBlock: bloqueadoArea })
         applySpellDebuffTo(t.id)
       }
     } else {
@@ -451,7 +453,7 @@ export function calculateTurnOutcome(params: {
           if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${target.name}!`)
         }
         if (damage > 0) applyDamageWithCircum(target.id, damage, attacker.id, n)
-        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000 })
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000, damage, isBlock: bloqueado })
         applySpellDebuffTo(target.id)
       } else if (spell.special === "avada_miss_hp" && n.includes("avada")) {
         state = state.map((d) => {

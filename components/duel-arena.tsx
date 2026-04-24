@@ -519,10 +519,12 @@ const DuelArena = (
   /** True após receber GAME_START via Socket.io. */
   const [gameStartAcknowledged, setGameStartAcknowledged] = useState(isOfflineMode)
   const [knownBroadcastPlayers, setKnownBroadcastPlayers] = useState<string[]>(isOfflineMode ? [selfDuelistId ?? ""] : selfDuelistId ? [selfDuelistId] : [])
+  /** Nomes reais dos jogadores na sala (vindos do servidor via ROOM_STATUS). */
+  const [roomPlayerNames, setRoomPlayerNames] = useState<string[]>([])
   /** Contador real de players na sala (via ROOM_STATUS). */
   const [roomPlayerCount, setRoomPlayerCount] = useState(1)
   /** Floating Combat Text. */
-  const [floatingTexts, setFloatingTexts] = useState<Array<{ id: number; text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" }>>([])
+  const [floatingTexts, setFloatingTexts] = useState<Array<{ id: number; text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip"; x: number; y: number }>>([])
   const fctCounterRef = useRef(0)
   /** Floating Emojis. */
   const [floatingEmojis, setFloatingEmojis] = useState<Array<{ id: number; emoji: string; userId: string }>>([])
@@ -567,34 +569,29 @@ const DuelArena = (
     setBattleLog((prev) => [...prev, line])
   }, [])
 
-  /** Parseia logs de dano vindos do servidor e gera Floating Combat Text. */
-  const spawnFCTFromLogs = useCallback((logs: string[]) => {
-    for (const log of logs) {
-      let text = ""
-      let type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" = "damage"
-      if (log.includes("CRÍTICO") && log.includes("causou")) {
-        const m = log.match(/causou (\d+) de dano/)
-        text = m ? `💥 ${m[1]}!` : "💥 CRÍTICO!"
-        type = "crit"
-      } else if (log.includes("causou") && log.includes("de dano")) {
-        const m = log.match(/causou (\d+) de dano/)
-        text = m ? `-${m[1]}` : "-?"
-        type = "damage"
-      } else if (log.includes("bloqueado pelo Protego")) {
-        text = "🛡 BLOQ"
-        type = "block"
-      } else if (log.includes("errou")) {
-        text = "MISS"
-        type = "miss"
-      } else if (log.includes("perdeu a vez") || log.includes("impossibilitado")) {
-        text = "SKIP"
-        type = "skip"
-      }
-      if (text) {
-        const id = ++fctCounterRef.current
-        setFloatingTexts((prev) => [...prev, { id, text, type }])
-        setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2000)
-      }
+  /** Deriva texto e tipo de FCT a partir de uma EngineAnimation. */
+  const getFCTFromAnim = useCallback(
+    (anim: EngineAnimation): { text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" } | null => {
+      if (anim.isMiss) return { text: "Esquivou!", type: "miss" }
+      if (anim.isBlock) return { text: "🛡 Bloqueado!", type: "block" }
+      if (!anim.damage || anim.damage <= 0) return null
+      if (anim.isCrit) return { text: `${anim.damage} (Crítico!)`, type: "crit" }
+      return { text: `-${anim.damage}`, type: "damage" }
+    },
+    []
+  )
+
+  /** Obtém posição (% relativa à arena) do HUD de um duelist para posicionar o FCT. */
+  const getFCTPos = useCallback((targetId: string): { x: number; y: number } => {
+    const arena = arenaRef.current
+    if (!arena) return { x: 50, y: 38 }
+    const rect = arena.getBoundingClientRect()
+    const el = hudRefs.current[targetId]
+    if (!el) return { x: 50, y: 38 }
+    const r = el.getBoundingClientRect()
+    return {
+      x: ((r.left - rect.left + r.width / 2) / rect.width) * 100,
+      y: ((r.top - rect.top) / rect.height) * 100,
     }
   }, [])
 
@@ -888,7 +885,6 @@ const DuelArena = (
 
       setDuelists(state)
       setBattleLog((prev) => [...prev, ...outcome.logs])
-      spawnFCTFromLogs(outcome.logs)
       const resolvedTurn = roundTurn
       const roundHash = computeRoundHash(resolvedTurn, state)
       if (lastRoundHashRef.current !== roundHash) {
@@ -966,7 +962,6 @@ const DuelArena = (
       setDuelists(state)
       duelistsRef.current = state
       setBattleLog((prev) => [...prev, ...data.logs])
-      spawnFCTFromLogs(data.logs)
       turnNumberRef.current = data.nextTurn
       setTurnNumber(data.nextTurn)
       if (data.circumFlames) setCircumFlames(data.circumFlames)
@@ -995,17 +990,38 @@ const DuelArena = (
         const caster = stateSnapshot.find((d) => d.id === anim.casterId)
         const resolvedTargetIds = anim.targetIds?.length ? anim.targetIds : anim.targetId ? [anim.targetId] : []
         const targets = stateSnapshot.filter((d) => resolvedTargetIds.includes(d.id))
+
         if (anim.type === "cast" && caster && anim.spellName) {
-          const prefix = anim.isMiss ? "ERROU" : "CONJUROU"
-          const critText = anim.isCrit ? " (CRIT!)" : ""
-          setResolutionText(`${caster.name} ${prefix} ${anim.spellName}!${critText}`)
-          setBattleMessage(`${caster.name} ${prefix} ${anim.spellName}!${critText}`)
-          await sleep(500)
+          const acao = anim.isMiss ? "errou" : "conjurou"
+          const critLabel = anim.isCrit ? " (Crítico!)" : ""
+          setResolutionText(`${caster.name} ${acao} ${anim.spellName}!${critLabel}`)
+          setBattleMessage(`${caster.name} ${acao} ${anim.spellName}!${critLabel}`)
+          await sleep(400)
           await playSpellVfx(anim.spellName, caster, targets)
+
+          // Spawna FCT sincronizado com o impacto da animação
+          const fctTargets = targets.length > 0 ? targets : []
+          for (const t of fctTargets) {
+            const fctData = getFCTFromAnim(anim)
+            if (!fctData) continue
+            const pos = getFCTPos(t.id)
+            const id = ++fctCounterRef.current
+            setFloatingTexts((prev) => [...prev, { id, text: fctData.text, type: fctData.type, x: pos.x, y: pos.y }])
+            setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2000)
+          }
+
+          setResolutionText("")
+        } else if (anim.type === "skip" && caster) {
+          setResolutionText(`${caster.name} perdeu a vez!`)
+          const pos = getFCTPos(caster.id)
+          const id = ++fctCounterRef.current
+          setFloatingTexts((prev) => [...prev, { id, text: "Atordoado!", type: "skip", x: pos.x, y: pos.y }])
+          setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2000)
+          await sleep(400)
           setResolutionText("")
         } else if (anim.type === "potion" && caster) {
           setResolutionText(`${caster.name} usou poção!`)
-          await sleep(500)
+          await sleep(400)
           setResolutionText("")
         }
         await sleep(anim.delay ?? 900)
@@ -1052,13 +1068,15 @@ const DuelArena = (
       setSocketDisconnected(true)
     })
 
-    socket.on("ROOM_STATUS", ({ playersJoined, playersExpected }: { playersJoined: number; playersExpected: number }) => {
+    socket.on("ROOM_STATUS", ({ playersJoined, playersExpected, playerNames }: { playersJoined: number; playersExpected: number; playerNames?: string[] }) => {
       setRoomPlayerCount(playersJoined)
-      // Preenche o array de players conhecidos com placeholders se necessário
+      // Armazena nomes reais vindos do servidor
+      if (playerNames && playerNames.length > 0) setRoomPlayerNames(playerNames)
+      // Mantém lista de IDs para contagem/keying
       setKnownBroadcastPlayers((prev) => {
         if (prev.length >= playersJoined) return prev
         const next = [...prev]
-        while (next.length < playersJoined) next.push(`player-${next.length}`)
+        while (next.length < playersJoined) next.push(`slot-${next.length}`)
         return next
       })
       setDebugLastEvent(`ROOM_STATUS ${playersJoined}/${playersExpected}`)
@@ -1746,7 +1764,7 @@ const DuelArena = (
           )}
           {/* ── Floating Combat Text ──────────────────────────────────────── */}
           {floatingTexts.map((fct) => (
-            <div key={fct.id} className={`fct fct-${fct.type}`} style={{ left: "50%", top: "40%", transform: "translateX(-50%)" }}>
+            <div key={fct.id} className={`fct fct-${fct.type}`} style={{ left: `${fct.x}%`, top: `${fct.y}%`, transform: "translateX(-50%)" }}>
               {fct.text}
             </div>
           ))}
@@ -1818,10 +1836,12 @@ const DuelArena = (
             <div className="mb-2 rounded border border-amber-900/60 bg-stone-950/60 p-2 text-xs">
               <p className="mb-1 text-amber-300">Jogadores na sala</p>
               <div className="flex flex-wrap gap-1">
-                {(knownBroadcastPlayers.length > 0 ? knownBroadcastPlayers : participantRoster).map((id, idx) => {
-                  const label = id === selfDuelistId ? `${playerBuild.name} (você)` : participantNames[idx] || `Bruxo ${idx + 1}`
+                {Array.from({ length: Math.max(knownBroadcastPlayers.length, roomPlayerCount) }).map((_, idx) => {
+                  const isMe = idx === 0 && selfDuelistId
+                  const name = roomPlayerNames[idx] || participantNames[idx] || (isMe ? playerBuild.name : `Bruxo ${idx + 1}`)
+                  const label = name === playerBuild.name ? `${name} (você)` : name
                   return (
-                    <Badge key={`${id}-${idx}`} className="border-amber-700 bg-stone-800 text-amber-200">
+                    <Badge key={idx} className="border-amber-700 bg-stone-800 text-amber-200">
                       {label}
                     </Badge>
                   )

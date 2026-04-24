@@ -313,10 +313,11 @@ io.on("connection", (socket: Socket) => {
         room.players.get(userId)!.socketId = socket.id
       }
 
-      // Informa a sala quantos players já entraram
+      // Informa a sala quantos players já entraram (inclui nomes para exibição no lobby)
       io.to(matchId).emit("ROOM_STATUS", {
         playersJoined: room.players.size,
         playersExpected: room.expectedPlayers,
+        playerNames: [...room.players.values()].map((p) => p.build.name),
       })
 
       broadcastActiveMatches()

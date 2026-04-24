@@ -588,20 +588,20 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </CardTitle>
           </CardHeader>
           {showRecentPanel && (
-            <CardContent className="max-h-[36vh] overflow-y-auto pt-2">
+            <CardContent className="pt-2">
               {recentResults.length === 0 && <p className="text-xs text-amber-200/95">Nenhum duelo finalizado ainda.</p>}
-              <div className="space-y-2">
-                {recentResults.map((r) => (
-                  <div key={r.matchId + r.finishedAt} className="rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs">
+              <ol className="space-y-2">
+                {recentResults.slice(0, 5).map((r, i) => (
+                  <li key={r.matchId + r.finishedAt} className="rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-amber-300">{r.gameMode.toUpperCase()}</span>
+                      <span className="font-semibold text-amber-300">#{i + 1} · {r.gameMode === "1v1" ? "Duelo 1v1" : r.gameMode === "2v2" ? "Batalha 2v2" : r.gameMode === "ffa" ? "Todos contra Todos (4)" : r.gameMode === "ffa3" ? "Todos contra Todos (3)" : r.gameMode.toUpperCase()}</span>
                       <span className="text-amber-200/60">{new Date(r.finishedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
                     </div>
-                    <p className="mt-0.5 text-green-400">🏆 {r.winnerNames.join(" & ") || "?"}</p>
-                    {r.loserNames.length > 0 && <p className="text-red-400/80">💀 {r.loserNames.join(", ")}</p>}
-                  </div>
+                    <p className="mt-0.5 text-green-400">🏆 {r.winnerNames.join(" & ") || "?"} venceu</p>
+                    {r.loserNames.length > 0 && <p className="text-red-400/80">💀 {r.loserNames.join(" & ")} perdeu</p>}
+                  </li>
                 ))}
-              </div>
+              </ol>
             </CardContent>
           )}
         </Card>
