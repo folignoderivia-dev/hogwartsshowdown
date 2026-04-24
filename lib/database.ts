@@ -331,3 +331,23 @@ export async function getFriendMessages(userId: string, friendId: string): Promi
     createdAt: m.created_at,
   }))
 }
+
+/**
+ * Insere um relatório de bug/denúncia na tabela `reports`.
+ * Estrutura mínima esperada:
+ *   id uuid PK default gen_random_uuid()
+ *   reporter_id text
+ *   match_id text
+ *   message text
+ *   created_at timestamptz default now()
+ */
+export async function submitReport(reporterId: string, matchId: string | null, message: string): Promise<boolean> {
+  const supabase = getSupabaseClient()
+  const { error } = await supabase.from("reports").insert({
+    reporter_id: reporterId,
+    match_id: matchId,
+    message,
+    created_at: new Date().toISOString(),
+  })
+  return !error
+}

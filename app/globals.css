@@ -121,3 +121,53 @@
     oklch(0.22 0.045 42) 100%
   );
 }
+
+/* ── Floating Combat Text (FCT) ─────────────────────────────────────── */
+@keyframes fct-rise {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  60%  { opacity: 1; transform: translateY(-36px) scale(1.08); }
+  100% { opacity: 0; transform: translateY(-60px) scale(0.9); }
+}
+.fct {
+  position: absolute;
+  pointer-events: none;
+  font-family: var(--font-oswald), 'Oswald', 'Roboto Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+  animation: fct-rise 1.8s ease-out forwards;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 4px rgba(0,0,0,0.7);
+  z-index: 200;
+  white-space: nowrap;
+}
+.fct-damage  { color: #f87171; }
+.fct-crit    { color: #fbbf24; font-size: 1.35rem; }
+.fct-miss    { color: #94a3b8; font-size: 0.9rem; font-style: italic; }
+.fct-heal    { color: #4ade80; }
+.fct-block   { color: #60a5fa; font-size: 0.9rem; }
+.fct-skip    { color: #f472b6; font-size: 0.85rem; }
+
+/* ── Floating Emoji ─────────────────────────────────────────────────── */
+@keyframes emoji-float {
+  0%   { opacity: 0; transform: translateY(0) scale(0.5); }
+  15%  { opacity: 1; transform: translateY(-10px) scale(1.2); }
+  70%  { opacity: 1; transform: translateY(-30px) scale(1); }
+  100% { opacity: 0; transform: translateY(-55px) scale(0.8); }
+}
+.floating-emoji {
+  position: absolute;
+  pointer-events: none;
+  font-size: 2.5rem;
+  animation: emoji-float 2.4s ease-out forwards;
+  z-index: 300;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+}
+
+/* ── Battle log RPG font ────────────────────────────────────────────── */
+.battle-log-text {
+  font-family: var(--font-oswald), 'Oswald', 'Roboto Condensed', sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  line-height: 1.4;
+}

@@ -395,6 +395,23 @@ io.on("connection", (socket: Socket) => {
 
       // Verifica se todos os vivos enviaram ação
       const aliveIds = room.duelists.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
+
+      // Auto-skip autoritativo para jogadores incapacitados (stun, freeze, paralysis…)
+      const INCAP_DEBUFFS = new Set(["stun", "freeze", "paralysis", "confusion"])
+      for (const aliveId of aliveIds) {
+        if (room.pendingActions.has(aliveId)) continue
+        const d = room.duelists.find((x) => x.id === aliveId)
+        if (d?.debuffs.some((db) => INCAP_DEBUFFS.has(db.type))) {
+          room.pendingActions.set(aliveId, {
+            casterId: aliveId,
+            type: "skip",
+            turnId: room.turnNumber,
+            eventId: `auto-skip-${aliveId}-${room.turnNumber}`,
+          })
+          console.log(`[Server] Auto-skip para jogador incapacitado: ${aliveId.slice(0, 8)}…`)
+        }
+      }
+
       const allReady = aliveIds.length > 0 && aliveIds.every((id) => room.pendingActions.has(id))
 
       if (!allReady) return
@@ -440,17 +457,29 @@ io.on("connection", (socket: Socket) => {
       const isFfaMode = room.gameMode === "ffa" || room.gameMode === "ffa3"
       const ffaWinnerId = outcome.ffaWinnerId
 
+      /** Personaliza outcome para cada jogador:
+       * - FFA: win só para o sobrevivente final
+       * - 1v1/2v2: engine retorna resultado relativo ao time "player" (seat 0/time A);
+       *   jogadores no time "enemy" (seat 1 / time B) recebem o outcome invertido. */
+      const personalizeOutcome = (uid: string): typeof outcome.outcome => {
+        if (!outcome.outcome) return null
+        if (isFfaMode) {
+          return ffaWinnerId ? (uid === ffaWinnerId ? "win" : "lose") : outcome.outcome
+        }
+        const slot = room.players.get(uid)
+        if (slot?.team === "enemy") {
+          if (outcome.outcome === "win") return "lose"
+          if (outcome.outcome === "lose") return "win"
+        }
+        return outcome.outcome
+      }
+
       const emitResolution = (uid: string, sock: ReturnType<typeof io.sockets.sockets.get>) => {
         if (!sock) return
-        // Em FFA, distribui win/lose baseado no vencedor real (ffaWinnerId)
-        let personalOutcome: typeof outcome.outcome = outcome.outcome
-        if (isFfaMode && ffaWinnerId && outcome.outcome) {
-          personalOutcome = uid === ffaWinnerId ? "win" : "lose"
-        }
         sock.emit("TURN_RESOLVED", {
           animationsToPlay: outcome.animationsToPlay,
           newDuelists: personalizeDuelists(room.duelists, uid),
-          outcome: personalOutcome,
+          outcome: personalizeOutcome(uid),
           logs: outcome.logs,
           nextTurn: room.turnNumber,
           circumFlames: room.circumFlames,
@@ -539,6 +568,12 @@ io.on("connection", (socket: Socket) => {
       socket.to(matchId).emit("CHAT_MESSAGE", { sender, text })
     }
   )
+
+  // ── SEND_EMOJI ────────────────────────────────────────────────────────────────
+  socket.on("send_emoji", ({ matchId, userId, emoji }: { matchId: string; userId: string; emoji: string }) => {
+    // Retransmite para todos na sala (incluindo o emitente via broadcast)
+    io.to(matchId).emit("emoji_received", { userId, emoji })
+  })
 
   // ── LIST_ACTIVE_MATCHES ───────────────────────────────────────────────────────
   socket.on("LIST_ACTIVE_MATCHES", () => {

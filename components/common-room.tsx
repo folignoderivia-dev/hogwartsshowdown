@@ -120,6 +120,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [showRecentPanel, setShowRecentPanel] = useState(false)
   const [showSpectatePanel, setShowSpectatePanel] = useState(false)
   const lobbySocketRef = useRef<Socket | null>(null)
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set())
   const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [showRankingPanel, setShowRankingPanel] = useState(true)
@@ -276,6 +277,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     const syncOnline = () => {
       const state = lobby.presenceState()
       setOnlineWizards(Object.keys(state).length)
+      // Extrai IDs dos usuários presentes para o indicador de online nos amigos
+      const ids = new Set<string>(
+        Object.entries(state).flatMap(([key, presences]) =>
+          (presences as any[]).map((p: any) => p.userId || key).filter((id: string) => id && !id.startsWith("anon-"))
+        )
+      )
+      setOnlineUserIds(ids)
     }
     lobby
       .on("presence", { event: "sync" }, syncOnline)
@@ -283,7 +291,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       .on("presence", { event: "leave" }, syncOnline)
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
-          await lobby.track({ online_at: new Date().toISOString(), username: currentUser?.username || "Visitante" })
+          await lobby.track({ online_at: new Date().toISOString(), username: currentUser?.username || "Visitante", userId: currentUser?.id || "" })
         }
       })
 
@@ -843,7 +851,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     {friends.map((friend) => (
                       <div key={friend.id} className="rounded border border-amber-900/60 bg-stone-900/60 px-3 py-2 text-xs text-amber-100">
                         <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
-                          <p className="font-semibold text-amber-200">{friend.username}</p>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`inline-block h-2 w-2 rounded-full ${onlineUserIds.has(friend.id) ? "bg-green-400 shadow-[0_0_4px_#4ade80]" : "bg-stone-500"}`}
+                              title={onlineUserIds.has(friend.id) ? "Online" : "Offline"}
+                            />
+                            <p className="font-semibold text-amber-200">{friend.username}</p>
+                          </div>
                           <div className="flex flex-wrap gap-1">
                             <Button
                               type="button"

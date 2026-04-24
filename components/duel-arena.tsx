@@ -1,10 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, FlaskConical, Send, Wand2, X } from "lucide-react"
+import { AlertTriangle, ArrowLeft, FlaskConical, Send, Wand2, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { submitReport } from "@/lib/database"
 import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, type SpellInfo, WAND_PASSIVES } from "@/lib/data-store"
 import type { ArenaVfxState, BattleStatus, Duelist, HPState, DebuffType, Point } from "@/lib/arena-types"
 import type { PlayerBuild } from "@/lib/types"
@@ -517,6 +519,18 @@ const DuelArena = (
   /** True após receber GAME_START via Socket.io. */
   const [gameStartAcknowledged, setGameStartAcknowledged] = useState(isOfflineMode)
   const [knownBroadcastPlayers, setKnownBroadcastPlayers] = useState<string[]>(isOfflineMode ? [selfDuelistId ?? ""] : selfDuelistId ? [selfDuelistId] : [])
+  /** Contador real de players na sala (via ROOM_STATUS). */
+  const [roomPlayerCount, setRoomPlayerCount] = useState(1)
+  /** Floating Combat Text. */
+  const [floatingTexts, setFloatingTexts] = useState<Array<{ id: number; text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" }>>([])
+  const fctCounterRef = useRef(0)
+  /** Floating Emojis. */
+  const [floatingEmojis, setFloatingEmojis] = useState<Array<{ id: number; emoji: string; userId: string }>>([])
+  const emojiCounterRef = useRef(0)
+  /** Report modal. */
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [reportText, setReportText] = useState("")
+  const [reportSent, setReportSent] = useState(false)
   /** Estado do socket.io */
   const [socketConnected, setSocketConnected] = useState(false)
   const [socketDisconnected, setSocketDisconnected] = useState(false)
@@ -551,6 +565,37 @@ const DuelArena = (
   }, [])
   const addLog = useCallback((line: string) => {
     setBattleLog((prev) => [...prev, line])
+  }, [])
+
+  /** Parseia logs de dano vindos do servidor e gera Floating Combat Text. */
+  const spawnFCTFromLogs = useCallback((logs: string[]) => {
+    for (const log of logs) {
+      let text = ""
+      let type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" = "damage"
+      if (log.includes("CRÍTICO") && log.includes("causou")) {
+        const m = log.match(/causou (\d+) de dano/)
+        text = m ? `💥 ${m[1]}!` : "💥 CRÍTICO!"
+        type = "crit"
+      } else if (log.includes("causou") && log.includes("de dano")) {
+        const m = log.match(/causou (\d+) de dano/)
+        text = m ? `-${m[1]}` : "-?"
+        type = "damage"
+      } else if (log.includes("bloqueado pelo Protego")) {
+        text = "🛡 BLOQ"
+        type = "block"
+      } else if (log.includes("errou")) {
+        text = "MISS"
+        type = "miss"
+      } else if (log.includes("perdeu a vez") || log.includes("impossibilitado")) {
+        text = "SKIP"
+        type = "skip"
+      }
+      if (text) {
+        const id = ++fctCounterRef.current
+        setFloatingTexts((prev) => [...prev, { id, text, type }])
+        setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2000)
+      }
+    }
   }, [])
 
   /** Envia intenção de ação ao servidor Socket.io autoritativo. */
@@ -843,6 +888,7 @@ const DuelArena = (
 
       setDuelists(state)
       setBattleLog((prev) => [...prev, ...outcome.logs])
+      spawnFCTFromLogs(outcome.logs)
       const resolvedTurn = roundTurn
       const roundHash = computeRoundHash(resolvedTurn, state)
       if (lastRoundHashRef.current !== roundHash) {
@@ -920,6 +966,7 @@ const DuelArena = (
       setDuelists(state)
       duelistsRef.current = state
       setBattleLog((prev) => [...prev, ...data.logs])
+      spawnFCTFromLogs(data.logs)
       turnNumberRef.current = data.nextTurn
       setTurnNumber(data.nextTurn)
       if (data.circumFlames) setCircumFlames(data.circumFlames)
@@ -1006,9 +1053,13 @@ const DuelArena = (
     })
 
     socket.on("ROOM_STATUS", ({ playersJoined, playersExpected }: { playersJoined: number; playersExpected: number }) => {
+      setRoomPlayerCount(playersJoined)
+      // Preenche o array de players conhecidos com placeholders se necessário
       setKnownBroadcastPlayers((prev) => {
         if (prev.length >= playersJoined) return prev
-        return prev
+        const next = [...prev]
+        while (next.length < playersJoined) next.push(`player-${next.length}`)
+        return next
       })
       setDebugLastEvent(`ROOM_STATUS ${playersJoined}/${playersExpected}`)
     })
@@ -1096,7 +1147,27 @@ const DuelArena = (
       console.warn("[Socket] Erro do servidor:", message)
     })
 
+    socket.on("emoji_received", ({ userId, emoji }: { userId: string; emoji: string }) => {
+      const id = ++emojiCounterRef.current
+      setFloatingEmojis((prev) => [...prev, { id, emoji, userId }])
+      setTimeout(() => setFloatingEmojis((prev) => prev.filter((e) => e.id !== id)), 2600)
+    })
+
     return () => {
+      socket.off("connect")
+      socket.off("disconnect")
+      socket.off("connect_error")
+      socket.off("ROOM_STATUS")
+      socket.off("GAME_START")
+      socket.off("RECONNECT_STATE")
+      socket.off("TURN_RESOLVED")
+      socket.off("OPPONENT_DISCONNECTED")
+      socket.off("OPPONENT_LEFT")
+      socket.off("SYNC_ERROR")
+      socket.off("CHAT_MESSAGE")
+      socket.off("ERROR")
+      socket.off("MATCH_RESULT")
+      socket.off("emoji_received")
       socket.disconnect()
       socketRef.current = null
       setSocketConnected(false)
@@ -1673,11 +1744,28 @@ const DuelArena = (
               [?]
             </div>
           )}
+          {/* ── Floating Combat Text ──────────────────────────────────────── */}
+          {floatingTexts.map((fct) => (
+            <div key={fct.id} className={`fct fct-${fct.type}`} style={{ left: "50%", top: "40%", transform: "translateX(-50%)" }}>
+              {fct.text}
+            </div>
+          ))}
+
+          {/* ── Floating Emojis ───────────────────────────────────────────── */}
+          {floatingEmojis.map((fe) => {
+            const d = duelists.find((x) => x.id === fe.userId)
+            const isRight = d && !d.isPlayer
+            return (
+              <div key={fe.id} className="floating-emoji" style={{ [isRight ? "right" : "left"]: "25%", top: "25%" }}>
+                {fe.emoji}
+              </div>
+            )
+          })}
+
           {!isOfflineMode && !gameStartAcknowledged && (
             <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-red-950/50">
               <div className="rounded-xl border border-red-600 bg-red-900/80 px-6 py-4 text-center shadow-[0_0_30px_rgba(239,68,68,0.45)]">
-                <p className="text-xl font-bold tracking-wide text-red-100">AGUARDANDO OPONENTE...</p>
-                <p className="mt-1 text-xs text-red-200/90">Supabase Presence: a luta só começa com {expectedOnlinePlayers} UUID(s) reais no canal.</p>
+                <p className="text-xl font-bold tracking-wide text-red-100">AGUARDANDO OPONENTE... ({roomPlayerCount}/{expectedOnlinePlayers})</p>
               </div>
             </div>
           )}
@@ -1743,7 +1831,7 @@ const DuelArena = (
           )}
           {!isOfflineMode && !gameStartAcknowledged && (
             <p className="mb-2 text-xs text-amber-300">
-              Aguardando jogadores na sala ({knownBroadcastPlayers.length || 1}/{expectedOnlinePlayers})...
+              Aguardando jogadores na sala ({roomPlayerCount}/{expectedOnlinePlayers})...
             </p>
           )}
           {!isOfflineMode && !socketConnected && !gameStartAcknowledged && (
@@ -1805,6 +1893,34 @@ const DuelArena = (
               )}
             </div>
           )}
+
+          {/* ── Painel de Expressões (Emojis) ─────────────────────────────── */}
+          {isOnlineMatch && !isReadOnlySpectator && selfDuelistId && socketRef.current?.connected && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-amber-400/70">Reações:</span>
+              {["😂", "😭", "😲", "😡", "🤫", "👍"].map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className="text-xl transition-transform hover:scale-125 active:scale-95"
+                  title={`Enviar ${emoji}`}
+                  onClick={() => {
+                    socketRef.current?.emit("send_emoji", { matchId, userId: selfDuelistId, emoji })
+                  }}
+                >
+                  {emoji}
+                </button>
+              ))}
+              {/* Botão de Denúncia */}
+              <button
+                type="button"
+                className="ml-auto rounded border border-red-800/60 bg-red-950/40 px-2 py-0.5 text-[10px] text-red-400 hover:bg-red-900/50"
+                onClick={() => { setShowReportModal(true); setReportSent(false) }}
+              >
+                🚨 Relatar
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
@@ -1815,7 +1931,7 @@ const DuelArena = (
           ) : (
             <p className="text-red-400">[Socket: Aguardando...]</p>
           )}
-          <p>[Players: {knownBroadcastPlayers.length}/{expectedOnlinePlayers}]</p>
+          <p>[Players: {roomPlayerCount}/{expectedOnlinePlayers}]</p>
           <p className="truncate" title={debugLastEvent}>
             [Evento: {debugLastEvent || "—"}]
           </p>
@@ -1827,7 +1943,7 @@ const DuelArena = (
           <p className="mb-2 text-xs font-bold text-amber-300">Log de Batalha</p>
           <div className="h-32 overflow-y-auto rounded border border-amber-800 bg-stone-900 p-2">
             {battleLog.slice(-40).map((line, i) => (
-              <p key={i} className="mb-1 text-xs text-amber-100/90">{line}</p>
+              <p key={i} className={`mb-1 battle-log-text ${line.startsWith("→") ? (line.includes("CRÍTICO") ? "text-yellow-300" : line.includes("bloqueado") ? "text-blue-300" : line.includes("errou") ? "text-stone-400" : "text-red-300") : "text-amber-100/90"}`}>{line}</p>
             ))}
           </div>
         </div>
@@ -1860,6 +1976,54 @@ const DuelArena = (
                 <span key={i} className="h-2 w-2 animate-bounce rounded-full bg-red-400" style={{ animationDelay: `${i * 0.15}s` }} />
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Report ───────────────────────────────────────────────── */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/70">
+          <div className="w-full max-w-sm rounded-xl border-2 border-red-800 bg-stone-900 p-6 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-base font-bold text-red-300">
+                <AlertTriangle className="h-4 w-4" />
+                Relatar Bug / Denúncia
+              </h3>
+              <button type="button" onClick={() => setShowReportModal(false)} className="text-stone-400 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {reportSent ? (
+              <p className="text-sm text-green-400">✅ Relatório enviado! Obrigado.</p>
+            ) : (
+              <>
+                <Textarea
+                  value={reportText}
+                  onChange={(e) => setReportText(e.target.value)}
+                  placeholder="Descreva o bug ou o comportamento suspeito..."
+                  className="mb-3 min-h-[90px] border-stone-700 bg-stone-800 text-sm text-amber-100 placeholder:text-stone-500"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="outline" className="border-stone-600 text-stone-300" onClick={() => setShowReportModal(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-red-800 text-white hover:bg-red-700"
+                    disabled={!reportText.trim()}
+                    onClick={async () => {
+                      if (!reportText.trim()) return
+                      await submitReport(playerBuild.userId ?? "", matchId ?? null, reportText.trim())
+                      setReportSent(true)
+                      setReportText("")
+                      setTimeout(() => setShowReportModal(false), 2000)
+                    }}
+                  >
+                    Enviar
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
