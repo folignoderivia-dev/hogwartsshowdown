@@ -304,6 +304,12 @@ const reduceDebuffs = (duelist: Duelist): Duelist => ({
     .filter((d) => d.type === "arestum_penalty" || d.duration > 0),
 })
 
+/** Retorna as barras de HP iniciais respeitando a passiva de cada casa.
+ *  Sonserina: 4 barras (400 HP). Todas as outras: 5 barras (500 HP). */
+function buildHpBars(house: string): number[] {
+  return house === "slytherin" ? [100, 100, 100, 100] : [100, 100, 100, 100, 100]
+}
+
 function buildSpellManaForSpells(spells: string[], house: string): Record<string, { current: number; max: number }> {
   const out: Record<string, { current: number; max: number }> = {}
   spells.forEach((sn) => {
@@ -359,7 +365,7 @@ const DuelArena = (
       wand: playerBuild.wand,
       avatar: playerBuild.avatar,
       spells: playerBuild.spells,
-      hp: { bars: [100, 100, 100, 100, 100] },
+      hp: { bars: buildHpBars(playerBuild.house) },
       speed: Math.round(100 * playerMod.speed),
       debuffs: [],
       isPlayer: true,
@@ -372,6 +378,7 @@ const DuelArena = (
 
     const withMana = (d: Duelist): Duelist => ({
       ...d,
+      hp: { bars: buildHpBars(d.house) },
       spellMana: buildSpellManaForSpells(d.spells, d.house),
       turnsInBattle: 0,
       disabledSpells: {},
@@ -388,7 +395,7 @@ const DuelArena = (
           wand: "dragon",
           avatar: "",
           spells: enemySpells,
-          hp: { bars: [100, 100, 100, 100, 100] },
+          hp: { bars: buildHpBars("slytherin") },
           speed: 92,
           debuffs: [],
           team: "enemy",
@@ -431,7 +438,7 @@ const DuelArena = (
           wand: duelWand,
           avatar: duelAvatar,
           spells: duelSpells,
-          hp: { bars: [100, 100, 100, 100, 100] },
+          hp: { bars: buildHpBars(duelHouse) },
           speed: 95 - idx * 2,
           debuffs: [],
           isPlayer: isLocal,
@@ -454,7 +461,7 @@ const DuelArena = (
       wand: playerBuild.wand,
       avatar: playerBuild.avatar,
       spells: playerBuild.spells,
-      hp: { bars: [100, 100, 100, 100, 100] },
+      hp: { bars: buildHpBars(playerBuild.house) },
       speed: Math.round(100 * playerMod.speed),
       debuffs: [],
       isPlayer: true,
@@ -472,7 +479,7 @@ const DuelArena = (
       wand: botBase.wand,
       avatar: DEFAULT_AVATARS[(stage + 1) % DEFAULT_AVATARS.length],
       spells: botBase.spells,
-      hp: { bars: [100, 100, 100, 100, 100] },
+      hp: { bars: buildHpBars(botBase.house) },
       speed: 92 + stage * 3,
       debuffs: [],
       team: "enemy",
@@ -800,7 +807,7 @@ const DuelArena = (
 
   const applyRapinomonioBlock = useCallback((state: Duelist[]) => {
     let next = [...state]
-    // Rapinomônio novo: drena mana de 1 spell aleatória de cada duelista no início
+    // Rapinomônio: drena mana de 1 spell aleatória de cada duelista no início
     const hasCaster = next.some((d) => WAND_PASSIVES[d.wand]?.effect === "rapinomonio_drain_start")
     if (!hasCaster) return next
     for (const target of next) {
@@ -810,6 +817,22 @@ const DuelArena = (
       const newSm = { ...target.spellMana }
       newSm[pick] = { ...newSm[pick], current: 0 }
       next = next.map((d) => (d.id === target.id ? { ...d, spellMana: newSm } : d))
+    }
+    return next
+  }, [])
+
+  const applyCentauroBlock = useCallback((state: Duelist[]) => {
+    let next = [...state]
+    // Centauro: bloqueia spells de cura dos oponentes no início da batalha
+    const centauros = next.filter((d) => WAND_PASSIVES[d.wand]?.effect === "centauro_block_heals")
+    for (const centauro of centauros) {
+      const foes = next.filter((d) => d.team !== centauro.team)
+      for (const foe of foes) {
+        const healSpells = ["Ferula", "Episkey", "Vulnera Sanetur"]
+        const nextDisabled = { ...(foe.disabledSpells || {}) }
+        healSpells.forEach((s) => { if (foe.spells.includes(s)) nextDisabled[s] = 999 })
+        next = next.map((d) => (d.id === foe.id ? { ...d, disabledSpells: nextDisabled } : d))
+      }
     }
     return next
   }, [])
@@ -1289,13 +1312,13 @@ const DuelArena = (
       setPendingActions({})
       setTurnNumber(1)
       setGameOver(null)
-      const seeded = applyRapinomonioBlock(buildChallengeRound(0))
+      const seeded = applyCentauroBlock(applyRapinomonioBlock(buildChallengeRound(0)))
       setDuelists(seeded)
       beginRoundSelection(seeded)
       return
     }
     if (isOfflineMode) {
-      const seeded = applyRapinomonioBlock(duelists)
+      const seeded = applyCentauroBlock(applyRapinomonioBlock(duelists))
       setDuelists(seeded)
       beginRoundSelection(seeded)
       return
