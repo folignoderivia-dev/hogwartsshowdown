@@ -1,0 +1,495 @@
+import { HOUSE_GDD, WAND_PASSIVES, rollSpellPower, type SpellInfo } from "./data-store"
+import type { DebuffType, Duelist, HPState } from "./arena-types"
+import type { RoundAction } from "./duelActions"
+
+/** Motor puro: recebe `RoundAction` em memória. Persistência Supabase usa `match_turns.action_payload` apenas na Arena. */
+
+export interface EngineAnimation {
+  type: "cast" | "skip" | "potion"
+  casterId: string
+  targetId?: string
+  spellName?: string
+  targetIds?: string[]
+  isMiss?: boolean
+  isCrit?: boolean
+  delay?: number
+}
+
+export interface TurnOutcome {
+  newDuelists: Duelist[]
+  logs: string[]
+  animationsToPlay: EngineAnimation[]
+  outcome: "win" | "lose" | "timeout" | null
+  orderedActions: RoundAction[]
+}
+
+export const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
+export const getTotalHP = (hp: HPState) => hp.bars.reduce((sum, value) => sum + value, 0)
+export const isDefeated = (hp: HPState) => getTotalHP(hp) <= 0
+export const getSpellInfo = (name: string, spellDatabase: SpellInfo[]) => spellDatabase.find((s) => s.name === name)
+
+export const isSelfTargetSpell = (spellName: string): boolean => {
+  const n = normSpell(spellName)
+  return (
+    (n.includes("protego") && !n.includes("diabol")) ||
+    n.includes("ferula") ||
+    n.includes("episkey") ||
+    (n.includes("finite") && n.includes("incantatem")) ||
+    n.includes("circum") ||
+    n.includes("maximos") ||
+    (n.includes("aqua") && n.includes("eructo")) ||
+    (n.includes("salvio") && n.includes("hexia")) ||
+    (n.includes("vulnera") && n.includes("sanetur"))
+  )
+}
+
+export const isAreaSpell = (spellName: string): boolean => {
+  const n = normSpell(spellName)
+  return n.includes("bombarda") || (n.includes("desumo") && n.includes("tempestas")) || n.includes("fumus") || (n.includes("protego") && n.includes("diabol"))
+}
+
+export const getSpellMaxPower = (spell: SpellInfo): number => {
+  if (spell.powerMin != null && spell.powerMax != null) return spell.powerMax
+  return spell.power ?? 0
+}
+
+const applyDamage = (hp: HPState, amount: number, opts?: { thestral?: boolean }): HPState => {
+  const bars = [...hp.bars]
+  let remaining = amount
+  for (let i = bars.length - 1; i >= 0; i--) {
+    if (remaining <= 0) break
+    if (bars[i] <= 0) continue
+    const absorbed = Math.min(remaining, bars[i])
+    if (opts?.thestral && bars[i] === 100 && absorbed >= 100) {
+      bars[i] = 1
+      remaining -= 99
+      continue
+    }
+    bars[i] -= absorbed
+    remaining -= absorbed
+  }
+  return { bars }
+}
+
+const healCurrentBar = (hp: HPState, amount: number): HPState => {
+  const bars = [...hp.bars]
+  for (let i = bars.length - 1; i >= 0; i--) {
+    if (bars[i] > 0 && bars[i] < 100) {
+      bars[i] = Math.min(100, bars[i] + amount)
+      break
+    }
+  }
+  return { bars }
+}
+
+const healFlatTotal = (hp: HPState, flat: number): HPState => {
+  let left = Math.min(500, Math.max(0, Math.round(flat)))
+  const bars = [...hp.bars]
+  for (let i = bars.length - 1; i >= 0 && left > 0; i--) {
+    const room = 100 - bars[i]
+    if (room <= 0) continue
+    const add = Math.min(room, left)
+    bars[i] += add
+    left -= add
+  }
+  return { bars }
+}
+
+const reduceDebuffs = (duelist: Duelist): Duelist => ({
+  ...duelist,
+  debuffs: duelist.debuffs
+    .map((d) => (d.type === "arestum_penalty" ? d : { ...d, duration: d.duration - 1 }))
+    .filter((d) => d.type === "arestum_penalty" || d.duration > 0),
+})
+
+export const calculateAccuracy = (attacker: Duelist, defender: Duelist, base: number, spell?: SpellInfo) => {
+  let accuracy = base
+  const un = spell?.isUnforgivable
+  const wandJammed = attacker.wandPassiveStripped || attacker.debuffs.some((d) => d.type === "disarm")
+  if (!un && !wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "accuracy_plus10") accuracy += 10
+  if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "crit20_acc_minus10") accuracy -= 10
+  const spellNorm = normSpell(spell?.name || "")
+  if (
+    attacker.debuffs.some((d) => d.type === "unforgivable_acc_down") &&
+    (spellNorm.includes("crucius") || spellNorm.includes("avada") || spellNorm.includes("imperio") || spellNorm.includes("imperius"))
+  ) {
+    accuracy -= 15
+  }
+  accuracy -= (defender.arrestoStacks ?? 0) * 5
+  if (attacker.debuffs.some((d) => d.type === "lumus_acc_down")) accuracy -= 20
+  if (attacker.nextAccBonusPct) accuracy += attacker.nextAccBonusPct
+  return Math.max(5, Math.min(100, accuracy))
+}
+
+const rollHit = (attacker: Duelist, defender: Duelist, spell: SpellInfo, missStreak = 0) => {
+  if (spell.accuracy >= 100) return true
+  const pityBonus = Math.min(20, missStreak * 7)
+  const finalAcc = Math.min(100, calculateAccuracy(attacker, defender, spell.accuracy, spell) + pityBonus)
+  return Math.random() * 100 <= finalAcc
+}
+
+const calculateDamage = (attacker: Duelist, defender: Duelist, base: number, spellNorm?: string) => {
+  let damage = base
+  if (spellNorm && WAND_PASSIVES[defender.wand]?.effect === "kelpie_fire_immune") {
+    const n = spellNorm
+    if (n.includes("incendio") || n.includes("confrigo")) return 0
+  }
+  if (spellNorm?.includes("incendio") && defender.debuffs.some((d) => d.type === "burn")) {
+    damage *= 2
+  }
+  if (attacker.house === "slytherin") damage *= HOUSE_GDD.slytherin.outgoingDamageMult
+  if (defender.house === "hufflepuff") damage *= HOUSE_GDD.hufflepuff.incomingDamageMult
+  if (defender.debuffs.some((d) => d.type === "mark")) damage *= 1.2
+  if (attacker.debuffs.some((d) => d.type === "damage_amp")) damage *= 1.5
+  damage *= Math.max(0.2, 1 - (defender.arrestoStacks ?? 0) * 0.05)
+  if (attacker.nextDamagePotionMult) damage *= attacker.nextDamagePotionMult
+  return Math.round(damage)
+}
+
+const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: string): number => {
+  let c = 0.1
+  if (spellNameNorm && spellNameNorm.includes("rictumsempra")) c += 0.3
+  if (attacker.wand === "dragon") c += 0.2
+  if (attacker.debuffs.some((d) => d.type === "crit_boost")) c += 0.25
+  if (defender?.house === "slytherin") c += HOUSE_GDD.slytherin.extraCritTakenChance
+  return Math.min(0.95, c)
+}
+
+const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target: Duelist | null): number => {
+  let base = rollSpellPower(spell)
+  if (attacker.cruciusWeakness && !normSpell(sn).includes("crucius")) base *= 0.5
+  if (attacker.maximosChargePct) base *= 1 + attacker.maximosChargePct / 100
+  if (target && normSpell(sn).includes("subito") && getTotalHP(target.hp) === 500) base *= 1.5
+  if (WAND_PASSIVES[attacker.wand]?.effect === "acromantula_power_stack") {
+    base += (attacker.turnsInBattle ?? 0) * 20
+  }
+  return Math.round(base)
+}
+
+const getSpellCastPriority = (spellName: string, spell: SpellInfo | undefined, attacker: Duelist): number => {
+  if (!spell) return 0
+  let p = spell.priority ?? 0
+  const n = normSpell(spellName)
+  if (n.includes("aqua") && n.includes("eructo")) p += 5
+  if (!isSelfTargetSpell(spellName) && getSpellMaxPower(spell) > 0) {
+    const hg = HOUSE_GDD[attacker.house as keyof typeof HOUSE_GDD]
+    if (hg && "attackPriorityBonus" in hg) p += hg.attackPriorityBonus as number
+  }
+  if (attacker.wand === "thunderbird") p += 1
+  return p
+}
+
+const effectiveSpeed = (d: Duelist) => {
+  let s = d.speed
+  if (d.debuffs.some((x) => x.type === "slow")) s = Math.floor(s * 0.35)
+  return s
+}
+
+export const getValidTargetsForSpell = (spellName: string, attacker: Duelist, state: Duelist[]) => {
+  if (isSelfTargetSpell(spellName)) return state.filter((d) => d.id === attacker.id && !isDefeated(d.hp))
+  if (isAreaSpell(spellName)) {
+    const n = normSpell(spellName)
+    if (n.includes("desumo")) return state.filter((d) => !isDefeated(d.hp))
+    if (n.includes("protego") && n.includes("diabol")) return state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
+    return state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
+  }
+  return state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
+}
+
+export function calculateTurnOutcome(params: {
+  duelists: Duelist[]
+  actions: RoundAction[]
+  spellDatabase: SpellInfo[]
+  turnNumber: number
+  gameMode: "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3"
+  circumFlames: Record<string, number>
+}): TurnOutcome {
+  let state = [...params.duelists]
+  const logs: string[] = []
+  const animationsToPlay: EngineAnimation[] = []
+
+  const evaluateOutcome = (s: Duelist[]) => {
+    const playerAliveCount = s.filter((d) => d.team === "player" && !isDefeated(d.hp)).length
+    const enemyAliveCount = s.filter((d) => d.team === "enemy" && !isDefeated(d.hp)).length
+    const totalAliveCount = s.filter((d) => !isDefeated(d.hp)).length
+    if (params.gameMode === "2v2") {
+      if (enemyAliveCount === 0) return "win" as const
+      if (playerAliveCount === 0) return "lose" as const
+      return null
+    }
+    if (params.gameMode === "ffa" || params.gameMode === "ffa3") {
+      if (totalAliveCount === 1) {
+        const winner = s.find((d) => !isDefeated(d.hp))
+        return winner?.isPlayer ? "win" : "lose"
+      }
+      return null
+    }
+    if (enemyAliveCount === 0) return "win" as const
+    if (playerAliveCount === 0) return "lose" as const
+    return null
+  }
+
+  const rankAction = (a: RoundAction) => {
+    if (a.type === "skip") return -2_000_000_000
+    if (a.type === "potion") return -1_500_000_000
+    const da = state.find((d) => d.id === a.casterId)
+    const sa = a.type === "cast" && a.spellName ? getSpellInfo(a.spellName, params.spellDatabase) : undefined
+    if (da && sa && a.spellName) return getSpellCastPriority(a.spellName, sa, da)
+    return -9999
+  }
+
+  const orderedActions = [...params.actions].sort((a, b) => {
+    const ra = rankAction(a)
+    const rb = rankAction(b)
+    if (rb !== ra) return rb - ra
+    const da = state.find((d) => d.id === a.casterId)
+    const db = state.find((d) => d.id === b.casterId)
+    return (db ? effectiveSpeed(db) : 0) - (da ? effectiveSpeed(da) : 0)
+  })
+
+  for (const action of orderedActions) {
+    const attacker = state.find((d) => d.id === action.casterId)
+    if (!attacker || isDefeated(attacker.hp)) {
+      logs.push(`[Engine]: ação ignorada para caster inválido/morto (${action.casterId}).`)
+      continue
+    }
+
+    if (action.type === "skip") {
+      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} perdeu a vez!`)
+      animationsToPlay.push({ type: "skip", casterId: attacker.id, targetIds: [], delay: 1200 })
+      continue
+    }
+
+    if (action.type === "potion") {
+      const potKey = action.potionType || "foco"
+      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} usou poção (${potKey})!`)
+      if (potKey === "wiggenweld") {
+        state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healCurrentBar(d.hp, 100) } : d))
+      } else if (potKey === "edurus") {
+        state = state.map((d) => (d.id === attacker.id ? { ...d, debuffs: [] } : d))
+      } else if (potKey === "mortovivo") {
+        state = state.map((d) => (d.id === attacker.id ? { ...d, destinyBond: true } : d))
+      } else if (potKey === "maxima") {
+        state = state.map((d) => {
+          if (d.id === attacker.id) return { ...d, nextDamagePotionMult: 2 }
+          return { ...d, debuffs: [...d.debuffs, { type: "damage_amp" as const, duration: 1 }] }
+        })
+      } else if (potKey === "foco") {
+        state = state.map((d) => (d.id === attacker.id ? { ...d, nextAccBonusPct: 30 } : d))
+      }
+      animationsToPlay.push({ type: "potion", casterId: attacker.id, targetIds: [attacker.id], targetId: attacker.id, delay: 1000 })
+      if (evaluateOutcome(state)) return { newDuelists: state, logs, animationsToPlay, outcome: evaluateOutcome(state), orderedActions }
+      continue
+    }
+
+    const sn = action.spellName || ""
+    const spell = getSpellInfo(sn, params.spellDatabase)
+    if (!spell) continue
+    const n = normSpell(sn)
+
+    const cannotAct = attacker.debuffs.some((d) => d.type === "stun" || d.type === "freeze")
+    if (cannotAct) {
+      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} está impossibilitado de agir!`)
+      continue
+    }
+
+    let targets: Duelist[] = []
+    if (isSelfTargetSpell(sn)) {
+      if (!isDefeated(attacker.hp)) targets = [attacker]
+    } else if (isAreaSpell(sn)) {
+      if (n.includes("desumo")) targets = state.filter((d) => !isDefeated(d.hp))
+      else if (n.includes("protego") && n.includes("diabol")) targets = state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
+      else targets = state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
+    } else {
+      const t = state.find((d) => d.id === action.targetId)
+      if (t && !isDefeated(t.hp)) targets = [t]
+    }
+    if (targets.length === 0) continue
+
+    animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetIds: targets.map((t) => t.id), targetId: targets[0]?.id, delay: 1200 })
+    logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} lançou ${sn}${isAreaSpell(sn) ? " em área" : ` em ${targets[0].name}`}!`)
+
+    const protegoBlocks = (def: Duelist) =>
+      def.debuffs.some((d) => d.type === "protego") && !def.debuffs.some((d) => d.type === "silence_defense") && !n.includes("diffindo")
+
+    const applySpellDebuffTo = (defenderId: string) => {
+      if (!spell.debuff) return
+      const before = state.find((d) => d.id === defenderId)
+      if (before?.debuffs.some((d) => d.type === "anti_debuff")) return
+      if (Math.random() * 100 <= spell.debuff.chance) {
+        let dur = spell.debuff.duration || 1
+        if (WAND_PASSIVES[attacker.wand]?.effect === "basilisk_debuff_duration") dur += 1
+        const meta = spell.debuff.type === "provoke" ? attacker.id : undefined
+        state = state.map((d) => (d.id === defenderId ? { ...d, debuffs: [...d.debuffs, { type: spell.debuff!.type as DebuffType, duration: dur, meta }] } : d))
+      }
+    }
+
+    const applyDamageWithCircum = (defId: string, dmg: number, dealerId: string, sourceSpellNorm?: string) => {
+      const def = state.find((d) => d.id === defId)
+      if (!def) return
+      if (
+        sourceSpellNorm &&
+        def.debuffs.some((d) => d.type === "protego_maximo") &&
+        (sourceSpellNorm.includes("crucius") || sourceSpellNorm.includes("avada") || sourceSpellNorm.includes("imperio") || sourceSpellNorm.includes("imperius"))
+      ) {
+        state = state.map((d) =>
+          d.id === defId ? { ...d, hp: healFlatTotal(d.hp, 500), debuffs: d.debuffs.filter((x) => x.type !== "protego_maximo") } : d
+        )
+        return
+      }
+      state = state.map((d) => (d.id === defId ? { ...d, hp: applyDamage(d.hp, dmg, { thestral: d.wand === "thestral" }) } : d))
+      if (def.debuffs.some((d) => d.type === "salvio_reflect") && dealerId !== defId && dmg > 0) {
+        state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, Math.round(dmg), { thestral: d.wand === "thestral" }) } : d))
+      }
+      const circumOn = (def.circumAura ?? 0) > 0 || (params.circumFlames[defId] ?? 0) > 0
+      if (circumOn && dealerId !== defId) {
+        state = state.map((d) =>
+          d.id === dealerId ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "burn"), { type: "burn", duration: 2 }] } : d
+        )
+      }
+    }
+
+    if (isSelfTargetSpell(sn)) {
+      if (n.includes("protego") && !n.includes("maximo") && !n.includes("diabol")) {
+        if (!attacker.lastRoundSpellWasProtego) {
+          state = state.map((d) =>
+            d.id === attacker.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "protego"), { type: "protego", duration: 1 }], lastRoundSpellWasProtego: true } : d
+          )
+        }
+      } else if (n.includes("ferula")) {
+        const healAmt = Math.floor(Math.random() * 141) + 10
+        state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d))
+      } else if (n.includes("circum")) {
+        state = state.map((d) => (d.id === attacker.id ? { ...d, circumAura: 3 } : d))
+      } else if (n.includes("maximos")) {
+        const pct = Math.floor(Math.random() * 91) + 10
+        state = state.map((d) => (d.id === attacker.id ? { ...d, maximosChargePct: pct } : d))
+      } else if (n.includes("salvio") && n.includes("hexia")) {
+        state = state.map((d) =>
+          d.id === attacker.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "salvio_reflect"), { type: "salvio_reflect", duration: 1 }] } : d
+        )
+      } else if (n.includes("vulnera") && n.includes("sanetur")) {
+        state = state.map((d) =>
+          d.id === attacker.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "anti_debuff"), { type: "anti_debuff", duration: 3 }] } : d
+        )
+      } else if (n.includes("episkey")) {
+        state = state.map((d) =>
+          d.id === attacker.id
+            ? { ...d, hp: healFlatTotal(d.hp, 50), debuffs: [...d.debuffs.filter((x) => x.type !== "crit_boost"), { type: "crit_boost", duration: 2 }] }
+            : d
+        )
+      } else if (n.includes("protego") && n.includes("maximo")) {
+        state = state.map((d) =>
+          d.id === attacker.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "protego_maximo"), { type: "protego_maximo", duration: 2 }] } : d
+        )
+      } else if (n.includes("finite") && n.includes("incantatem")) {
+        state = state.map((d) => (d.id === attacker.id ? { ...d, debuffs: [] } : d))
+      }
+    } else if (n.includes("fumus")) {
+      state = state.map((d) => ({
+        ...d,
+        debuffs: [],
+        disabledSpells: {},
+        nextAccBonusPct: undefined,
+        nextDamagePotionMult: undefined,
+        maximosChargePct: undefined,
+        circumAura: undefined,
+        destinyBond: false,
+      }))
+    } else if (isAreaSpell(sn) && getSpellMaxPower(spell) > 0) {
+      for (const t of targets) {
+        const streak = attacker.missStreakBySpell?.[sn] ?? 0
+        const hit = rollHit(attacker, t, spell, streak)
+        if (!hit) {
+          animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: true, isCrit: false, delay: 900 })
+          continue
+        }
+        let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t), n)
+        let isCrit = false
+        if (Math.random() < getCritChance(attacker, t, n)) {
+          damage *= 2
+          isCrit = true
+        }
+        if (protegoBlocks(t)) damage = 0
+        applyDamageWithCircum(t.id, damage, attacker.id, n)
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900 })
+        applySpellDebuffTo(t.id)
+      }
+    } else {
+      const target = targets[0]
+      const streak = attacker.missStreakBySpell?.[sn] ?? 0
+      const hit = rollHit(attacker, target, spell, streak)
+      if (hit) {
+        let damage = getSpellMaxPower(spell) > 0 ? calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n) : 0
+        let isCrit = false
+        if (damage > 0 && Math.random() < getCritChance(attacker, target, n)) {
+          damage *= 2
+          isCrit = true
+        }
+        if (protegoBlocks(target)) damage = 0
+        if (damage > 0) applyDamageWithCircum(target.id, damage, attacker.id, n)
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000 })
+        applySpellDebuffTo(target.id)
+      } else if (spell.special === "avada_miss_hp" && n.includes("avada")) {
+        state = state.map((d) => {
+          if (d.id !== attacker.id) return d
+          const bars = [...d.hp.bars]
+          for (let i = bars.length - 1; i >= 0; i--) {
+            if (bars[i] > 0) {
+              bars[i] = 0
+              break
+            }
+          }
+          return { ...d, hp: { bars } }
+        })
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 1000 })
+      } else {
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 900 })
+      }
+    }
+
+    state = state.map((d) => {
+      if (d.id !== attacker.id) return d
+      const sm = { ...(d.spellMana || {}) }
+      const slot = sm[sn]
+      if (slot) sm[sn] = { ...slot, current: Math.max(0, slot.current - 1) }
+      return {
+        ...d,
+        spellMana: sm,
+        lastSpellUsed: sn,
+        lastRoundSpellWasProtego: n.includes("protego") ? d.lastRoundSpellWasProtego : false,
+        lastRoundSpellWasLumus: n.includes("lumus") ? d.lastRoundSpellWasLumus : false,
+        nextAccBonusPct: undefined,
+        nextDamagePotionMult: undefined,
+      }
+    })
+
+    const atkAfter = state.find((x) => x.id === action.casterId)
+    if (atkAfter && WAND_PASSIVES[atkAfter.wand]?.effect === "phoenix_regen") {
+      const pct = Math.floor(Math.random() * 21) + 5
+      state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healCurrentBar(d.hp, pct) } : d))
+    }
+
+    const outcomeMid = evaluateOutcome(state)
+    if (outcomeMid) return { newDuelists: state, logs, animationsToPlay, outcome: outcomeMid, orderedActions }
+  }
+
+  state = state.map((d) => {
+    let hp = d.hp
+    if (d.debuffs.some((x) => x.type === "burn")) hp = applyDamage(hp, 15, { thestral: d.wand === "thestral" })
+    if (d.debuffs.some((x) => x.type === "poison")) hp = applyDamage(hp, 10, { thestral: d.wand === "thestral" })
+    return hp !== d.hp ? { ...d, hp } : d
+  })
+  state = state.map(reduceDebuffs)
+  state = state.map((d) => ({
+    ...d,
+    disabledSpells: Object.fromEntries(
+      Object.entries(d.disabledSpells || {})
+        .map(([k, v]) => [k, Math.max(0, Number(v) - 1)] as [string, number])
+        .filter(([, v]) => v > 0)
+    ),
+    turnsInBattle: (d.turnsInBattle ?? 0) + 1,
+  }))
+
+  return { newDuelists: state, logs, animationsToPlay, outcome: evaluateOutcome(state), orderedActions }
+}

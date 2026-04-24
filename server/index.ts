@@ -8,11 +8,11 @@ import express from "express"
 import { createServer } from "http"
 import { Server, type Socket } from "socket.io"
 import cors from "cors"
-import { calculateTurnOutcome, isDefeated, getTotalHP } from "../lib/turn-engine"
-import { HOUSE_GDD, HOUSE_MODIFIERS, WAND_PASSIVES, SPELL_DATABASE, rollSpellPower, type SpellInfo } from "../lib/data-store"
-import type { Duelist, HPState, DebuffType } from "../lib/arena-types"
-import type { RoundAction } from "../lib/duelActions"
-import type { PlayerBuild, GameMode } from "../lib/types"
+import { calculateTurnOutcome, isDefeated, getTotalHP } from "./lib/turn-engine"
+import { HOUSE_GDD, HOUSE_MODIFIERS, WAND_PASSIVES, SPELL_DATABASE, rollSpellPower, type SpellInfo } from "./lib/data-store"
+import type { Duelist, HPState, DebuffType } from "./lib/arena-types"
+import type { RoundAction } from "./lib/duelActions"
+import type { PlayerBuild, GameMode } from "./lib/types"
 
 const app = express()
 app.use(cors())
