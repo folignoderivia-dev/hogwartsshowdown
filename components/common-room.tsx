@@ -523,6 +523,15 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <p className="mt-1 text-amber-100/90">Monte sua Build e duele! Pvp Multiplayer</p>
           </div>
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2">
+            {/* Link de download do APK — gerado pelo GitHub Actions */}
+            <a
+              href="https://github.com/folignoderivia-dev/hogwartsshowdown/releases/latest/download/app-debug.apk"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-700 bg-emerald-950/50 px-3 py-1 text-xs font-medium text-emerald-300 transition-colors hover:bg-emerald-900/60 hover:text-emerald-200"
+            >
+              📲 Baixar APK
+            </a>
             <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
               🟢 {onlineWizards} Bruxos Online
             </Badge>
