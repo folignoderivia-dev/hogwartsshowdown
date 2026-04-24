@@ -241,7 +241,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const filteredSpells = SPELL_DATABASE.filter((spell) => {
     if (!spell.name.toLowerCase().includes(spellSearch.toLowerCase())) return false
     // Spells VIP-only só aparecem para VIPs
-    if (spell.isVipOnly && !isVip) return false
+    if (spell.isVipOnly && !(currentUser?.isVip ?? false)) return false
     return true
   }).sort((a, b) => {
     if (spellSort === "name") return a.name.localeCompare(b.name, "pt")
