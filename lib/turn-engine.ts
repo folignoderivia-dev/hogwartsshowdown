@@ -231,14 +231,18 @@ const effectiveSpeed = (d: Duelist) => {
   return s
 }
 
-export const getValidTargetsForSpell = (spellName: string, attacker: Duelist, state: Duelist[]) => {
+export const getValidTargetsForSpell = (spellName: string, attacker: Duelist, state: Duelist[], gameMode?: string) => {
+  // Em FFA cada jogador luta por si só — qualquer um vivo exceto o próprio é alvo válido
+  const isFfa = gameMode === "ffa" || gameMode === "ffa3"
   if (isSelfTargetSpell(spellName)) return state.filter((d) => d.id === attacker.id && !isDefeated(d.hp))
   if (isAreaSpell(spellName)) {
     const n = normSpell(spellName)
     if (n.includes("desumo")) return state.filter((d) => !isDefeated(d.hp))
     if (n.includes("protego") && n.includes("diabol")) return state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
+    if (isFfa) return state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
     return state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
   }
+  if (isFfa) return state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
   return state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
 }
 
@@ -441,12 +445,14 @@ export function calculateTurnOutcome(params: {
       }
     }
 
+    const isFfaMode = params.gameMode === "ffa" || params.gameMode === "ffa3"
     let targets: Duelist[] = []
     if (isSelfTargetSpell(sn)) {
       if (!isDefeated(attacker.hp)) targets = [attacker]
     } else if (isAreaSpell(sn)) {
       if (n.includes("desumo")) targets = state.filter((d) => !isDefeated(d.hp))
       else if (n.includes("protego") && n.includes("diabol")) targets = state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
+      else if (isFfaMode) targets = state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
       else targets = state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
     } else {
       const t = state.find((d) => d.id === action.targetId)

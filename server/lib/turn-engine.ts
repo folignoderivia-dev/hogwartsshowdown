@@ -239,14 +239,17 @@ const effectiveSpeed = (d: Duelist) => {
   return s
 }
 
-export const getValidTargetsForSpell = (spellName: string, attacker: Duelist, state: Duelist[]) => {
+export const getValidTargetsForSpell = (spellName: string, attacker: Duelist, state: Duelist[], gameMode?: string) => {
+  const isFfa = gameMode === "ffa" || gameMode === "ffa3"
   if (isSelfTargetSpell(spellName)) return state.filter((d) => d.id === attacker.id && !isDefeated(d.hp))
   if (isAreaSpell(spellName)) {
     const n = normSpell(spellName)
     if (n.includes("desumo")) return state.filter((d) => !isDefeated(d.hp))
     if (n.includes("protego") && n.includes("diabol")) return state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
+    if (isFfa) return state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
     return state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
   }
+  if (isFfa) return state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
   return state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
 }
 

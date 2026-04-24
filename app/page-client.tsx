@@ -98,10 +98,27 @@ export default function PageClient() {
     setPlayerBuild(build)
     if (typeof window !== "undefined") window.localStorage.setItem(`duel:lastBuild:${build.userId}`, JSON.stringify(build))
     void (async () => {
+      // Quadribol usa socket direto (código Q-XXXXX), não Supabase
+      if (build.gameMode === "quidditch" || matchId.startsWith("Q-")) {
+        const qBuild: PlayerBuild = { ...build, gameMode: "quidditch" }
+        setPlayerBuild(qBuild)
+        setActiveMatchId(matchId)
+        setMatchPending(false)
+        setIsSpectator(false)
+        setScreen("battle")
+        return
+      }
       const joined = await joinRoomById(matchId, build.userId!, build.username || build.name)
       attachMatch(build, joined)
     })()
   }
+
+  const handleQuidditchRoomsUpdate = useCallback((rooms: Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number }>) => {
+    setOpenRooms((prev) => {
+      const nonQ = prev.filter((r) => r.mode !== "quidditch")
+      return [...nonQ, ...rooms]
+    })
+  }, [])
 
   const handleReturnToCommonRoom = () => {
     setScreen("setup")
@@ -267,6 +284,7 @@ export default function PageClient() {
           onJoinRoom={handleJoinOpenRoom}
           onRefreshRooms={refreshOpenRooms}
           openRooms={openRooms}
+          onQuidditchRoomsUpdate={handleQuidditchRoomsUpdate}
           onSpectateMatch={handleSpectateMatch}
           resumableMatch={resumableMatch}
           onResumeMatch={handleResumeMatch}

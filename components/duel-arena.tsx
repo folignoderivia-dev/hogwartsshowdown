@@ -650,6 +650,14 @@ const DuelArena = (
     }
   }, [])
 
+  const ackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearAckTimeout = useCallback(() => {
+    if (ackTimeoutRef.current) {
+      clearTimeout(ackTimeoutRef.current)
+      ackTimeoutRef.current = null
+    }
+  }, [])
+
   /** Envia intenção de ação ao servidor Socket.io autoritativo. */
   const submitTurnAction = useCallback(
     (action: RoundAction) => {
@@ -666,6 +674,20 @@ const DuelArena = (
       setBattleMessage("Intenção enviada — aguardando resolução do servidor...")
       setDebugLastEvent(`SUBMIT_ACTION T${tn}`)
       socket.emit("SUBMIT_ACTION", { matchId, userId: selfDuelistId, turn: tn, action: payload })
+
+      // Timeout de segurança: se em 35s não houver resposta, desbloqueie o cliente
+      if (ackTimeoutRef.current) clearTimeout(ackTimeoutRef.current)
+      ackTimeoutRef.current = setTimeout(() => {
+        setAwaitingServerAck((prev) => {
+          if (prev) {
+            console.warn("[Arena] Timeout de ack — desbloqueando cliente.")
+            setBattleMessage("Sem resposta do servidor. Tente novamente.")
+            setBattleStatus("selecting")
+            setPotionUsed(false)
+          }
+          return false
+        })
+      }, 35_000)
     },
     [isOfflineMode, matchId, selfDuelistId]
   )
@@ -772,7 +794,7 @@ const DuelArena = (
     requestAnimationFrame(() => {
       setArenaVfx((prev) => (prev && prev.key === key ? { ...prev, active: true } : prev))
     })
-    await sleep(1000)
+    await sleep(1600)
     setArenaVfx(null)
   }
 
@@ -856,7 +878,9 @@ const DuelArena = (
       }))
     )
     setBattleStatus("selecting")
-    setTimeLeft(120)
+    // Não inicia/reinicia o timer para jogadores já eliminados
+    const selfAlive = state.some((d) => d.id === selfDuelistId && !isDefeated(d.hp))
+    if (selfAlive || !selfDuelistId) setTimeLeft(120)
     setPendingSpell(null)
     setBattleMessage("")
     setResidualBanner(null)
@@ -926,6 +950,7 @@ const DuelArena = (
     const roundTurn = turnNumberRef.current
     try {
       setBattleStatus("resolving")
+      clearAckTimeout()
       setAwaitingServerAck(false)
       setBattleMessage("")
       const snapshot = [...duelistsRef.current]
@@ -1019,6 +1044,7 @@ const DuelArena = (
     resolvingRef.current = true
     try {
       setBattleStatus("resolving")
+      clearAckTimeout()
       setAwaitingServerAck(false)
       setBattleMessage("")
       setDebugLastEvent(`TURN_RESOLVED T${data.nextTurn - 1}`)
@@ -1061,7 +1087,7 @@ const DuelArena = (
         if (anim.type === "cast" && caster && anim.spellName) {
           if (!anim.fctOnly) {
             // VFX visual: dispara apenas uma vez (animação geral com todos os alvos)
-            await sleep(300)
+            await sleep(500)
             await playSpellVfx(anim.spellName, caster, targets)
           }
 
@@ -1073,26 +1099,26 @@ const DuelArena = (
             const pos = getFCTPos(t.id)
             const id = ++fctCounterRef.current
             setFloatingTexts((prev) => [...prev, { id, text: fctData.text, type: fctData.type, x: pos.x, y: pos.y }])
-            setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2200)
+            setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 3200)
           }
         } else if (anim.type === "skip" && caster) {
           const pos = getFCTPos(caster.id)
           const id = ++fctCounterRef.current
           setFloatingTexts((prev) => [...prev, { id, text: `${caster.name} Atordoado!`, type: "skip", x: pos.x, y: pos.y }])
-          setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2200)
-          await sleep(300)
+          setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 3200)
+          await sleep(500)
         } else if (anim.type === "potion" && caster) {
           const pos = getFCTPos(caster.id)
           const id = ++fctCounterRef.current
           const potionLabel = anim.potionType ? (POTION_NAMES[anim.potionType] ?? anim.potionType) : "Poção"
           setFloatingTexts((prev) => [...prev, { id, text: `🧪 ${potionLabel}!`, type: "heal", x: pos.x, y: pos.y }])
-          setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2200)
+          setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 3200)
           // Animação de frasco/brilho sobre o avatar
           setPotionGlowId(caster.id)
-          setTimeout(() => setPotionGlowId(null), 1200)
-          await sleep(400)
+          setTimeout(() => setPotionGlowId(null), 1800)
+          await sleep(700)
         }
-        await sleep(anim.delay ?? 900)
+        await sleep(anim.delay ?? 1300)
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1230,6 +1256,17 @@ const DuelArena = (
 
     socket.on("ERROR", ({ message }: { message: string }) => {
       console.warn("[Socket] Erro do servidor:", message)
+      // Desbloqueia o cliente se estava aguardando resposta
+      setAwaitingServerAck(false)
+      setPotionUsed((prev) => {
+        // Se a poção foi marcada como usada mas o servidor não processou, reverte
+        if (prev) {
+          setBattleMessage(`Ação rejeitada: ${message}`)
+          return false
+        }
+        return prev
+      })
+      setBattleStatus("selecting")
     })
 
     socket.on("emoji_received", ({ userId, emoji }: { userId: string; emoji: string }) => {
@@ -1428,9 +1465,10 @@ const DuelArena = (
       return
     }
     if (isAreaSpell(spellName)) {
-      const anchor =
-        duelists.find((d) => d.team !== player.team && !isDefeated(d.hp)) ||
-        duelists.find((d) => !isDefeated(d.hp))
+      const isFfa = playerBuild.gameMode === "ffa" || playerBuild.gameMode === "ffa3"
+      const anchor = isFfa
+        ? duelists.find((d) => d.id !== player.id && !isDefeated(d.hp))
+        : (duelists.find((d) => d.team !== player.team && !isDefeated(d.hp)) || duelists.find((d) => !isDefeated(d.hp)))
       if (!anchor) return
       commitCast(anchor.id, true)
       return
@@ -1455,7 +1493,7 @@ const DuelArena = (
     if (!selfDuelistId) return
     if (!pendingSpell || !player || playerDefeated || battleStatus !== "selecting" || awaitingServerAck) return
     if (!isOnlineMatch && pendingActions[selfDuelistId]) return
-    const valid = getValidTargetsForSpell(pendingSpell, player, duelists).some((d) => d.id === targetId && !isDefeated(d.hp))
+    const valid = getValidTargetsForSpell(pendingSpell, player, duelists, playerBuild.gameMode).some((d) => d.id === targetId && !isDefeated(d.hp))
     if (!valid) return
     const prov = player.debuffs.find((d) => d.type === "provoke")
     if (prov?.meta && targetId !== prov.meta) return
@@ -1556,7 +1594,7 @@ const DuelArena = (
     const avatarKey = duelist.avatar || DEFAULT_AVATARS[(duelist.id.charCodeAt(duelist.id.length - 1) || 0) % DEFAULT_AVATARS.length]
     const avatar = AVATAR_IMAGES[avatarKey]
     const dead = isDefeated(duelist.hp)
-    const targetable = pendingSpell && player ? getValidTargetsForSpell(pendingSpell, player, duelists).some((d) => d.id === duelist.id && !isDefeated(d.hp)) : false
+    const targetable = pendingSpell && player ? getValidTargetsForSpell(pendingSpell, player, duelists, playerBuild.gameMode).some((d) => d.id === duelist.id && !isDefeated(d.hp)) : false
     return (
       <button
         ref={(el) => {
@@ -1960,7 +1998,18 @@ const DuelArena = (
             <p className="mb-2 text-xs text-amber-300">Conectando ao servidor de batalha...</p>
           )}
           {isReadOnlySpectator && <p className="mb-2 text-xs text-blue-300">Modo espectador: comandos de combate desabilitados.</p>}
-          {playerDefeated && <p className="mb-2 text-xs text-red-300">Você foi derrotado e agora é espectador.</p>}
+          {playerDefeated && !gameOver && (
+            <div className="mb-3 rounded-lg border border-red-800/60 bg-red-950/50 px-3 py-2 text-center">
+              <p className="text-sm font-bold text-red-300">💀 Você foi eliminado!</p>
+              <p className="text-xs text-red-400/80">Agora é espectador — acompanhe a batalha até o fim.</p>
+              {(() => {
+                const survivors = duelists.filter((d) => !isDefeated(d.hp) && d.id !== selfDuelistId)
+                return survivors.length > 0 ? (
+                  <p className="mt-1 text-xs text-amber-300/70">Sobreviventes: {survivors.map((d) => d.name).join(", ")}</p>
+                ) : null
+              })()}
+            </div>
+          )}
           {!playerDefeated && battleStatus === "selecting" && !isOnlineMatch && selfDuelistId && pendingActions[selfDuelistId] && (
             <p className="mb-2 text-xs text-amber-300">Aguardando outros bruxos...</p>
           )}
@@ -1970,7 +2019,7 @@ const DuelArena = (
           {playerCannotAct && !playerDefeated && selfDuelistId && !pendingActions[selfDuelistId] && <p className="mb-2 text-xs text-red-300">Você está sob Freeze/Stun e não pode agir neste turno.</p>}
           {pendingSpell && <p className="mb-2 text-xs text-amber-300">Feitiço selecionado: {pendingSpell}. Escolha um alvo.</p>}
 
-          {!isReadOnlySpectator && (isOnlineMatch ? !awaitingServerAck : !selfDuelistId || !pendingActions[selfDuelistId]) && (
+          {!isReadOnlySpectator && !playerDefeated && (isOnlineMatch ? !awaitingServerAck : !selfDuelistId || !pendingActions[selfDuelistId]) && (
             <div className="mb-2 flex flex-wrap gap-2">
               {playerBuild.spells.map((spell) => {
                 const mana = player?.spellMana?.[spell]

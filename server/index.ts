@@ -479,6 +479,7 @@ io.on("connection", (socket: Socket) => {
       }
       if (turn !== room.turnNumber) {
         console.warn(`[Server] SUBMIT_ACTION turno errado: esperado ${room.turnNumber}, recebido ${turn}`)
+        socket.emit("SYNC_ERROR", { message: `Turno inválido: esperado T${room.turnNumber}, recebido T${turn}. Ação descartada — aguarde o turno correto.` })
         return
       }
 
@@ -684,7 +685,19 @@ io.on("connection", (socket: Socket) => {
       gameStarted: r.gameStarted,
       playerNames: [...r.players.values()].map((p) => p.build.name),
     }))
-    socket.emit("active_matches_update", { rooms, recentMatches: recentMatches.slice(0, 10) })
+    // Inclui salas de Quadribol aguardando 2º jogador
+    const waitingQuidditch = [...quidditchRooms.values()]
+      .filter((q) => q.players.size === 1)
+      .map((q) => ({
+        matchId: q.matchId,
+        gameMode: "quidditch" as const,
+        playersJoined: 1,
+        playersExpected: 2,
+        turnNumber: 0,
+        gameStarted: false,
+        playerNames: [...q.players.values()].map((p) => p.name),
+      }))
+    socket.emit("active_matches_update", { rooms, recentMatches: recentMatches.slice(0, 10), waitingQuidditch })
   })
 
   // ── LEAVE_MATCH ───────────────────────────────────────────────────────────────

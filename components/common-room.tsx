@@ -42,6 +42,7 @@ interface CommonRoomProps {
   onJoinRoom?: (build: PlayerBuild, matchId: string) => void
   onRefreshRooms?: () => void
   openRooms?: Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number }>
+  onQuidditchRoomsUpdate?: (rooms: Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number }>) => void
   onSpectateMatch: (matchId: string, mode: PlayerBuild["gameMode"]) => void
   onResumeMatch?: () => void
   resumableMatch?: { matchId: string; mode: PlayerBuild["gameMode"]; status: "waiting" | "in_progress" } | null
@@ -130,7 +131,7 @@ const GAME_MODES = [
 const MAX_SPELL_POINTS = 6
 const MAX_UNFORGIVABLE = 1
 
-export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, onJoinRoom, onRefreshRooms, openRooms = [], onSpectateMatch, onResumeMatch, resumableMatch, currentUser, onAuthChange }: CommonRoomProps) {
+export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, onJoinRoom, onRefreshRooms, openRooms = [], onQuidditchRoomsUpdate, onSpectateMatch, onResumeMatch, resumableMatch, currentUser, onAuthChange }: CommonRoomProps) {
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
   const [authEmail, setAuthEmail] = useState("")
@@ -387,7 +388,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     const sock = ioClient(socketUrl, { transports: ["polling", "websocket"], autoConnect: true })
     lobbySocketRef.current = sock
     sock.on("connect", () => { sock.emit("LIST_ACTIVE_MATCHES") })
-    sock.on("active_matches_update", (data: { rooms: any[]; recentMatches: any[] }) => {
+    sock.on("active_matches_update", (data: { rooms: any[]; recentMatches: any[]; waitingQuidditch?: any[] }) => {
       setDuelsInProgress(
         (data.rooms || [])
           .filter((r) => r.gameStarted)
@@ -407,8 +408,20 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         }
         return merged.sort((a, b) => (b.finishedAt > a.finishedAt ? 1 : -1)).slice(0, 10)
       })
+      // Propaga salas de Quadribol aguardando oponente para o pai (page-client)
+      if (onQuidditchRoomsUpdate) {
+        const qWaiting = (data.waitingQuidditch || []).map((q: any) => ({
+          matchId: q.matchId as string,
+          mode: "quidditch" as PlayerBuild["gameMode"],
+          host: q.playerNames?.[0] || "Bruxo",
+          playersJoined: 1,
+          playersExpected: 2,
+        }))
+        onQuidditchRoomsUpdate(qWaiting)
+      }
     })
     return () => { sock.disconnect(); lobbySocketRef.current = null }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Carrega histórico persistente do Supabase ao montar
@@ -543,8 +556,28 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   }
 
   const handleJoinRoomClick = (matchId: string) => {
+    if (!currentUser || !onJoinRoom) return
+    const room = openRooms.find((r) => r.matchId === matchId)
+    // Salas de Quadribol não exigem build completo — usa payload mínimo
+    if (room?.mode === "quidditch") {
+      const qPayload: PlayerBuild = {
+        name: currentUser.username,
+        house: house || "ravenclaw",
+        wand: wand || "unicorn",
+        potion: potion || "foco",
+        spells: selectedSpells,
+        avatar,
+        gameMode: "quidditch",
+        userId: currentUser.id,
+        username: currentUser.username,
+        elo: currentUser.elo,
+        isVip,
+      }
+      onJoinRoom(qPayload, matchId)
+      return
+    }
     const payload = buildPayload()
-    if (!payload || !onJoinRoom) return
+    if (!payload) return
     onJoinRoom(payload, matchId)
   }
 
@@ -934,21 +967,24 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 <p className="text-xs text-amber-200/95">Nenhuma sala esperando jogadores.</p>
               ) : (
                 <div className="space-y-2">
-                  {openRooms.map((r) => (
+                  {openRooms.map((r) => {
+                    const modeLabel = r.mode === "1v1" ? "Duelo 1v1" : r.mode === "2v2" ? "Batalha 2v2" : r.mode === "ffa" ? "All In One (4)" : r.mode === "ffa3" ? "All In One (3)" : r.mode === "quidditch" ? "🏆 Quadribol" : r.mode.toUpperCase()
+                    return (
                     <div key={r.matchId} className="flex flex-col gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-amber-100">
-                        {r.mode.toUpperCase()} · Host: {r.host} · {r.playersJoined}/{r.playersExpected}
+                        {modeLabel} · Host: {r.host} · {r.playersJoined}/{r.playersExpected}
                       </span>
                       <Button
                         size="sm"
                         className="h-7 border border-amber-700 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50"
                         onClick={() => handleJoinRoomClick(r.matchId)}
-                        disabled={!isReady}
+                        disabled={!currentUser}
                       >
                         Entrar
                       </Button>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
@@ -1756,9 +1792,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             {gameMode !== "teste" && gameMode !== "challenge" && (
               <Button
                 size="lg"
-                disabled={!isReady || openRooms.length === 0}
+                disabled={!isReady || !openRooms.some((r) => !gameMode || r.mode === gameMode)}
                 onClick={() => {
-                  const first = openRooms[0]
+                  const first = openRooms.find((r) => !gameMode || r.mode === gameMode) || openRooms[0]
                   if (first) handleJoinRoomClick(first.matchId)
                 }}
                 className="medieval-frame w-full border border-amber-700 bg-amber-900/50 px-4 py-3 text-sm sm:px-6 sm:py-4 sm:text-base font-bold text-amber-100 hover:bg-amber-800/60"
