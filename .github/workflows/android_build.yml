@@ -12,6 +12,8 @@ jobs:
   build:
     name: Build APK (Capacitor Remote App)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # necessário para criar GitHub Releases
 
     steps:
       # ── 1. Checkout ───────────────────────────────────────────────────────────
