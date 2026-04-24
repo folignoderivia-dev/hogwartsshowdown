@@ -3,7 +3,7 @@ import type { PlayerBuild } from "@/lib/types"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
 
-/** PvP: persistência de turno em `public.match_turns.action_payload` (jsonb) — ver `DuelArena` / `persistTurnBackup`. */
+/** PvP: matchmaking via Supabase (criação de sala). Combate em tempo real via Socket.io (server/index.ts). */
 
 export interface ExternalMatchState {
   matchId: string
@@ -229,6 +229,7 @@ export function useMatchManager() {
         })
         .select("match_id,mode,status,players_expected,players_joined,p1_id,p2_id,p3_id,p4_id,p1_name,p2_name,p3_name,p4_name,current_turn_owner")
         .single()
+      if (!created) throw new Error("Não foi possível criar a sala")
       await supabase.from("match_players").upsert({ match_id: created.match_id, player_id: playerId }, { onConflict: "match_id,player_id" })
       await supabase.from("match_ready_states").upsert(
         { match_id: created.match_id, player_id: playerId, is_ready: false, updated_at: new Date().toISOString() },
@@ -470,58 +471,6 @@ export function useMatchManager() {
     // Fonte de verdade passa a ser o banco, então aqui só atualizamos estado local.
   }, [])
 
-  const subscribeToMatch = useCallback(
-    (
-      matchId: string,
-      handlers: {
-        onState?: (state: ExternalMatchState) => void
-      }
-    ) => {
-      const supabase = getSupabaseClient()
-      // Remove canal com mesmo tópico antes de criar (evita reutilizar canal já subscrito).
-      const channelName = `match-meta-${matchId}`
-      for (const existing of supabase.getChannels()) {
-        if (existing.topic === channelName || existing.topic === `realtime:${channelName}`) {
-          void supabase.removeChannel(existing)
-        }
-      }
-      const channel = supabase.channel(channelName)
-      // Todos os .on() ANTES de subscribe().
-      channel.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "matches", filter: `match_id=eq.${matchId}` },
-        (evt: any) => {
-          const row = evt.new || evt.old
-          if (!row) return
-          const ids = [row.p1_id, row.p2_id, row.p3_id, row.p4_id].filter(
-            (id): id is string => typeof id === "string" && id.length > 0
-          )
-          handlers.onState?.({
-            matchId: row.match_id,
-            status: row.status,
-            playersExpected: row.players_expected,
-            playersJoined: row.players_joined,
-            participantIds: ids,
-            participantNames: ids.map((id) => {
-              if (id === row.p1_id) return row.p1_name || "Bruxo"
-              if (id === row.p2_id) return row.p2_name || "Bruxo"
-              if (id === row.p3_id) return row.p3_name || "Bruxo"
-              return row.p4_name || "Bruxo"
-            }),
-            mode: row.mode,
-            currentTurnOwner: row.current_turn_owner || row.p1_id,
-          })
-        }
-      )
-      channel.subscribe()
-
-      return () => {
-        void supabase.removeChannel(channel)
-      }
-    },
-    []
-  )
-
   return {
     externalMatchState,
     queuedPayloads,
@@ -535,6 +484,5 @@ export function useMatchManager() {
     fetchInProgressMatches,
     handleAction,
     applyExternalState,
-    subscribeToMatch,
   }
 }

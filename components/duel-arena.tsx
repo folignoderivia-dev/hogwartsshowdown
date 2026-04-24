@@ -6,13 +6,15 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, type SpellInfo, WAND_PASSIVES } from "@/lib/data-store"
-import type { ArenaVfxState, BattleStatus, Duelist, Point } from "@/lib/arena-types"
+import type { ArenaVfxState, BattleStatus, Duelist, HPState, DebuffType, Point } from "@/lib/arena-types"
 import type { PlayerBuild } from "@/lib/types"
 import { useArenaMatchSync } from "@/hooks/useArenaMatchSync"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
+import { io, type Socket } from "socket.io-client"
 import {
   calculateTurnOutcome,
+  type EngineAnimation,
   getSpellInfo,
   getSpellMaxPower,
   getTotalHP,
@@ -402,7 +404,7 @@ const DuelArena = (
   const buildChallengeRound = useCallback((stage: number): Duelist[] => {
     const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
     const playerDuelist: Duelist = {
-      id: selfDuelistId,
+      id: selfDuelistId ?? "",
       name: playerBuild.name,
       house: playerBuild.house,
       wand: playerBuild.wand,
@@ -512,19 +514,24 @@ const DuelArena = (
   const resolvingRef = useRef(false)
   const botTimeoutsRef = useRef<number[]>([])
   const [awaitingServerAck, setAwaitingServerAck] = useState(false)
-  /** Só fica true ao receber `GAME_START` via broadcast (inclui eco self:true). */
+  /** True após receber GAME_START via Socket.io. */
   const [gameStartAcknowledged, setGameStartAcknowledged] = useState(isOfflineMode)
-  const [knownBroadcastPlayers, setKnownBroadcastPlayers] = useState<string[]>(isOfflineMode ? [selfDuelistId] : [selfDuelistId].filter(Boolean))
-  /** Canal `match-${matchId}`: presence + postgres_changes (sem broadcast de turno). */
-  const [matchChannelConnected, setMatchChannelConnected] = useState(false)
-  const [channelSubscribeError, setChannelSubscribeError] = useState("")
+  const [knownBroadcastPlayers, setKnownBroadcastPlayers] = useState<string[]>(isOfflineMode ? [selfDuelistId ?? ""] : selfDuelistId ? [selfDuelistId] : [])
+  /** Estado do socket.io */
+  const [socketConnected, setSocketConnected] = useState(false)
+  const [socketDisconnected, setSocketDisconnected] = useState(false)
   const [debugLastEvent, setDebugLastEvent] = useState("")
-  const matchRealtimeChannelRef = useRef<ReturnType<ReturnType<typeof getSupabaseClient>["channel"]> | null>(null)
-  /** PvP Showdown: ações por turno vindas só do ledger `match_turns` (INSERT/UPDATE). */
-  const onlineActionsByTurnRef = useRef<Record<number, Record<string, RoundAction>>>({})
-  const postgresTurnRowDedupeRef = useRef<Set<string>>(new Set())
-  const onlineSelfSubmittedRef = useRef(false)
+  /** Ref para a instância do socket (singleton por partida) */
+  const socketRef = useRef<Socket | null>(null)
   const runResolutionRef = useRef<(actions: RoundAction[]) => Promise<void>>(async () => {})
+  const handleTurnResolvedRef = useRef<((data: {
+    animationsToPlay: EngineAnimation[]
+    newDuelists: Duelist[]
+    outcome: "win" | "lose" | null
+    logs: string[]
+    nextTurn: number
+    circumFlames?: Record<string, number>
+  }) => Promise<void>) | null>(null)
   const duelistsRef = useRef<Duelist[]>([])
   const turnNumberRef = useRef(turnNumber)
   const battleStatusRef = useRef<BattleStatus>("idle")
@@ -546,108 +553,24 @@ const DuelArena = (
     setBattleLog((prev) => [...prev, line])
   }, [])
 
-  const mergeDuelistsFromPlayerIds = useCallback(
-    (ids: string[]) => {
-      const unique = [...new Set(ids.filter(Boolean))].sort()
-      if (unique.length === 0) return
-      setDuelists((prev) => {
-        const base = buildOnlineDuelists(unique)
-        const merged = base.map((d) => {
-          const old = prev.find((p) => p.id === d.id)
-          return old ? { ...d, hp: old.hp, debuffs: old.debuffs, spellMana: old.spellMana || d.spellMana } : d
-        })
-        return Array.from(new Map(merged.map((d) => [d.id, d])).values())
-      })
-    },
-    [buildOnlineDuelists]
-  )
-
-  /** Backup REST/RPC: coluna obrigatória `action_payload` (jsonb) em `public.match_turns`. */
-  const persistTurnBackup = useCallback(
-    async (payload: RoundAction): Promise<boolean> => {
-      if (!matchId || !selfDuelistId) return false
-      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
-      const isTransientSchemaOrCacheError = (err: { code?: string; message?: string } | null) => {
-        if (!err) return false
-        const m = (err.message || "").toLowerCase()
-        return (
-          err.code === "42703" ||
-          err.code === "PGRST204" ||
-          m.includes("action_payload") ||
-          m.includes("schema cache") ||
-          (m.includes("could not find") && m.includes("column"))
-        )
-      }
-
-      try {
-        const supabase = getSupabaseClient()
-        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession()
-        if (sessionErr) console.warn("[Arena] getSession:", sessionErr.message, sessionErr)
-        if (!sessionData?.session) {
-          console.warn("[Arena] persist: sem sessão JWT (mobile: storage bloqueado ou login expirado).")
-        }
-
-        const tn = turnNumberRef.current
-        if (tn === 1) await wait(500)
-
-        const row = {
-          match_id: matchId,
-          turn_number: tn,
-          player_id: selfDuelistId,
-          action_payload: payload as unknown as Record<string, unknown>,
-          updated_at: new Date().toISOString(),
-        }
-
-        for (let attempt = 0; attempt < 3; attempt++) {
-          if (attempt > 0) await wait(500)
-          const { error } = await supabase.from("match_turns").upsert(row, { onConflict: "match_id,turn_number,player_id" })
-          if (!error) return true
-          console.warn("[Arena] match_turns upsert:", error.message, error.code, error.details, error.hint, error)
-          if (!isTransientSchemaOrCacheError(error)) break
-        }
-
-        const { error: rpcErr } = await supabase.rpc("submit_duel_turn", {
-          p_match_id: matchId,
-          p_turn_number: tn,
-          p_player_id: selfDuelistId,
-          p_action_payload: payload as unknown as Record<string, unknown>,
-        })
-        if (rpcErr) {
-          console.warn("[Arena] submit_duel_turn RPC:", rpcErr.message, rpcErr.code, rpcErr.details, rpcErr)
-          addLog(`[Backup]: falha turno ${tn} (upsert + RPC).`)
-          setChannelSubscribeError((prev) => prev || `DB ${rpcErr.code ?? ""}: ${rpcErr.message}`)
-          return false
-        }
-        return true
-      } catch (e) {
-        console.warn("[Arena] persistTurnBackup exception:", e)
-        return false
-      }
-    },
-    [addLog, matchId, selfDuelistId]
-  )
-
+  /** Envia intenção de ação ao servidor Socket.io autoritativo. */
   const submitTurnAction = useCallback(
-    async (action: RoundAction) => {
+    (action: RoundAction) => {
       if (isOfflineMode || !matchId || !selfDuelistId) return
+      const socket = socketRef.current
+      if (!socket?.connected) {
+        console.warn("[Arena] SUBMIT_ACTION: socket desconectado.")
+        return
+      }
       const tn = turnNumberRef.current
       const eventId = action.eventId || `${selfDuelistId}-${tn}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       const payload: RoundAction = { ...action, casterId: selfDuelistId, turnId: tn, eventId }
       setAwaitingServerAck(true)
-      setBattleMessage("Intenção enviada — aguardando ledger do servidor...")
-      setDebugLastEvent(`TURN_INTENT tx T${tn}`)
-      void persistTurnBackup(payload).then((ok) => {
-        if (!ok) {
-          console.warn("[Arena] persistTurnBackup retornou false (turno", tn, ")")
-          onlineSelfSubmittedRef.current = false
-          setAwaitingServerAck(false)
-          setBattleMessage("Falha ao gravar turno. Tente de novo.")
-          return
-        }
-        onlineSelfSubmittedRef.current = true
-      })
+      setBattleMessage("Intenção enviada — aguardando resolução do servidor...")
+      setDebugLastEvent(`SUBMIT_ACTION T${tn}`)
+      socket.emit("SUBMIT_ACTION", { matchId, userId: selfDuelistId, turn: tn, action: payload })
     },
-    [isOfflineMode, matchId, persistTurnBackup, selfDuelistId]
+    [isOfflineMode, matchId, selfDuelistId]
   )
   const arenaRef = useRef<HTMLDivElement | null>(null)
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -668,7 +591,7 @@ const DuelArena = (
   } = useArenaMatchSync({
     gameMode: playerBuild.gameMode,
     matchId,
-    selfDuelistId,
+    selfDuelistId: selfDuelistId ?? "",
     participantIds,
     expectedOnlinePlayers,
   })
@@ -680,21 +603,8 @@ const DuelArena = (
   useEffect(() => {
     if (!isOnlineMatch) {
       setGameStartAcknowledged(true)
-      return
     }
-    if (!matchId) {
-      setGameStartAcknowledged(false)
-    }
-  }, [isOnlineMatch, matchId])
-
-  useEffect(() => {
-    if (!isOnlineMatch || matchStatus !== "finished") return
-    resolvingRef.current = false
-    setAwaitingServerAck(false)
-    setBattleMessage("Partida finalizada no servidor.")
-    setGameOver((prev) => prev ?? "timeout")
-    setBattleStatus("finished")
-  }, [isOnlineMatch, matchStatus])
+  }, [isOnlineMatch])
 
   const playSpellVfx = async (spellName: string, attacker: Duelist, targets: Duelist[]) => {
     const arena = arenaRef.current
@@ -822,11 +732,6 @@ const DuelArena = (
   const beginRoundSelection = (state: Duelist[] = duelists) => {
     if (gameOver) return
     const rt = turnNumberRef.current
-    if (isOnlineMatch) {
-      onlineActionsByTurnRef.current = {}
-      postgresTurnRowDedupeRef.current.clear()
-      onlineSelfSubmittedRef.current = false
-    }
     setCircumFlames((prev) => {
       const next: Record<string, number> = {}
       for (const [id, turns] of Object.entries(prev)) {
@@ -895,7 +800,7 @@ const DuelArena = (
     }
 
     const localPlayer = state.find((d) => d.id === selfDuelistId)
-    if (!isOnlineMatch) {
+    if (!isOnlineMatch && selfDuelistId) {
       if (!localPlayer || isDefeated(localPlayer.hp)) {
         initialActions[selfDuelistId] = { casterId: selfDuelistId, type: "skip", turnId: rt }
       } else if (localPlayer.debuffs.some((d) => d.type === "stun" || d.type === "freeze")) {
@@ -905,39 +810,16 @@ const DuelArena = (
     setPendingActions(initialActions)
   }
 
+  /** Resolução local (somente modo offline/PvE). */
   const runResolution = async (queuedActions: RoundAction[]) => {
     if (resolvingRef.current) return
     resolvingRef.current = true
     const roundTurn = turnNumberRef.current
     try {
       setBattleStatus("resolving")
-      if (!isOnlineMatch) {
-        setAwaitingServerAck(false)
-      }
+      setAwaitingServerAck(false)
       setBattleMessage("")
       const snapshot = [...duelistsRef.current]
-      const aliveIds = snapshot.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
-      if (aliveIds.length > 0 && isOnlineMatch) {
-        const byCaster = new Map(queuedActions.map((a) => [a.casterId, a]))
-        const syncBad = aliveIds.some((id) => {
-          const a = byCaster.get(id)
-          return !a || a.turnId !== roundTurn
-        })
-        if (syncBad) {
-          console.warn("[Arena] runResolution: fila de ações incompleta ou turnId divergente", {
-            aliveIds,
-            roundTurn,
-            queued: queuedActions,
-          })
-          addLog(`[Sync]: erro de sincronia no turno ${roundTurn}.`)
-          setBattleMessage("Erro de Sincronia: Tentando novamente...")
-          setPendingActions({})
-          delete onlineActionsByTurnRef.current[roundTurn]
-          setAwaitingServerAck(false)
-          setBattleStatus("selecting")
-          return
-        }
-      }
 
       let outcome: ReturnType<typeof calculateTurnOutcome>
       try {
@@ -952,44 +834,12 @@ const DuelArena = (
       } catch (engineErr) {
         console.warn("[Arena] calculateTurnOutcome:", engineErr)
         addLog(`[Engine]: exceção no turno ${roundTurn} — abortando resolução.`)
-        setBattleMessage("Erro de Sincronia: Tentando novamente...")
-        if (isOnlineMatch) {
-          setPendingActions({})
-          delete onlineActionsByTurnRef.current[roundTurn]
-          setAwaitingServerAck(false)
-        }
         setBattleStatus("selecting")
         return
       }
-      let state = outcome.newDuelists
-      if (isOnlineMatch) {
-        state = Array.from(new Map(state.map((d) => [d.id, d])).values())
-      }
-      for (const anim of outcome.animationsToPlay) {
-        if (isOnlineMatch && matchStatus === "finished") {
-          setAwaitingServerAck(false)
-          setGameOver((prev) => prev ?? "timeout")
-          setBattleStatus("finished")
-          return
-        }
-        const caster = state.find((d) => d.id === anim.casterId)
-        const resolvedTargetIds = anim.targetIds?.length ? anim.targetIds : anim.targetId ? [anim.targetId] : []
-        const targets = state.filter((d) => resolvedTargetIds.includes(d.id))
-        if (anim.type === "cast" && caster && anim.spellName) {
-          const prefix = anim.isMiss ? "ERROU" : "CONJUROU"
-          const critText = anim.isCrit ? " (CRIT!)" : ""
-          setResolutionText(`${caster.name} ${prefix} ${anim.spellName}!${critText}`)
-          setBattleMessage(`${caster.name} ${prefix} ${anim.spellName}!${critText}`)
-          await sleep(500)
-          await playSpellVfx(anim.spellName, caster, targets)
-          setResolutionText("")
-        } else if (anim.type === "potion" && caster) {
-          setResolutionText(`${caster.name} usou poção!`)
-          await sleep(500)
-          setResolutionText("")
-        }
-        await sleep(anim.delay ?? 900)
-      }
+
+      const state = outcome.newDuelists
+      await playAnimations(outcome.animationsToPlay, state)
 
       setDuelists(state)
       setBattleLog((prev) => [...prev, ...outcome.logs])
@@ -1007,11 +857,7 @@ const DuelArena = (
       const nextTurn = roundTurn + 1
       turnNumberRef.current = nextTurn
       setTurnNumber(nextTurn)
-      if (isOnlineMatch) {
-        delete onlineActionsByTurnRef.current[resolvedTurn]
-        setAwaitingServerAck(false)
-        setBattleMessage("")
-      }
+
       if (outcome.outcome) {
         if (playerBuild.gameMode === "challenge" && outcome.outcome === "win" && challengeStage < CHALLENGE_LABELS.length - 1) {
           const nextStage = challengeStage + 1
@@ -1043,10 +889,6 @@ const DuelArena = (
     } catch (e) {
       console.error("[Arena] runResolution", e)
       addLog("[Engine]: erro na resolução do turno; estado revertido para seleção.")
-      if (isOnlineMatch) {
-        setAwaitingServerAck(false)
-        delete onlineActionsByTurnRef.current[roundTurn]
-      }
       setBattleStatus("selecting")
     } finally {
       resolvingRef.current = false
@@ -1055,160 +897,224 @@ const DuelArena = (
 
   runResolutionRef.current = runResolution
 
-  const tryFlushOnlineTurnFromServer = useCallback(() => {
-    if (!isOnlineMatch || !matchId || !selfDuelistId) return
+  /** Reproduz resolução de turno enviada pelo servidor Socket.io (online). */
+  handleTurnResolvedRef.current = async (data: {
+    animationsToPlay: EngineAnimation[]
+    newDuelists: Duelist[]
+    outcome: "win" | "lose" | null
+    logs: string[]
+    nextTurn: number
+    circumFlames?: Record<string, number>
+  }) => {
     if (resolvingRef.current) return
-    if (battleStatusRef.current !== "selecting") return
-    const tn = turnNumberRef.current
-    const alive = duelistsRef.current.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
-    if (alive.length === 0) return
-    const buf = onlineActionsByTurnRef.current[tn] || {}
-    const allReady = alive.every((id) => {
-      const a = buf[id]
-      return !!a && a.turnId === tn
-    })
-    if (!allReady) return
-    const actionList = alive.map((id) => buf[id]!)
-    setDebugLastEvent(`SHOWDOWN_FLUSH T${tn}`)
-    void runResolutionRef.current(actionList)
-  }, [isOnlineMatch, matchId, selfDuelistId])
+    resolvingRef.current = true
+    try {
+      setBattleStatus("resolving")
+      setAwaitingServerAck(false)
+      setBattleMessage("")
+      setDebugLastEvent(`TURN_RESOLVED T${data.nextTurn - 1}`)
 
-  const ingestMatchTurnRow = useCallback(
-    (row: { id?: number | string; turn_number?: number; player_id?: string; action_payload?: RoundAction }) => {
-      const tn = Number(row.turn_number)
-      const pid = String(row.player_id || "")
-      if (!pid || row.action_payload == null) return
-      const dedupeKey = row.id != null && String(row.id).length > 0 ? `rid:${row.id}` : `tp:${tn}:${pid}`
-      if (postgresTurnRowDedupeRef.current.has(dedupeKey)) return
-      postgresTurnRowDedupeRef.current.add(dedupeKey)
-      if (postgresTurnRowDedupeRef.current.size > 600) {
-        postgresTurnRowDedupeRef.current = new Set([...postgresTurnRowDedupeRef.current].slice(-300))
+      const state = data.newDuelists
+      await playAnimations(data.animationsToPlay, state)
+
+      setDuelists(state)
+      duelistsRef.current = state
+      setBattleLog((prev) => [...prev, ...data.logs])
+      turnNumberRef.current = data.nextTurn
+      setTurnNumber(data.nextTurn)
+      if (data.circumFlames) setCircumFlames(data.circumFlames)
+
+      if (data.outcome) {
+        setGameOver(data.outcome)
+        if (data.outcome === "win" || data.outcome === "lose") {
+          onBattleEnd?.(data.outcome, playerBuild.userId)
+        }
+        setBattleStatus("finished")
+        return
       }
-      const raw = row.action_payload as RoundAction
-      const action: RoundAction = { ...raw, casterId: pid, turnId: tn }
-      if (!onlineActionsByTurnRef.current[tn]) onlineActionsByTurnRef.current[tn] = {}
-      onlineActionsByTurnRef.current[tn][pid] = action
-      setDebugLastEvent(`match_turns ${tn} ← ${pid.slice(0, 8)}…`)
-      tryFlushOnlineTurnFromServer()
+      beginRoundSelection(state)
+    } catch (e) {
+      console.error("[Arena] handleTurnResolved:", e)
+      setBattleStatus("selecting")
+    } finally {
+      resolvingRef.current = false
+    }
+  }
+
+  // ─── Reprodutor de animações (compartilhado entre offline e online) ─────────
+  const playAnimations = useCallback(
+    async (animations: EngineAnimation[], stateSnapshot: Duelist[]) => {
+      for (const anim of animations) {
+        const caster = stateSnapshot.find((d) => d.id === anim.casterId)
+        const resolvedTargetIds = anim.targetIds?.length ? anim.targetIds : anim.targetId ? [anim.targetId] : []
+        const targets = stateSnapshot.filter((d) => resolvedTargetIds.includes(d.id))
+        if (anim.type === "cast" && caster && anim.spellName) {
+          const prefix = anim.isMiss ? "ERROU" : "CONJUROU"
+          const critText = anim.isCrit ? " (CRIT!)" : ""
+          setResolutionText(`${caster.name} ${prefix} ${anim.spellName}!${critText}`)
+          setBattleMessage(`${caster.name} ${prefix} ${anim.spellName}!${critText}`)
+          await sleep(500)
+          await playSpellVfx(anim.spellName, caster, targets)
+          setResolutionText("")
+        } else if (anim.type === "potion" && caster) {
+          setResolutionText(`${caster.name} usou poção!`)
+          await sleep(500)
+          setResolutionText("")
+        }
+        await sleep(anim.delay ?? 900)
+      }
     },
-    [tryFlushOnlineTurnFromServer]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
-  const forceReconnectRef = useRef<(() => void) | null>(null)
-
+  // ─── Ciclo de vida do Socket.io ─────────────────────────────────────────────
   useEffect(() => {
     if (!isOnlineMatch || !matchId || !selfDuelistId || isReadOnlySpectator) return
-    const supabase = getSupabaseClient()
-    const presenceKey = playerBuild.userId || selfDuelistId
-    const channelName = `match-${matchId}`
-    let active = true
 
-    const openChannel = () => {
-      for (const existing of supabase.getChannels()) {
-        const t = existing.topic
-        if (t === channelName || t === `realtime:${channelName}`) {
-          void supabase.removeChannel(existing)
-        }
-      }
-      const ch = supabase.channel(channelName, {
-        config: { presence: { key: presenceKey } },
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001"
+    const socket = io(socketUrl, {
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: Infinity,
+    })
+    socketRef.current = socket
+
+    socket.on("connect", () => {
+      console.log("[Socket] Conectado:", socket.id)
+      setSocketConnected(true)
+      setSocketDisconnected(false)
+      setDebugLastEvent("socket conectado")
+      socket.emit("JOIN_MATCH", {
+        matchId,
+        userId: selfDuelistId,
+        build: playerBuild,
       })
+    })
 
-      const syncPresenceRoster = () => {
-        if (!active) return
-        const raw = ch.presenceState() as Record<string, unknown[]>
-        const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-        const merged = Object.keys(raw || {}).filter((k) => uuidRe.test(k)).sort()
-        setKnownBroadcastPlayers(merged.length > 0 ? merged : [selfDuelistId])
-        if (merged.length > 0) mergeDuelistsFromPlayerIds(merged)
-        if (merged.length >= expectedOnlinePlayers) {
-          setGameStartAcknowledged(true)
-          setBattleMessage("")
-          setDebugLastEvent(`presence:${merged.length}`)
-        } else {
-          setGameStartAcknowledged(false)
-        }
-      }
+    socket.on("disconnect", () => {
+      console.warn("[Socket] Desconectado.")
+      setSocketConnected(false)
+      setSocketDisconnected(true)
+      setDebugLastEvent("socket DESCONECTADO")
+    })
 
-      const onMatchTurnChange = (payload: { eventType?: string; new?: Record<string, unknown> }) => {
-        if (!active) return
-        if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") return
-        const row = payload.new as { id?: number | string; match_id?: string; turn_number?: number; player_id?: string; action_payload?: RoundAction }
-        if (!row) return
-        if (row.match_id != null && String(row.match_id) !== matchId) return
-        ingestMatchTurnRow(row)
-      }
+    socket.on("connect_error", (err) => {
+      console.warn("[Socket] Erro de conexão:", err.message)
+      setSocketDisconnected(true)
+    })
 
-      ch.on("presence", { event: "sync" }, syncPresenceRoster)
-      ch.on("postgres_changes", { event: "*", schema: "public", table: "match_turns", filter: `match_id=eq.${matchId}` }, onMatchTurnChange)
-
-      ch.subscribe(async (status, err) => {
-        if (!active) return
-        if (err) {
-          const em = err instanceof Error ? err.message : String(err)
-          setChannelSubscribeError(em)
-          console.warn("[Arena] Realtime:", err)
-        }
-        if (status === "SUBSCRIBED") {
-          setMatchChannelConnected(true)
-          setChannelSubscribeError("")
-          setDebugLastEvent("match channel SUBSCRIBED")
-          try {
-            await ch.track({
-              user_id: selfDuelistId,
-              name: playerBuild.name,
-              online_at: new Date().toISOString(),
-            })
-          } catch (trackErr) {
-            console.warn("[Arena] presence.track", trackErr)
-          }
-          syncPresenceRoster()
-        }
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          if (!active) return
-          setMatchChannelConnected(false)
-          setDebugLastEvent(`match channel ${status}`)
-        }
+    socket.on("ROOM_STATUS", ({ playersJoined, playersExpected }: { playersJoined: number; playersExpected: number }) => {
+      setKnownBroadcastPlayers((prev) => {
+        if (prev.length >= playersJoined) return prev
+        return prev
       })
+      setDebugLastEvent(`ROOM_STATUS ${playersJoined}/${playersExpected}`)
+    })
 
-      matchRealtimeChannelRef.current = ch
-      return ch
-    }
+    socket.on("GAME_START", ({ duelists: serverDuelists, turnNumber: serverTurn, yourPlayerId }: {
+      duelists: Duelist[]
+      turnNumber: number
+      gameMode: string
+      yourPlayerId: string
+    }) => {
+      console.log("[Socket] GAME_START recebido:", serverDuelists.map((d) => d.name))
+      setKnownBroadcastPlayers(serverDuelists.map((d) => d.id))
+      setDuelists(serverDuelists)
+      turnNumberRef.current = serverTurn
+      setTurnNumber(serverTurn)
+      setGameStartAcknowledged(true)
+      setBattleMessage("")
+      setDebugLastEvent(`GAME_START (${serverDuelists.length} duelistas)`)
+      // Inicia a seleção após o servidor confirmar o início
+      const seeded = serverDuelists
+      setBattleStatus("selecting")
+      setTimeLeft(120)
+      setPendingSpell(null)
+      setResolutionText("")
+      setResidualBanner(null)
+      setStatusFloater(null)
+      setFeedbackText("")
+      setCurrentTargetId(null)
+      setFeedbackTargetId(null)
+    })
 
-    openChannel()
+    socket.on("RECONNECT_STATE", ({ duelists: serverDuelists, turnNumber: serverTurn, circumFlames: cf }: {
+      duelists: Duelist[]
+      turnNumber: number
+      circumFlames: Record<string, number>
+    }) => {
+      console.log("[Socket] RECONNECT_STATE recebido")
+      setDuelists(serverDuelists)
+      turnNumberRef.current = serverTurn
+      setTurnNumber(serverTurn)
+      setGameStartAcknowledged(true)
+      if (cf) setCircumFlames(cf)
+      setDebugLastEvent(`RECONNECT T${serverTurn}`)
+      setBattleStatus("selecting")
+    })
 
-    // "Forçar Conexão" reutilizável pelo botão do painel de debug.
-    forceReconnectRef.current = () => {
-      if (!active) return
-      setMatchChannelConnected(false)
-      setDebugLastEvent("force reconnect…")
-      const c = matchRealtimeChannelRef.current
-      if (c) void supabase.removeChannel(c)
-      matchRealtimeChannelRef.current = null
-      openChannel()
-    }
+    socket.on("TURN_RESOLVED", async (data: {
+      animationsToPlay: EngineAnimation[]
+      newDuelists: Duelist[]
+      outcome: "win" | "lose" | null
+      logs: string[]
+      nextTurn: number
+      circumFlames?: Record<string, number>
+    }) => {
+      if (handleTurnResolvedRef.current) {
+        await handleTurnResolvedRef.current(data)
+      }
+    })
+
+    socket.on("OPPONENT_DISCONNECTED", ({ userId }: { userId: string }) => {
+      const opponentName = duelistsRef.current.find((d) => d.id === userId)?.name || "Oponente"
+      setBattleMessage(`${opponentName} se desconectou. Aguardando reconexão...`)
+      setDebugLastEvent("OPPONENT_DISCONNECTED")
+    })
+
+    socket.on("OPPONENT_LEFT", ({ userId }: { userId: string }) => {
+      const opponentName = duelistsRef.current.find((d) => d.id === userId)?.name || "Oponente"
+      addLog(`[Sistema]: ${opponentName} abandonou a partida.`)
+      setGameOver("win")
+      setBattleStatus("finished")
+    })
+
+    socket.on("SYNC_ERROR", ({ message }: { message: string }) => {
+      console.warn("[Socket] SYNC_ERROR:", message)
+      setAwaitingServerAck(false)
+      setBattleMessage(`Erro de sincronia: ${message}`)
+      setBattleStatus("selecting")
+    })
+
+    socket.on("CHAT_MESSAGE", ({ sender, text }: { sender: string; text: string }) => {
+      setChatMessages((prev) => [...prev, { sender, text }])
+    })
+
+    socket.on("ERROR", ({ message }: { message: string }) => {
+      console.warn("[Socket] Erro do servidor:", message)
+    })
 
     return () => {
-      active = false
-      forceReconnectRef.current = null
-      const c = matchRealtimeChannelRef.current
-      if (c) void supabase.removeChannel(c)
-      matchRealtimeChannelRef.current = null
-      setMatchChannelConnected(false)
+      socket.disconnect()
+      socketRef.current = null
+      setSocketConnected(false)
     }
-  }, [expectedOnlinePlayers, ingestMatchTurnRow, isOnlineMatch, isReadOnlySpectator, matchId, mergeDuelistsFromPlayerIds, playerBuild.name, playerBuild.userId, selfDuelistId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnlineMatch, matchId, selfDuelistId, isReadOnlySpectator])
 
   // Wake Lock: impede o celular de suspender o JS enquanto a batalha estiver ativa.
   useEffect(() => {
     if (isOfflineMode || gameOver || battleStatus === "idle") return
     if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return
-    let lock: { release: () => Promise<void> } | null = null
+    let lock: any = null
     let mounted = true
     void (async () => {
       try {
         lock = await (navigator as any).wakeLock.request("screen")
         console.log("[Arena] Wake Lock adquirido.")
-        lock.addEventListener?.("release", () => {
+        lock?.addEventListener?.("release", () => {
           if (mounted) console.log("[Arena] Wake Lock liberado pelo sistema.")
         })
       } catch (e) {
@@ -1220,53 +1126,6 @@ const DuelArena = (
       lock?.release().catch(() => {})
     }
   }, [isOfflineMode, gameOver, battleStatus])
-
-  // Fallback HTTP: quando desconectado do Realtime, busca ações do turno via SELECT a cada 3 s.
-  useEffect(() => {
-    if (!isOnlineMatch || !matchId || matchChannelConnected || gameOver) return
-    let cancelled = false
-    const pollHttp = async () => {
-      if (cancelled) return
-      const tn = turnNumberRef.current
-      const supabase = getSupabaseClient()
-      const { data, error } = await supabase
-        .from("match_turns")
-        .select("id,turn_number,player_id,action_payload,match_id")
-        .eq("match_id", matchId)
-        .eq("turn_number", tn)
-      if (cancelled || error || !data?.length) return
-      for (const row of data) {
-        ingestMatchTurnRow(row as { id?: number | string; turn_number?: number; player_id?: string; action_payload?: RoundAction })
-      }
-    }
-    const id = window.setInterval(() => void pollHttp(), 3000)
-    void pollHttp()
-    return () => {
-      cancelled = true
-      window.clearInterval(id)
-    }
-  }, [isOnlineMatch, matchId, matchChannelConnected, gameOver, ingestMatchTurnRow])
-
-  useEffect(() => {
-    if (!isOnlineMatch || !matchId || !gameStartAcknowledged || isReadOnlySpectator) return
-    let cancelled = false
-    const supabase = getSupabaseClient()
-    const tn = turnNumberRef.current
-    void (async () => {
-      const { data, error } = await supabase
-        .from("match_turns")
-        .select("id,turn_number,player_id,action_payload,match_id")
-        .eq("match_id", matchId)
-        .eq("turn_number", tn)
-      if (cancelled || error || !data?.length) return
-      for (const row of data) {
-        ingestMatchTurnRow(row as { id?: number | string; turn_number?: number; player_id?: string; action_payload?: RoundAction })
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [gameStartAcknowledged, ingestMatchTurnRow, isOnlineMatch, isReadOnlySpectator, matchId, turnNumber])
 
   useEffect(() => {
     setBackgroundImage(SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)])
@@ -1293,22 +1152,8 @@ const DuelArena = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    if (isOfflineMode) return
-    if (!isBattleReady || isInitializing || !gameStartAcknowledged) {
-      setBattleStatus("idle")
-      return
-    }
-    if (onlineReadyPlayers < expectedOnlinePlayers) {
-      setBattleStatus("idle")
-      return
-    }
-    if (battleStatus !== "idle") return
-    const seeded = applyRapinomonioBlock(duelists)
-    setDuelists(seeded)
-    beginRoundSelection(seeded)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [battleStatus, playerBuild.gameMode, onlineReadyPlayers, expectedOnlinePlayers, isBattleReady, gameStartAcknowledged, isInitializing])
+  // Batalha online: GAME_START via socket.io já chama beginRoundSelection diretamente.
+  // Este efeito apenas garante que o status fica "idle" enquanto aguarda o servidor.
 
   useEffect(() => {
     return () => {
@@ -1323,16 +1168,10 @@ const DuelArena = (
       setTimeLeft((prev) => {
         if (prev <= 1) {
           if (isOnlineMatch) {
-            const selfActed = onlineSelfSubmittedRef.current || awaitingServerAck
-            if (!selfActed) {
-              addLog(`[Turno ${turnNumber}]: tempo esgotado (2 min) — derrota por inatividade.`)
-              setGameOver("lose")
-              setBattleStatus("finished")
-              return 0
-            }
             if (!awaitingServerAck) {
-              const skipAction: RoundAction = { casterId: selfDuelistId, type: "skip", turnId: turnNumberRef.current }
-              void submitTurnAction(skipAction)
+              // Tempo esgotado sem agir: envia skip automático
+              const skipAction: RoundAction = { casterId: selfDuelistId ?? "", type: "skip", turnId: turnNumberRef.current }
+              submitTurnAction(skipAction)
             }
             return 0
           }
@@ -1360,7 +1199,7 @@ const DuelArena = (
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [addLog, awaitingServerAck, battleStatus, duelists, gameOver, isOnlineMatch, pendingActions, player?.name, playerDefeated, selfDuelistId, submitTurnAction, turnNumber])
+  }, [addLog, awaitingServerAck, battleStatus, duelists, gameOver, isOnlineMatch, pendingActions, playerDefeated, selfDuelistId, submitTurnAction, turnNumber])
 
   useEffect(() => {
     if (isOnlineMatch) return
@@ -1383,6 +1222,7 @@ const DuelArena = (
     if (isOnlineMatch && !gameStartAcknowledged) return
     if (!isBattleReady || isInitializing) return
     if (gameOver || battleStatus !== "selecting" || playerCannotAct || playerDefeated || awaitingServerAck) return
+    if (!selfDuelistId) return
     if (!isOnlineMatch && pendingActions[selfDuelistId]) return
     if (!player || isDefeated(player.hp)) return
     const mana = player.spellMana?.[spellName]
@@ -1393,18 +1233,19 @@ const DuelArena = (
     const taunt = player.debuffs.find((d) => d.type === "taunt")
     if (taunt && player.lastSpellUsed && spellName !== player.lastSpellUsed) return
 
+    const sid = selfDuelistId
     const commitCast = (targetId: string, areaAll?: boolean) => {
       const spell = getSpellInfo(spellName, SPELL_DATABASE)
-      const localAction: RoundAction = { casterId: selfDuelistId, type: "cast", spellName, baseDamage: spell ? getSpellMaxPower(spell) : 0, targetId, areaAll, turnId: turnNumber }
+      const localAction: RoundAction = { casterId: sid, type: "cast", spellName, baseDamage: spell ? getSpellMaxPower(spell) : 0, targetId, areaAll, turnId: turnNumber }
       if (isOnlineMatch) {
         void submitTurnAction(localAction)
       } else {
-        setPendingActions((prev) => ({ ...prev, [selfDuelistId]: localAction }))
+        setPendingActions((prev) => ({ ...prev, [sid]: localAction }))
       }
     }
 
     if (isSelfTargetSpell(spellName)) {
-      commitCast(selfDuelistId)
+      commitCast(sid)
       return
     }
     if (isAreaSpell(spellName)) {
@@ -1432,6 +1273,7 @@ const DuelArena = (
     if (isReadOnlySpectator) return
     if (isOnlineMatch && !gameStartAcknowledged) return
     if (!isBattleReady || isInitializing) return
+    if (!selfDuelistId) return
     if (!pendingSpell || !player || playerDefeated || battleStatus !== "selecting" || awaitingServerAck) return
     if (!isOnlineMatch && pendingActions[selfDuelistId]) return
     const valid = getValidTargetsForSpell(pendingSpell, player, duelists).some((d) => d.id === targetId && !isDefeated(d.hp))
@@ -1443,7 +1285,7 @@ const DuelArena = (
     if (isOnlineMatch) {
       void submitTurnAction(localAction)
     } else {
-      setPendingActions((prev) => ({ ...prev, [selfDuelistId]: localAction }))
+      setPendingActions((prev) => ({ ...prev, [selfDuelistId!]: localAction }))
     }
     setPendingSpell(null)
   }
@@ -1452,6 +1294,7 @@ const DuelArena = (
     if (isReadOnlySpectator) return
     if (isOnlineMatch && !gameStartAcknowledged) return
     if (!isBattleReady || isInitializing) return
+    if (!selfDuelistId) return
     if (potionUsed || gameOver || !player || playerDefeated || battleStatus !== "selecting" || awaitingServerAck) return
     if (!isOnlineMatch && !!pendingActions[selfDuelistId]) return
     if (player.debuffs.some((d) => d.type === "no_potion")) return
@@ -1460,7 +1303,7 @@ const DuelArena = (
     if (isOnlineMatch) {
       void submitTurnAction(localAction)
     } else {
-      setPendingActions((prev) => ({ ...prev, [selfDuelistId]: localAction }))
+      setPendingActions((prev) => ({ ...prev, [selfDuelistId!]: localAction }))
     }
   }
 
@@ -1468,19 +1311,19 @@ const DuelArena = (
     if (!chatInput.trim()) return
     const text = chatInput.trim()
     setChatMessages((prev) => [...prev, { sender: playerBuild.name, text }])
-    if (matchId) {
-      const supabase = getSupabaseClient()
-      void supabase.channel(`match-chat-${matchId}`).send({
-        type: "broadcast",
-        event: "chat_message",
-        payload: { sender: playerBuild.name, text, senderId: playerBuild.userId || "anon" },
-      })
+    if (matchId && socketRef.current?.connected) {
+      socketRef.current.emit("CHAT_MESSAGE", { matchId, sender: playerBuild.name, text })
     }
     setChatInput("")
   }
 
   const handleLeaveRoom = async () => {
     try {
+      // Notifica o servidor socket antes de sair
+      if (isOnlineMatch && matchId && selfDuelistId && socketRef.current?.connected) {
+        socketRef.current.emit("LEAVE_MATCH", { matchId, userId: selfDuelistId })
+        socketRef.current.disconnect()
+      }
       const supabase = getSupabaseClient()
       const leavingId = selfDuelistId
       if (matchId && leavingId && !isOfflineMode && !isReadOnlySpectator) {
@@ -1509,20 +1352,7 @@ const DuelArena = (
     }
   }
 
-  useEffect(() => {
-    if (!matchId) return
-    const supabase = getSupabaseClient()
-    const chatChannel = supabase
-      .channel(`match-chat-${matchId}`)
-      .on("broadcast", { event: "chat_message" }, ({ payload }: any) => {
-        if (!payload?.text || payload.senderId === (playerBuild.userId || "anon")) return
-        setChatMessages((prev) => [...prev, { sender: payload.sender || "Bruxo", text: payload.text }])
-      })
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(chatChannel)
-    }
-  }, [matchId, playerBuild.userId])
+  // Chat: recebido via socket no useEffect do ciclo de vida do socket (acima)
 
   const renderHearts = (hp: HPState) => {
     const total = getTotalHP(hp)
@@ -1910,21 +1740,21 @@ const DuelArena = (
               Aguardando jogadores na sala ({knownBroadcastPlayers.length || 1}/{expectedOnlinePlayers})...
             </p>
           )}
-          {!isOfflineMode && !isBattleReady && (
-            <p className="mb-2 text-xs text-amber-300">Conectando canal Realtime (presence + ledger)...</p>
+          {!isOfflineMode && !socketConnected && !gameStartAcknowledged && (
+            <p className="mb-2 text-xs text-amber-300">Conectando ao servidor de batalha...</p>
           )}
           {isReadOnlySpectator && <p className="mb-2 text-xs text-blue-300">Modo espectador: comandos de combate desabilitados.</p>}
           {playerDefeated && <p className="mb-2 text-xs text-red-300">Você foi derrotado e agora é espectador.</p>}
-          {!playerDefeated && battleStatus === "selecting" && !isOnlineMatch && pendingActions[selfDuelistId] && (
+          {!playerDefeated && battleStatus === "selecting" && !isOnlineMatch && selfDuelistId && pendingActions[selfDuelistId] && (
             <p className="mb-2 text-xs text-amber-300">Aguardando outros bruxos...</p>
           )}
           {!playerDefeated && awaitingServerAck && (
-            <p className="mb-2 text-xs text-amber-300">Intenção registrada — aguardando oponente e fita do servidor...</p>
+            <p className="mb-2 text-xs text-amber-300">Intenção enviada — aguardando resolução do servidor...</p>
           )}
-          {playerCannotAct && !playerDefeated && !pendingActions[selfDuelistId] && <p className="mb-2 text-xs text-red-300">Você está sob Freeze/Stun e não pode agir neste turno.</p>}
+          {playerCannotAct && !playerDefeated && selfDuelistId && !pendingActions[selfDuelistId] && <p className="mb-2 text-xs text-red-300">Você está sob Freeze/Stun e não pode agir neste turno.</p>}
           {pendingSpell && <p className="mb-2 text-xs text-amber-300">Feitiço selecionado: {pendingSpell}. Escolha um alvo.</p>}
 
-          {!isReadOnlySpectator && (isOnlineMatch ? !awaitingServerAck : !pendingActions[selfDuelistId]) && (
+          {!isReadOnlySpectator && (isOnlineMatch ? !awaitingServerAck : !selfDuelistId || !pendingActions[selfDuelistId]) && (
             <div className="mb-2 flex flex-wrap gap-2">
               {playerBuild.spells.map((spell) => {
                 const mana = player?.spellMana?.[spell]
@@ -1973,29 +1803,16 @@ const DuelArena = (
       </main>
 
       {!isOfflineMode && matchId && (
-        <div
-          className="pointer-events-auto fixed bottom-20 right-3 z-[90] max-w-[13rem] rounded border border-stone-600/90 bg-black/85 px-2 py-1 font-mono text-[10px] leading-tight text-stone-300 shadow-md backdrop-blur-sm"
-        >
-          {matchChannelConnected ? (
-            <p className="text-green-400">[Conectado: Sim]</p>
+        <div className="pointer-events-none fixed bottom-20 right-3 z-[90] max-w-[13rem] rounded border border-stone-600/90 bg-black/85 px-2 py-1 font-mono text-[10px] leading-tight text-stone-300 shadow-md backdrop-blur-sm">
+          {socketConnected ? (
+            <p className="text-green-400">[Socket: Conectado]</p>
           ) : (
-            <button
-              type="button"
-              onClick={() => forceReconnectRef.current?.()}
-              className="w-full rounded border border-red-500/80 bg-red-900/60 px-2 py-0.5 text-left text-[10px] font-bold text-red-200 hover:bg-red-800/80 active:scale-95"
-            >
-              ⚡ FORÇAR CONEXÃO
-            </button>
+            <p className="text-red-400">[Socket: Aguardando...]</p>
           )}
           <p>[Players: {knownBroadcastPlayers.length}/{expectedOnlinePlayers}]</p>
           <p className="truncate" title={debugLastEvent}>
-            [Último Evento: {debugLastEvent || "—"}]
+            [Evento: {debugLastEvent || "—"}]
           </p>
-          {channelSubscribeError && (
-            <p className="truncate text-amber-400/90" title={channelSubscribeError}>
-              [Erro: {channelSubscribeError}]
-            </p>
-          )}
         </div>
       )}
 
@@ -2023,6 +1840,23 @@ const DuelArena = (
           </div>
         </div>
       </footer>
+
+      {/* Modal de desconexão — inquebrável para PvP online */}
+      {isOnlineMatch && socketDisconnected && !gameOver && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl border-2 border-red-700 bg-stone-900 p-8 text-center shadow-2xl">
+            <div className="mb-4 text-4xl">⚡</div>
+            <h2 className="mb-2 text-xl font-bold text-red-300">Conexão perdida</h2>
+            <p className="text-sm text-stone-300">Tentando reconectar automaticamente...</p>
+            <p className="mt-2 text-xs text-stone-500">Não feche o app. O jogo retomará assim que a conexão for restaurada.</p>
+            <div className="mt-4 flex justify-center gap-1">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className="h-2 w-2 animate-bounce rounded-full bg-red-400" style={{ animationDelay: `${i * 0.15}s` }} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {gameOver && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">

@@ -21,8 +21,7 @@ export default function PageClient() {
   const [accountUser, setAccountUser] = useState<DbUser | null>(null)
   const [pendingSpectate, setPendingSpectate] = useState<{ matchId: string; mode: PlayerBuild["gameMode"] } | null>(null)
   const [openRooms, setOpenRooms] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number }>>([])
-  const unsubscribeMatchRef = useRef<null | (() => void)>(null)
-  const { isOnlineMode, applyExternalState, externalMatchState, joinMatchmaker, createRoom, joinRoomById, fetchOpenRooms, findActiveMatchForPlayer, subscribeToMatch } = useMatchManager()
+  const { isOnlineMode, applyExternalState, externalMatchState, joinMatchmaker, createRoom, joinRoomById, fetchOpenRooms, findActiveMatchForPlayer } = useMatchManager()
   const [isSpectator, setIsSpectator] = useState(false)
   const [resumableMatch, setResumableMatch] = useState<{ matchId: string; mode: PlayerBuild["gameMode"]; status: "waiting" | "in_progress" } | null>(null)
   useEffect(() => {
@@ -51,40 +50,19 @@ export default function PageClient() {
       const joined = await joinMatchmaker(build.gameMode, build.userId!, build.username || build.name)
       setActiveMatchId(joined.matchId)
       applyExternalState(joined)
-      setMatchPending(joined.status !== "in_progress")
+      setMatchPending(false)
       setIsSpectator(false)
       setScreen("battle")
-
-      unsubscribeMatchRef.current?.()
-      unsubscribeMatchRef.current = subscribeToMatch(joined.matchId, {
-        onState: (st) => {
-          applyExternalState(st)
-          if (st.status === "in_progress" && st.playersJoined >= st.playersExpected) {
-            setMatchPending(false)
-            setScreen("battle")
-          }
-        },
-      })
     })()
   }
 
   const attachMatch = useCallback((build: PlayerBuild, joined: ExternalMatchState) => {
     setActiveMatchId(joined.matchId)
     applyExternalState(joined)
-    setMatchPending(joined.status !== "in_progress")
+    setMatchPending(false)
     setIsSpectator(false)
     setScreen("battle")
-
-    unsubscribeMatchRef.current?.()
-    unsubscribeMatchRef.current = subscribeToMatch(joined.matchId, {
-      onState: (st) => {
-        applyExternalState(st)
-        if (st.status === "in_progress" && st.playersJoined >= st.playersExpected) {
-          setMatchPending(false)
-        }
-      },
-    })
-  }, [applyExternalState, subscribeToMatch])
+  }, [applyExternalState])
 
   const handleCreateRoom = (build: PlayerBuild) => {
     if (!build.userId) return
@@ -115,8 +93,6 @@ export default function PageClient() {
     setMatchPending(false)
     setActiveMatchId(null)
     setIsSpectator(false)
-    unsubscribeMatchRef.current?.()
-    unsubscribeMatchRef.current = null
     void (async () => {
       const id = await getSessionUserId()
       if (id) {
@@ -147,7 +123,8 @@ export default function PageClient() {
         setResumableMatch(null)
         return
       }
-      setResumableMatch({ matchId: active.matchId, mode: active.mode, status: active.status })
+      const st = active.status === "finished" ? "in_progress" : active.status
+      setResumableMatch({ matchId: active.matchId, mode: active.mode, status: st })
     })()
   }, [accountUser?.id, findActiveMatchForPlayer])
 
@@ -181,13 +158,6 @@ export default function PageClient() {
     void refreshOpenRooms()
   }, [screen, refreshOpenRooms])
 
-  useEffect(() => {
-    return () => {
-      unsubscribeMatchRef.current?.()
-      unsubscribeMatchRef.current = null
-    }
-  }, [])
-
   const handleSpectateMatch = useCallback((matchId: string, mode: PlayerBuild["gameMode"]) => {
     const spectatorBuild: PlayerBuild = {
       name: accountUser?.username || "Espectador",
@@ -206,12 +176,7 @@ export default function PageClient() {
     setIsSpectator(true)
     setMatchPending(false)
     setScreen("battle")
-
-    unsubscribeMatchRef.current?.()
-    unsubscribeMatchRef.current = subscribeToMatch(matchId, {
-      onState: (st) => applyExternalState(st),
-    })
-  }, [accountUser, applyExternalState, subscribeToMatch])
+  }, [accountUser])
 
   const handleResumeMatch = useCallback(() => {
     if (!accountUser || !resumableMatch) return
@@ -240,19 +205,9 @@ export default function PageClient() {
     setPlayerBuild(fallbackBuild)
     setActiveMatchId(resumableMatch.matchId)
     setIsSpectator(false)
-    setMatchPending(resumableMatch.status !== "in_progress")
+    setMatchPending(false)
     setScreen("battle")
-    unsubscribeMatchRef.current?.()
-    unsubscribeMatchRef.current = subscribeToMatch(resumableMatch.matchId, {
-      onState: (st) => {
-        applyExternalState(st)
-        setResumableMatch({ matchId: st.matchId, mode: st.mode, status: st.status })
-        if (st.status === "in_progress" && st.playersJoined >= st.playersExpected) {
-          setMatchPending(false)
-        }
-      },
-    })
-  }, [accountUser, resumableMatch, subscribeToMatch, applyExternalState])
+  }, [accountUser, resumableMatch])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -303,7 +258,7 @@ export default function PageClient() {
         />
       ) : (
         <DuelArena
-          playerBuild={playerBuild}
+          playerBuild={playerBuild!}
           onReturn={handleReturnToCommonRoom}
           onBattleEnd={handleBattleEnd}
           matchId={activeMatchId || undefined}
