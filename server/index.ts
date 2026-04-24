@@ -377,8 +377,17 @@ app.get("/test-cors", (_req, res) => {
   res.json({ cors: "ok", origin: _req.headers.origin || "no-origin", ts: new Date().toISOString() })
 })
 
+// ─── Crash guards — nunca derrubar o processo ─────────────────────────────────
+process.on("uncaughtException", (err) => {
+  console.error("[Server] uncaughtException:", err)
+})
+process.on("unhandledRejection", (reason) => {
+  console.error("[Server] unhandledRejection:", reason)
+})
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 httpServer.listen(Number(PORT), "0.0.0.0", () => {
   console.log(`\n🟢 Servidor Showdown rodando em 0.0.0.0:${PORT}`)
   console.log(`   Health: http://localhost:${PORT}/health`)
+  console.log(`   CORS:   origin=true (dynamic reflection)`)
 })

@@ -4,8 +4,8 @@
   "private": true,
   "description": "Servidor autoritativo Socket.io — protocolo Pokémon Showdown",
   "scripts": {
-    "start": "ts-node index.ts",
-    "dev": "ts-node index.ts"
+    "start": "ts-node --transpile-only index.ts",
+    "dev": "ts-node --transpile-only index.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
