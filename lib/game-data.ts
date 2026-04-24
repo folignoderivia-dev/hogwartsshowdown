@@ -6,23 +6,34 @@ export const HOUSE_MODIFIERS: Record<string, { speed: number; mana: number; dama
 }
 
 export const HOUSE_GDD = {
-  gryffindor: { attackPriorityBonus: 1, manaStartDelta: -2 },
-  slytherin: { outgoingDamageMult: 1.15, extraCritTakenChance: 0.15 },
+  // Grifinória: +2 prioridade global / -2 mana em todas as spells
+  gryffindor: { attackPriorityBonus: 2, manaStartDelta: -2 },
+  // Sonserina: +25% crit chance / começa com 400 HP (4 barras)
+  slytherin: { critBonus: 0.25, startHpBars: 4 },
+  // Corvinal: +3 mana máximo em spells não-Imperdoáveis
   ravenclaw: { manaBonusNonUnforgivable: 3 },
-  hufflepuff: { incomingDamageMult: 0.85, attackPriorityBonus: -1 },
+  // Lufa-Lufa: 10% espinhos (reflete dano) / -3 prioridade global
+  hufflepuff: { thornsPercent: 0.10, attackPriorityBonus: -3 },
 } as const
 
 export const WAND_PASSIVES: Record<string, { name: string; description: string; effect: string }> = {
-  unicorn: { name: "Pelo de Unicornio", description: "+10% Acerto (exceto Imperdoaveis)", effect: "accuracy_plus10" },
-  dragon: { name: "Coracao de Dragao", description: "+20% crit / -10% acerto", effect: "crit20_acc_minus10" },
-  phoenix: { name: "Pena de Fenix", description: "Cura 5-25% HP no fim do turno", effect: "phoenix_regen" },
-  thestral: { name: "Pelo de Trestalio", description: "Endure: coracao nao zera exato (1% salvo)", effect: "thestral_endure" },
-  basilisk: { name: "Presa de Basilisco", description: "+1 turno em debuffs aplicados", effect: "basilisk_debuff_duration" },
-  thunderbird: { name: "Pena de Passaro Trovao", description: "+1 Prioridade", effect: "thunder_priority" },
-  ocammy: { name: "Pena de Ocammy", description: "50% recoil 50% se atacado com feitico do grimorio", effect: "ocammy_parry" },
-  kelpie: { name: "Crina de Kelpie", description: "Imune a Incendio e Confrigo", effect: "kelpie_fire_immune" },
-  acromantula: { name: "Pelo de Acromantula", description: "+20 poder base por turno de batalha completo", effect: "acromantula_power_stack" },
-  rapinomonio: { name: "Pele de Rapinomonio", description: "2 feitiços aleatórios bloqueados", effect: "rapinomonio_random_block_2" },
+  // ── Núcleos Existentes (atualizados) ──────────────────────────────────────
+  unicorn:     { name: "Pelo de Unicórnio",       description: "+10% Acerto (exceto Imperdoáveis)",                      effect: "accuracy_plus10" },
+  dragon:      { name: "Coração de Dragão",        description: "+20% Crit / -15% Acerto",                               effect: "crit20_acc_minus15" },
+  phoenix:     { name: "Pena de Fênix",            description: "Cura 25–75 HP fixo no fim do turno",                    effect: "phoenix_regen" },
+  thestral:    { name: "Pelo de Testrálio",         description: "Dano único máximo: 300",                                effect: "thestral_cap300" },
+  basilisk:    { name: "Presa de Basilisco",        description: "+20% chance de aplicar debuffs",                        effect: "basilisk_debuff_chance" },
+  thunderbird: { name: "Pena de Pássaro Trovão",   description: "+1 Prioridade global",                                  effect: "thunder_priority" },
+  occamy:      { name: "Pena de Occamy",            description: "Mesmo feitiço que o alvo: -25% Dano e -10% Acc no alvo", effect: "occamy_mirror" },
+  kelpie:      { name: "Crina de Kelpie",           description: "Imune a Incêndio, Confringo e Bombarda",               effect: "kelpie_fire_immune" },
+  acromantula: { name: "Pelo de Acromântula",       description: "+25 dano empilhável por turno completo",               effect: "acromantula_power_stack" },
+  rapinomonio: { name: "Pele de Rapinomônio",       description: "Início: 1 spell aleatória de cada duelista com mana 0", effect: "rapinomonio_drain_start" },
+  // ── Núcleos Novos ─────────────────────────────────────────────────────────
+  veela:       { name: "Cabelo de Veela",           description: "Penalidade aleatória de Acc (0-25%) / Imune a críticos", effect: "veela_acc_penalty" },
+  crupe:       { name: "Pelo de Crupe",             description: "Spells sem efeito: chance de dano x3",                 effect: "crupe_triple" },
+  cinzal:      { name: "Presa de Cinzal",           description: "Se receber >100 dmg: -15% poder das spells inimigas",  effect: "cinzal_weaken" },
+  centauro:    { name: "Pelo de Centauro",           description: "Oponente não pode usar Ferula, Episkey ou Vulnera Sanetur", effect: "centauro_block_heals" },
+  hippogriff:  { name: "Pena de Hipogrifo",          description: "Imunidade total a MARCA e BOMBA",                     effect: "hippogriff_immune_mark_bomb" },
 }
 
 export type SpellDebuffType =

@@ -57,25 +57,35 @@ const HOUSES = [
 
 
 const WAND_CORES = [
-  { value: "unicorn", label: "Pelo de Unicornio", desc: "+10% acerto (nao-imperdoaveis)", icon: Shield },
-  { value: "dragon", label: "Coracao de Dragao", desc: "+20% crit, -10% acerto", icon: Zap },
-  { value: "phoenix", label: "Pena de Fenix", desc: "Cura 5-25% HP fim do turno", icon: Heart },
-  { value: "thestral", label: "Pelo de Trestalio", desc: "Endure (1% no coracao)", icon: Wind },
-  { value: "basilisk", label: "Presa de Basilisco", desc: "+1 turno em debuffs", icon: AlertTriangle },
-  { value: "thunderbird", label: "Pena de Passaro Trovao", desc: "+1 prioridade", icon: Zap },
-  { value: "ocammy", label: "Pena de Ocammy", desc: "50% recoil se mesmo feitico", icon: Shield },
-  { value: "kelpie", label: "Crina de Kelpie", desc: "Imune a Incendio e Confrigo", icon: Wind },
-  { value: "acromantula", label: "Pelo de Acromantula", desc: "+20 poder/turno de batalha", icon: Bug },
-  { value: "rapinomonio", label: "Pele de Rapinomonio", desc: "2 feitiços aleatórios bloqueados", icon: AlertTriangle },
+  // Núcleos clássicos (atualizados)
+  { value: "unicorn",     label: "Pelo de Unicórnio",     desc: "+10% acerto (não-Imperdoáveis)",                  icon: Shield },
+  { value: "dragon",      label: "Coração de Dragão",      desc: "+20% crit / -15% acerto",                        icon: Zap },
+  { value: "phoenix",     label: "Pena de Fênix",          desc: "Cura 25-75 HP fixo fim do turno",                icon: Heart },
+  { value: "thestral",    label: "Pelo de Testrálio",       desc: "Dano único máximo 300",                          icon: Wind },
+  { value: "basilisk",    label: "Presa de Basilisco",      desc: "+20% chance de aplicar debuffs",                 icon: AlertTriangle },
+  { value: "thunderbird", label: "Pena de Pássaro Trovão", desc: "+1 prioridade global",                           icon: Zap },
+  { value: "occamy",      label: "Pena de Occamy",          desc: "Mesmo feitiço que alvo: -25% dano e -10% acc",   icon: Shield },
+  { value: "kelpie",      label: "Crina de Kelpie",         desc: "Imune a Incêndio, Confringo e Bombarda",         icon: Wind },
+  { value: "acromantula", label: "Pelo de Acromântula",     desc: "+25 dano por turno completo (empilhável)",       icon: Bug },
+  { value: "rapinomonio", label: "Pele de Rapinomônio",     desc: "Início: 1 spell de cada duelista começa com 0 mana", icon: AlertTriangle },
+  // Núcleos novos
+  { value: "veela",       label: "Cabelo de Veela",         desc: "Acc do atacante reduzida 0-25% aleatório; imune a críticos", icon: Shield },
+  { value: "crupe",       label: "Pelo de Crupe",           desc: "Spells sem efeito: 25% chance de dano x3",      icon: Zap },
+  { value: "cinzal",      label: "Presa de Cinzal",         desc: "Se receber >100 dmg: atacante perde 15% dano",   icon: AlertTriangle },
+  { value: "centauro",    label: "Pelo de Centauro",         desc: "Oponente bloqueado de usar Ferula/Episkey/Vulnera", icon: Wind },
+  { value: "hippogriff",  label: "Pena de Hipogrifo",       desc: "Imunidade total a MARCA e BOMBA",               icon: Shield },
 ]
 
 const POTIONS = [
-  { value: "wiggenweld", label: "Wiggenweld", effect: "Cura 100% HP (1 coracao)" },
-  { value: "mortovivo", label: "Morto Vivo", effect: "Destiny Bond: perde coracao = atacante perde coracao" },
-  { value: "edurus", label: "Edurus", effect: "Limpa todos os debuffs" },
-  { value: "maxima", label: "Maxima", effect: "Proximo feitico x2 dano; rivais +50% dano 1 turno" },
-  { value: "foco", label: "Foco", effect: "Proximo feitico +30% acerto" },
-  { value: "merlin", label: "Poção de Merlin", effect: "Copia 1 feitiço aleatório do oponente com mana 1" },
+  { value: "wiggenweld",  label: "Wiggenweld",       effect: "Cura HP = último dano recebido" },
+  { value: "mortovivo",  label: "Morto Vivo",        effect: "HP não cai abaixo de 1 por 1 turno (Undead)" },
+  { value: "edurus",     label: "Edurus",             effect: "Limpa debuffs + Imunidade por 1 turno" },
+  { value: "maxima",     label: "Maxima",             effect: "+50% dano final no próximo turno" },
+  { value: "foco",       label: "Foco",               effect: "+10% Accuracy permanente" },
+  { value: "merlin",      label: "Poção de Merlin",   effect: "Troca mana da sua spell mais fraca pela da mais forte do oponente" },
+  { value: "felix",       label: "Felix Felicis",     effect: "Recupera 100% mana da spell com menor mana atual" },
+  { value: "aconito",     label: "Acônito",            effect: "Aplica POISON no oponente por 4 turnos" },
+  { value: "amortentia",  label: "Amortentia",         effect: "CHARM no oponente (2t): se alvo curar, você também recebe a cura" },
 ]
 
 

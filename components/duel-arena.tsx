@@ -208,9 +208,13 @@ const BASE_CRIT_CHANCE = 0.1
 function getCritChance(attacker: Duelist, defender?: Duelist, spellNameNorm?: string): number {
   let c = BASE_CRIT_CHANCE
   if (spellNameNorm && spellNameNorm.includes("rictumsempra")) c += 0.3
-  if (attacker.wand === "dragon") c += 0.2
+  // Dragão: +20% crit
+  if (WAND_PASSIVES[attacker.wand]?.effect === "crit20_acc_minus15") c += 0.2
+  // Sonserina: +25% crit chance (novo)
+  if (attacker.house === "slytherin") c += HOUSE_GDD.slytherin.critBonus
+  // Veela: defensor nunca pode ser critado
+  if (WAND_PASSIVES[defender?.wand ?? ""]?.effect === "veela_acc_penalty") return 0
   if (attacker.debuffs.some((d) => d.type === "crit_boost")) c += 0.25
-  if (defender?.house === "slytherin") c += HOUSE_GDD.slytherin.extraCritTakenChance
   return Math.min(0.95, c)
 }
 
@@ -228,9 +232,9 @@ function getSpellCastPriority(spellName: string, spell: SpellInfo | undefined, a
   if (n.includes("aqua") && n.includes("eructo")) p += 5
   if (isOffensiveForHousePriority(spellName, spell)) {
     const hg = HOUSE_GDD[attacker.house as keyof typeof HOUSE_GDD]
-    if (hg && "attackPriorityBonus" in hg) p += hg.attackPriorityBonus as number
+    if (hg && "attackPriorityBonus" in hg) p += (hg as { attackPriorityBonus: number }).attackPriorityBonus
   }
-  if (attacker.wand === "thunderbird") p += 1
+  if (WAND_PASSIVES[attacker.wand]?.effect === "thunder_priority") p += 1
   return p
 }
 
@@ -796,19 +800,16 @@ const DuelArena = (
 
   const applyRapinomonioBlock = useCallback((state: Duelist[]) => {
     let next = [...state]
-    const casters = next.filter((d) => WAND_PASSIVES[d.wand]?.effect === "rapinomonio_random_block_2")
-    for (const caster of casters) {
-      const foes = next.filter((d) => d.id !== caster.id && d.team !== caster.team)
-      for (const foe of foes) {
-        if (!foe.spells || foe.spells.length === 0) continue
-        const shuffled = [...foe.spells].sort(() => Math.random() - 0.5)
-        const picks = shuffled.slice(0, Math.min(2, shuffled.length))
-        const nextDisabled = { ...(foe.disabledSpells || {}) }
-        picks.forEach((s) => {
-          nextDisabled[s] = Math.max(nextDisabled[s] || 0, 999)
-        })
-        next = next.map((d) => (d.id === foe.id ? { ...d, disabledSpells: nextDisabled } : d))
-      }
+    // Rapinomônio novo: drena mana de 1 spell aleatória de cada duelista no início
+    const hasCaster = next.some((d) => WAND_PASSIVES[d.wand]?.effect === "rapinomonio_drain_start")
+    if (!hasCaster) return next
+    for (const target of next) {
+      if (!target.spellMana || Object.keys(target.spellMana).length === 0) continue
+      const spellKeys = Object.keys(target.spellMana)
+      const pick = spellKeys[Math.floor(Math.random() * spellKeys.length)]
+      const newSm = { ...target.spellMana }
+      newSm[pick] = { ...newSm[pick], current: 0 }
+      next = next.map((d) => (d.id === target.id ? { ...d, spellMana: newSm } : d))
     }
     return next
   }, [])

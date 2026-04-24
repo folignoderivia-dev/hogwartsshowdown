@@ -82,6 +82,8 @@ export interface Duelist {
   usedPotions?: string[]
   /** Bônus permanente de acurácia (Poção Foco) */
   permanentAccBonus?: number
+  /** Aplicado pela Presa de Cinzal: próximos ataques causam 15% menos dano */
+  cinzalWeaken?: boolean
 }
 
 export type Point = { x: number; y: number }

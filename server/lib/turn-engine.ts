@@ -113,12 +113,20 @@ const reduceDebuffs = (duelist: Duelist): Duelist => ({
     .filter((d) => d.duration > 0),
 })
 
-export const calculateAccuracy = (attacker: Duelist, defender: Duelist, base: number, spell?: SpellInfo) => {
+export const calculateAccuracy = (attacker: Duelist, defender: Duelist, base: number, spell?: SpellInfo, attackerRoundSpellName?: string) => {
   let accuracy = base
   const un = spell?.isUnforgivable
   const wandJammed = attacker.wandPassiveStripped || attacker.debuffs.some((d) => d.type === "disarm")
+  // Unicórnio: +10% acerto (só para spells não-Imperdoáveis)
   if (!un && !wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "accuracy_plus10") accuracy += 10
-  if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "crit20_acc_minus10") accuracy -= 10
+  // Dragão: -15% acerto (atualizado de -10%)
+  if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "crit20_acc_minus15") accuracy -= 15
+  // Veela (defensor): penalidade aleatória de 0-25% em quem ataca o Veela
+  if (WAND_PASSIVES[defender.wand]?.effect === "veela_acc_penalty") accuracy -= Math.floor(Math.random() * 26)
+  // Occamy (atacante): se alvo usou o mesmo feitiço esta rodada, -10% acc
+  if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" && attackerRoundSpellName) {
+    if (normSpell(defender.lastSpellUsed ?? "") === normSpell(attackerRoundSpellName)) accuracy -= 10
+  }
   const spellNorm = normSpell(spell?.name || "")
   if (
     attacker.debuffs.some((d) => d.type === "unforgivable_acc_down") &&
@@ -136,25 +144,29 @@ export const calculateAccuracy = (attacker: Duelist, defender: Duelist, base: nu
   return Math.max(5, Math.min(100, accuracy))
 }
 
-const rollHit = (attacker: Duelist, defender: Duelist, spell: SpellInfo, missStreak = 0) => {
+const rollHit = (attacker: Duelist, defender: Duelist, spell: SpellInfo, missStreak = 0, spellName?: string) => {
   if (spell.accuracy >= 100) return true
   const pityBonus = Math.min(20, missStreak * 7)
-  const finalAcc = Math.min(100, calculateAccuracy(attacker, defender, spell.accuracy, spell) + pityBonus)
+  const finalAcc = Math.min(100, calculateAccuracy(attacker, defender, spell.accuracy, spell, spellName) + pityBonus)
   return Math.random() * 100 <= finalAcc
 }
 
-const calculateDamage = (attacker: Duelist, defender: Duelist, base: number, spellNorm?: string) => {
+const calculateDamage = (attacker: Duelist, defender: Duelist, base: number, spellNorm?: string, spell?: SpellInfo, occamyMirrorActive?: boolean) => {
   let damage = base
+  // Kelpie: imune a Incêndio, Confringo e Bombarda
   if (spellNorm && WAND_PASSIVES[defender.wand]?.effect === "kelpie_fire_immune") {
     const n = spellNorm
-    if (n.includes("incendio") || n.includes("confrigo")) return 0
+    if (n.includes("incendio") || n.includes("confrigo") || n.includes("bombarda")) return 0
   }
-  if (spellNorm?.includes("incendio") && defender.debuffs.some((d) => d.type === "burn")) {
-    damage *= 2
+  if (spellNorm?.includes("incendio") && defender.debuffs.some((d) => d.type === "burn")) damage *= 2
+  // Occamy: mesmo feitiço que o alvo → -25% dano
+  if (occamyMirrorActive) damage *= 0.75
+  // Crupe: spell sem debuff → 25% de chance de x3 dano
+  if (WAND_PASSIVES[attacker.wand]?.effect === "crupe_triple" && !spell?.debuff) {
+    if (Math.random() < 0.25) damage *= 3
   }
-  if (attacker.house === "slytherin") damage *= HOUSE_GDD.slytherin.outgoingDamageMult
-  if (defender.house === "hufflepuff") damage *= HOUSE_GDD.hufflepuff.incomingDamageMult
-  // MARCA agora força critico garantido (getCritChance retorna 1.0) — sem multiplicador aqui
+  // Cinzal: atacante foi debilitado por Cinzal do defensor → -15% dano
+  if (attacker.cinzalWeaken) damage *= 0.85
   if (attacker.debuffs.some((d) => d.type === "damage_amp")) damage *= 1.5
   // DAMAGE_REDUCE: atacante causa 25% menos dano
   if (attacker.debuffs.some((d) => d.type === "damage_reduce")) damage *= 0.75
@@ -166,16 +178,19 @@ const calculateDamage = (attacker: Duelist, defender: Duelist, base: number, spe
 }
 
 const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: string): number => {
-  // MARCA: critico garantido em qualquer dano recebido
+  // MARCA: crítico garantido
   if (defender?.debuffs.some((d) => d.type === "mark")) return 1.0
-  // Glacius: critico garantido se alvo estiver congelado
+  // Glacius: crítico garantido se alvo congelado
   if (spellNameNorm?.includes("glacius") && defender?.debuffs.some((d) => d.type === "freeze")) return 1.0
-  let c = 0.25 // taxa crítica base nativa: 25%
-  // CRIT_DOWN: alvo tem taxa crítica reduzida em 10%
+  // Veela: defensor nunca pode ser critado
+  if (WAND_PASSIVES[defender?.wand ?? ""]?.effect === "veela_acc_penalty") return 0
+  let c = 0.25 // taxa base: 25%
   if (defender?.debuffs.some((d) => d.type === "crit_down")) c = Math.max(0, c - 0.1)
-  if (attacker.wand === "dragon") c += 0.2
+  // Dragão: +20% crit (não mudou)
+  if (WAND_PASSIVES[attacker.wand]?.effect === "crit20_acc_minus15") c += 0.2
+  // Sonserina: +25% crit chance (novo, substitui extraCritTakenChance)
+  if (attacker.house === "slytherin") c += HOUSE_GDD.slytherin.critBonus
   if (attacker.debuffs.some((d) => d.type === "crit_boost")) c += 0.25
-  if (defender?.house === "slytherin") c += HOUSE_GDD.slytherin.extraCritTakenChance
   return Math.min(0.95, c)
 }
 
@@ -186,8 +201,9 @@ const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target
   let base = rollSpellPower(spell)
   if (attacker.cruciusWeakness && !n.includes("crucius")) base *= 0.5
   if (attacker.maximosChargePct) base *= 1 + attacker.maximosChargePct / 100
+  // Acromântula: +25 dano por turno completo (atualizado de +20)
   if (WAND_PASSIVES[attacker.wand]?.effect === "acromantula_power_stack") {
-    base += (attacker.turnsInBattle ?? 0) * 20
+    base += (attacker.turnsInBattle ?? 0) * 25
   }
   return Math.round(base)
 }
@@ -195,13 +211,14 @@ const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target
 const getSpellCastPriority = (spellName: string, spell: SpellInfo | undefined, attacker: Duelist): number => {
   if (!spell) return 0
   let p = spell.priority ?? 0
-  const n = normSpell(spellName)
+  // Casas com bônus/penalidade de prioridade (Grifinória +2, Lufa-Lufa -3)
   if (!isSelfTargetSpell(spellName) && getSpellMaxPower(spell) > 0) {
     const hg = HOUSE_GDD[attacker.house as keyof typeof HOUSE_GDD]
-    if (hg && "attackPriorityBonus" in hg) p += hg.attackPriorityBonus as number
+    if (hg && "attackPriorityBonus" in hg) p += (hg as { attackPriorityBonus: number }).attackPriorityBonus
   }
-  if (attacker.wand === "thunderbird") p += 1
-  // PARALISIA: força prioridade máxima 0 para todos os feitiços do paralisado
+  // Thunderbird: +1 prioridade global
+  if (WAND_PASSIVES[attacker.wand]?.effect === "thunder_priority") p += 1
+  // PARALISIA: força prioridade máxima 0
   if (attacker.debuffs.some((d) => d.type === "paralysis")) p = Math.min(0, p)
   return p
 }
@@ -439,6 +456,16 @@ export function calculateTurnOutcome(params: {
       }
     }
 
+    // CENTAURO: oponente com Centauro bloqueia spells de cura
+    const centauroEnemyExists = state.some((d) => d.team !== attacker.team && !isDefeated(d.hp) && WAND_PASSIVES[d.wand]?.effect === "centauro_block_heals")
+    if (centauroEnemyExists && isSelfTargetSpell(sn)) {
+      const nCur = normSpell(sn)
+      if (nCur.includes("ferula") || nCur.includes("episkey") || (nCur.includes("vulnera") && nCur.includes("sanetur"))) {
+        logs.push(`→ ${attacker.name} tentou usar ${sn}, mas está bloqueado pelo Centauro!`)
+        continue
+      }
+    }
+
     const isFFAMode = params.gameMode === "ffa" || params.gameMode === "ffa3"
     let targets: Duelist[] = []
     if (isSelfTargetSpell(sn)) {
@@ -476,9 +503,14 @@ export function calculateTurnOutcome(params: {
       if (before?.debuffs.some((d) => d.type === "anti_debuff")) return
       // IMMUNITY (Edurus): bloqueia todos os novos debuffs por 1 turno
       if (before?.debuffs.some((d) => d.type === "immunity")) return
-      if (Math.random() * 100 <= spell.debuff.chance) {
-        let dur = spell.debuff.duration || 1
-        if (WAND_PASSIVES[attacker.wand]?.effect === "basilisk_debuff_duration") dur += 1
+      // Hipogrifo: imune total a MARCA e BOMBA
+      if (WAND_PASSIVES[before?.wand ?? ""]?.effect === "hippogriff_immune_mark_bomb") {
+        if (spell.debuff.type === "mark" || spell.debuff.type === "bomba") return
+      }
+      // Basilisco: +20% chance de aplicar debuffs (multiplicador)
+      const chanceMultiplier = WAND_PASSIVES[attacker.wand]?.effect === "basilisk_debuff_chance" ? 1.2 : 1
+      if (Math.random() * 100 <= spell.debuff.chance * chanceMultiplier) {
+        const dur = spell.debuff.duration || 1
         const meta = spell.debuff.type === "provoke" ? attacker.id : undefined
         // Imperio é IRREMOVÍVEL
         const irremovable = n.includes("imperio") ? true : undefined
@@ -491,27 +523,44 @@ export function calculateTurnOutcome(params: {
     }
 
     /**
-     * Aplica dano ao defensor, respeitando:
-     * - UNDEAD: HP não pode cair abaixo de 1
-     * - Circum Inflamare (thorns): aplica BURN no atacante
-     * - Salvio Hexia (reflect): reflete dano de volta
+     * Aplica dano ao defensor, respeitando (em ordem):
+     * 1. Testrálio: cap de 300 por ataque único
+     * 2. UNDEAD: HP não pode cair abaixo de 1
+     * 3. Lufa-Lufa espinhos: 10% do dano reflete no atacante
+     * 4. Cinzal: se dano > 100, atacante fica debilitado (-15% dano)
+     * 5. Circum Inflamare: aplica BURN no atacante
+     * 6. Salvio Hexia: reflete 100% do dano de volta
      */
     const applyDamageWithCircum = (defId: string, dmg: number, dealerId: string, sourceSpellNorm?: string) => {
       const def = state.find((d) => d.id === defId)
       if (!def) return
-      // UNDEAD: HP não pode cair abaixo de 1 neste turno
       let effectiveDmg = dmg
+      // Testrálio: dano único máximo 300
+      if (WAND_PASSIVES[def.wand]?.effect === "thestral_cap300") {
+        effectiveDmg = Math.min(effectiveDmg, 300)
+      }
+      // UNDEAD: HP não pode cair abaixo de 1 neste turno
       if (def.debuffs.some((x) => x.type === "undead")) {
         const totalHp = getTotalHP(def.hp)
         effectiveDmg = Math.max(0, Math.min(effectiveDmg, totalHp - 1))
       }
       state = state.map((d) =>
         d.id === defId
-          ? { ...d, hp: applyDamage(d.hp, effectiveDmg, { thestral: d.wand === "thestral" }), damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + effectiveDmg }
+          ? { ...d, hp: applyDamage(d.hp, effectiveDmg, {}), damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + effectiveDmg }
           : d
       )
-      if (def.debuffs.some((d) => d.type === "salvio_reflect") && dealerId !== defId && dmg > 0) {
-        state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, Math.round(dmg), { thestral: d.wand === "thestral" }) } : d))
+      // Lufa-Lufa espinhos: reflete 10% do dano recebido para o atacante
+      if (def.house === "hufflepuff" && dealerId !== defId && effectiveDmg > 0) {
+        const thornDmg = Math.round(effectiveDmg * HOUSE_GDD.hufflepuff.thornsPercent)
+        if (thornDmg > 0) state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, thornDmg, {}) } : d))
+      }
+      // Cinzal: se recebeu > 100 de dano, o atacante fica debilitado (-15% dano futuros)
+      if (WAND_PASSIVES[def.wand]?.effect === "cinzal_weaken" && dealerId !== defId && effectiveDmg > 100) {
+        state = state.map((d) => (d.id === dealerId ? { ...d, cinzalWeaken: true } : d))
+        logs.push(`→ Cinzal: ${dealerId} foi debilitado! Próximos ataques causam 15% menos dano.`)
+      }
+      if (def.debuffs.some((d) => d.type === "salvio_reflect") && dealerId !== defId && effectiveDmg > 0) {
+        state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, Math.round(effectiveDmg), {}) } : d))
       }
       const circumOn = (def.circumAura ?? 0) > 0 || (params.circumFlames[defId] ?? 0) > 0
       if (circumOn && dealerId !== defId) {
@@ -640,13 +689,15 @@ export function calculateTurnOutcome(params: {
       const ignoresDefense = spell.ignoresDefense === true
       for (const t of targets) {
         const streak = attacker.missStreakBySpell?.[sn] ?? 0
-        const hit = rollHit(attacker, t, spell, streak)
+        const occamyMirror = WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" &&
+          normSpell(params.actions.find(a => a.casterId === t.id)?.spellName ?? "") === n
+        const hit = rollHit(attacker, t, spell, streak, sn)
         if (!hit) {
           animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: true, isCrit: false, delay: 900, fctOnly: true })
           logs.push(`→ ${attacker.name} errou ${sn} em ${t.name}!`)
           continue
         }
-        let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t), n)
+        let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t), n, spell, occamyMirror)
         let isCrit = false
         if (Math.random() < getCritChance(attacker, t, n)) {
           damage *= 2
@@ -658,7 +709,7 @@ export function calculateTurnOutcome(params: {
           logs.push(`→ ${sn} foi bloqueado pelo Protego de ${t.name}!`)
         } else {
           if (!ignoresDefense) damage = Math.max(0, damage - (t.defense ?? 0))
-          if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${t.name}!`)
+          if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${t.name}!${occamyMirror ? " (Occamy mirror!)" : ""}`)
         }
         applyDamageWithCircum(t.id, damage, attacker.id, n)
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900, damage, isBlock: bloqueadoArea, fctOnly: true })
@@ -712,9 +763,12 @@ export function calculateTurnOutcome(params: {
       // ── FLUXO PADRÃO (single target) ────────────────────────────────────────
       } else {
         const streak = attacker.missStreakBySpell?.[sn] ?? 0
-        const hit = rollHit(attacker, target, spell, streak)
+        // Occamy: verifica se o alvo usou o mesmo feitiço nesta rodada
+        const occamyMirror = WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" &&
+          normSpell(params.actions.find(a => a.casterId === target.id)?.spellName ?? "") === n
+        const hit = rollHit(attacker, target, spell, streak, sn)
         if (hit) {
-          let damage = getSpellMaxPower(spell) > 0 ? calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n) : 0
+          let damage = getSpellMaxPower(spell) > 0 ? calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n, spell, occamyMirror) : 0
           let isCrit = false
 
           // CRUCIUS: +30% dano por debuff no alvo
@@ -856,12 +910,13 @@ export function calculateTurnOutcome(params: {
 
     const atkAfter = state.find((x) => x.id === action.casterId)
     if (atkAfter && WAND_PASSIVES[atkAfter.wand]?.effect === "phoenix_regen") {
-      const pct = Math.floor(Math.random() * 21) + 5
-      state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healCurrentBar(d.hp, pct) } : d))
+      // Fênix: cura 25-75 HP fixo por turno (atualizado)
+      const healAmt = Math.floor(Math.random() * 51) + 25
+      state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d))
       // CHARM: espelha a cura de Phoenix para quem encantou o atacante
       const charmDebuff = atkAfter.debuffs.find((x) => x.type === "charm")
       if (charmDebuff?.meta) {
-        state = state.map((d) => d.id === charmDebuff.meta ? { ...d, hp: healCurrentBar(d.hp, pct) } : d)
+        state = state.map((d) => d.id === charmDebuff.meta ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d)
       }
     }
 

@@ -108,8 +108,8 @@ function buildSpellManaForSpells(
     const info = SPELL_DATABASE.find((s: SpellInfo) => s.name === sn)
     if (!info) return
     let max = info.pp
-    if (house === "gryffindor") max = Math.max(1, max + (HOUSE_GDD.gryffindor as any).manaStartDelta)
-    if (house === "ravenclaw" && !(info as any).isUnforgivable) max += (HOUSE_GDD.ravenclaw as any).manaBonusNonUnforgivable
+    if (house === "gryffindor") max = Math.max(1, max + HOUSE_GDD.gryffindor.manaStartDelta)
+    if (house === "ravenclaw" && !info.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
     out[sn] = { current: max, max }
   })
   return out
@@ -131,7 +131,7 @@ function buildDuelist(
     wand: build.wand,
     avatar: build.avatar,
     spells: build.spells,
-    hp: { bars: [100, 100, 100, 100, 100] },
+    hp: { bars: build.house === "slytherin" ? [100, 100, 100, 100] : [100, 100, 100, 100, 100] },
     speed: Math.round(100 * mod.speed) - seatIndex * 2 + initiative,
     defense,
     debuffs: [],
@@ -167,23 +167,68 @@ function expectedPlayerCount(mode: GameMode): number {
   return 2
 }
 
-// ─── Rapinomonio block (aplica no início da partida) ─────────────────────────
+// ─── Rapinomônio (novo): drena mana de 1 spell aleatória de cada duelista ────
 
 function applyRapinomonioBlock(duelists: Duelist[]): Duelist[] {
   let next = [...duelists]
-  const casters = next.filter((d) => WAND_PASSIVES[d.wand]?.effect === "rapinomonio_random_block_2")
-  for (const caster of casters) {
-    const foes = next.filter((d) => d.id !== caster.id && d.team !== caster.team)
-    for (const foe of foes) {
-      if (!foe.spells || foe.spells.length === 0) continue
-      const shuffled = [...foe.spells].sort(() => Math.random() - 0.5)
-      const picks = shuffled.slice(0, Math.min(2, shuffled.length))
-      const nextDisabled = { ...(foe.disabledSpells || {}) }
-      picks.forEach((s) => { nextDisabled[s] = Math.max(nextDisabled[s] || 0, 999) })
-      next = next.map((d) => (d.id === foe.id ? { ...d, disabledSpells: nextDisabled } : d))
-    }
+  const casters = next.filter((d) => WAND_PASSIVES[d.wand]?.effect === "rapinomonio_drain_start")
+  if (casters.length === 0) return next
+  // Para cada duelista no campo, drena mana de 1 spell aleatória
+  for (const target of next) {
+    if (!target.spellMana || Object.keys(target.spellMana).length === 0) continue
+    const spellKeys = Object.keys(target.spellMana)
+    const pick = spellKeys[Math.floor(Math.random() * spellKeys.length)]
+    const newSm = { ...target.spellMana }
+    newSm[pick] = { ...newSm[pick], current: 0 }
+    next = next.map((d) => (d.id === target.id ? { ...d, spellMana: newSm } : d))
+    console.log(`[Rapinomônio] ${target.name}: spell "${pick}" iniciou com mana 0.`)
   }
   return next
+}
+
+// ─── Centauro: bloqueia spells de cura dos oponentes ao início ───────────────
+
+function applyCentauroBlock(duelists: Duelist[]): Duelist[] {
+  let next = [...duelists]
+  const centauros = next.filter((d) => WAND_PASSIVES[d.wand]?.effect === "centauro_block_heals")
+  for (const centauro of centauros) {
+    const foes = next.filter((d) => d.team !== centauro.team)
+    for (const foe of foes) {
+      const healSpells = ["Ferula", "Episkey", "Vulnera Sanetur"]
+      const nextDisabled = { ...(foe.disabledSpells || {}) }
+      healSpells.forEach((s) => { if (foe.spells.includes(s)) nextDisabled[s] = 999 })
+      next = next.map((d) => (d.id === foe.id ? { ...d, disabledSpells: nextDisabled } : d))
+    }
+    console.log(`[Centauro] ${centauro.name}: oponentes bloqueados de usar spells de cura.`)
+  }
+  return next
+}
+
+// ─── Debug log de passivas ao iniciar batalha ─────────────────────────────────
+
+function logPassivesDebug(duelists: Duelist[]): void {
+  console.log("\n╔══════════════════════════════════════════════════╗")
+  console.log("║         DEBUG: PASSIVAS ATIVAS AO INÍCIO         ║")
+  console.log("╚══════════════════════════════════════════════════╝")
+  for (const d of duelists) {
+    const wandPassive = WAND_PASSIVES[d.wand]
+    const houseKey = d.house as keyof typeof HOUSE_GDD
+    const hg = HOUSE_GDD[houseKey]
+    const hpTotal = d.hp.bars.reduce((s, v) => s + v, 0)
+    console.log(`\n▶ ${d.name} [${d.house.toUpperCase()} | Núcleo: ${wandPassive?.name ?? d.wand}]`)
+    console.log(`  HP inicial: ${hpTotal} (${d.hp.bars.length} barras)`)
+    console.log(`  Núcleo: ${wandPassive?.description ?? "desconhecido"} (effect: ${wandPassive?.effect ?? "-"})`)
+    if ("attackPriorityBonus" in hg) console.log(`  Casa: Prioridade ${(hg as { attackPriorityBonus: number }).attackPriorityBonus > 0 ? "+" : ""}${(hg as { attackPriorityBonus: number }).attackPriorityBonus}`)
+    if ("critBonus" in hg)           console.log(`  Casa: +${Math.round((hg as { critBonus: number }).critBonus * 100)}% crit chance`)
+    if ("thornsPercent" in hg)       console.log(`  Casa: ${Math.round((hg as { thornsPercent: number }).thornsPercent * 100)}% espinhos (thorns)`)
+    if ("manaBonusNonUnforgivable" in hg) console.log(`  Casa: +${(hg as { manaBonusNonUnforgivable: number }).manaBonusNonUnforgivable} mana (não-Imperdoáveis)`)
+    if ("manaStartDelta" in hg) console.log(`  Casa: ${(hg as { manaStartDelta: number }).manaStartDelta} mana inicial`)
+    if (d.spellMana) {
+      const manaLines = Object.entries(d.spellMana).map(([s, m]) => `${s}: ${m.current}/${m.max}`).join(", ")
+      console.log(`  Mana: ${manaLines}`)
+    }
+  }
+  console.log("\n══════════════════════════════════════════════════\n")
 }
 
 // ─── Idle timeout (W.O. por inatividade) ──────────────────────────────────────
@@ -325,8 +370,13 @@ io.on("connection", (socket: Socket) => {
       // Inicia a partida quando a sala está cheia
       if (room.players.size >= room.expectedPlayers && !room.gameStarted) {
         room.gameStarted = true
-        room.duelists = applyRapinomonioBlock([...room.players.values()].map((p) => p.duelist))
+        let initialDuelists = [...room.players.values()].map((p) => p.duelist)
+        initialDuelists = applyRapinomonioBlock(initialDuelists)
+        initialDuelists = applyCentauroBlock(initialDuelists)
+        room.duelists = initialDuelists
 
+        // Debug: exibe passivas ativas ao iniciar a batalha
+        logPassivesDebug(room.duelists)
         console.log(`[Server] GAME_START → sala ${matchId} (${room.players.size} jogadores)`)
 
         // Envia estado personalizado para cada jogador
