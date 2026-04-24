@@ -18,6 +18,7 @@ export interface DbUser {
   isVip?: boolean
   vipExpires?: string | null
   avatarUrl?: string | null
+  isAdmin?: boolean
 }
 
 interface ProfileRow {
@@ -31,9 +32,10 @@ interface ProfileRow {
   is_vip?: boolean | null
   vip_expires?: string | null
   avatar_url?: string | null
+  is_admin?: boolean | null
 }
 
-const PROFILE_SELECT = "id,username,elo,wins,losses,favorite_spell,created_at,is_vip,vip_expires,avatar_url"
+const PROFILE_SELECT = "id,username,elo,wins,losses,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin"
 
 function isVipActive(row: ProfileRow): boolean {
   if (!row.is_vip) return false
@@ -48,6 +50,7 @@ function mapProfile(profile: ProfileRow, email: string): DbUser {
     username: profile.username,
     elo: profile.elo ?? ELO_START,
     wins: profile.wins ?? 0,
+    isAdmin: profile.is_admin ?? false,
     losses: profile.losses ?? 0,
     favoriteSpell: profile.favorite_spell ?? null,
     createdAt: profile.created_at ?? undefined,

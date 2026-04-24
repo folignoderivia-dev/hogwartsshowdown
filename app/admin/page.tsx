@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { getSupabaseClient } from "@/lib/supabase"
 
 interface VipRequest {
   id: string
@@ -21,6 +22,8 @@ export default function AdminPage() {
   const [error, setError] = useState("")
   const [approving, setApproving] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<Record<string, string>>({})
+  const [checkingSession, setCheckingSession] = useState(true)
+  const [adminSecret, setAdminSecret] = useState("")
 
   const fetchRequests = useCallback(async (s: string) => {
     setLoading(true)
@@ -34,12 +37,40 @@ export default function AdminPage() {
       }
       setRequests(data.requests ?? [])
       setAuthenticated(true)
+      setAdminSecret(s)
     } catch {
       setError("Falha de conexão")
     } finally {
       setLoading(false)
     }
   }, [])
+
+  // Verifica se o usuário atual tem is_admin=true na sessão Supabase
+  useEffect(() => {
+    const checkAdminSession = async () => {
+      try {
+        const supabase = getSupabaseClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user?.id) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("is_admin")
+            .eq("id", session.user.id)
+            .maybeSingle()
+          if (data?.is_admin === true) {
+            // Admin logado: buscar requests com senha padrão de admin
+            const envSecret = process.env.NEXT_PUBLIC_ADMIN_SECRET ?? "hogwarts-admin-2026"
+            await fetchRequests(envSecret)
+          }
+        }
+      } catch {
+        // Silencioso — pode não ter sessão
+      } finally {
+        setCheckingSession(false)
+      }
+    }
+    checkAdminSession()
+  }, [fetchRequests])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,12 +83,11 @@ export default function AdminPage() {
       const res = await fetch("/api/vip/grant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminSecret: secret, userId: req.user_id, days }),
+        body: JSON.stringify({ adminSecret, userId: req.user_id, days }),
       })
       const data = await res.json()
       if (res.ok) {
         setFeedback((prev) => ({ ...prev, [req.id]: `✓ VIP ativado por ${days} dias` }))
-        // Atualizar status local
         setRequests((prev) =>
           prev.map((r) => (r.id === req.id ? { ...r, status: "approved" } : r))
         )
@@ -71,13 +101,20 @@ export default function AdminPage() {
     }
   }
 
+  if (checkingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-stone-950">
+        <p className="text-amber-400">Verificando sessão...</p>
+      </div>
+    )
+  }
+
   if (!authenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-stone-950 px-4">
         <div className="w-full max-w-sm rounded-xl border border-amber-800/40 bg-stone-900 p-8 shadow-2xl">
-          <h1 className="mb-6 text-center text-2xl font-bold text-amber-300">
-            🔒 Painel Admin
-          </h1>
+          <h1 className="mb-2 text-center text-2xl font-bold text-amber-300">🔒 Painel Admin</h1>
+          <p className="mb-6 text-center text-xs text-stone-500">Hogwarts Showdown</p>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="mb-1 block text-xs text-amber-400">Senha de Admin</label>
@@ -98,6 +135,9 @@ export default function AdminPage() {
               {loading ? "Verificando..." : "Entrar"}
             </Button>
           </form>
+          <p className="mt-4 text-center text-xs text-stone-600">
+            Ou entre com uma conta Admin no jogo para acesso automático.
+          </p>
         </div>
       </div>
     )
@@ -107,12 +147,15 @@ export default function AdminPage() {
     <div className="min-h-screen bg-stone-950 px-4 py-8">
       <div className="mx-auto max-w-3xl">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-amber-300">👑 VIP Requests</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-amber-300">👑 VIP Requests</h1>
+            <p className="text-xs text-stone-500">{requests.length} pedido(s) encontrado(s)</p>
+          </div>
           <Button
             size="sm"
             variant="outline"
             className="border-amber-700 text-amber-400"
-            onClick={() => fetchRequests(secret)}
+            onClick={() => fetchRequests(adminSecret)}
             disabled={loading}
           >
             {loading ? "Carregando..." : "↻ Atualizar"}
@@ -121,7 +164,7 @@ export default function AdminPage() {
 
         {requests.length === 0 ? (
           <div className="rounded-lg border border-amber-800/30 bg-stone-900 p-8 text-center text-amber-500">
-            Nenhum pedido de VIP pendente.
+            Nenhum pedido de VIP encontrado.
           </div>
         ) : (
           <div className="space-y-3">
@@ -180,6 +223,15 @@ export default function AdminPage() {
                       onClick={() => handleApprove(req, 7)}
                     >
                       7 dias
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-green-800 text-green-400"
+                      disabled={approving === req.user_id}
+                      onClick={() => handleApprove(req, 365)}
+                    >
+                      1 ano
                     </Button>
                   </div>
                 ) : null}
