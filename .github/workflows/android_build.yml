@@ -25,14 +25,15 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # ── 3. Node.js 24 (Capacitor CLI exige >= 22) ────────────────────────────
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
+      # ── 3. Node.js 22 via NodeSource (garante versão correta independente do runner) ──
+      - name: Install Node.js 22 via NodeSource
+        run: |
+          curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          node --version
+          npm --version
 
-      # ── 4. Instalar dependências ──────────────────────────────────────────────
+      # ── 4. Instalar dependências npm ──────────────────────────────────────────
       - name: Install dependencies
         run: npm install
 
@@ -44,7 +45,7 @@ jobs:
       - name: Capacitor sync
         run: npx cap sync android
 
-      # ── 7. Capacitor copy (garante assets atualizados) ───────────────────────
+      # ── 7. Capacitor copy ─────────────────────────────────────────────────────
       - name: Capacitor copy
         run: npx cap copy android
 
