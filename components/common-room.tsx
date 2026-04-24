@@ -15,9 +15,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug } from "lucide-react"
+import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload } from "lucide-react"
 import { formatSpellPower, INITIAL_PLAYER_BUILD, SPELL_DATABASE, type SpellInfo } from "@/lib/data-store"
-import type { PlayerBuild } from "@/lib/types"
+import type { PlayerBuild, CustomRoomSettings } from "@/lib/types"
 import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
 import { getRecentMatchHistory } from "@/lib/database"
 import {
@@ -28,6 +28,8 @@ import {
   loginUser,
   registerUser,
   removeFriend,
+  submitVipRequest,
+  uploadVipAvatar,
   searchUsersByUsername,
   sendFriendMessage,
   signOutUser,
@@ -255,6 +257,36 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     return true
   }
 
+  // ── VIP & Custom Room ───────────────────────────────────────────────────────
+  const [pixModal, setPixModal] = useState(false)
+  const [pixCopied, setPixCopied] = useState(false)
+  const [vipProof, setVipProof] = useState("")
+  const [vipProofSent, setVipProofSent] = useState(false)
+  const [showCustomRoom, setShowCustomRoom] = useState(false)
+  const [customSettings, setCustomSettings] = useState<CustomRoomSettings>({
+    bannedSpells: [], bannedWands: [], bannedPotions: [], turnTimeout: 60, potionLimit: 1,
+  })
+  const isVip = currentUser?.isVip ?? false
+
+  const PIX_KEY = "guilhermefoligno@gmail.com"
+  const META_GOAL = 60
+  const META_CURRENT = 0
+
+  const handlePixCopy = () => {
+    navigator.clipboard.writeText(PIX_KEY).then(() => { setPixCopied(true); setTimeout(() => setPixCopied(false), 2000) })
+  }
+  const handleVipProofSubmit = async () => {
+    if (!currentUser || !vipProof.trim()) return
+    const ok = await submitVipRequest(currentUser.id, currentUser.email, vipProof)
+    if (ok) setVipProofSent(true)
+  }
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !currentUser?.id || !isVip) return
+    const url = await uploadVipAvatar(currentUser.id, file)
+    if (url) onAuthChange({ ...currentUser, avatarUrl: url })
+  }
+
   const isQuidditchMode = gameMode === "quidditch"
   const isReady =
     !!currentUser &&
@@ -436,10 +468,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       potion,
       spells: selectedSpells,
       avatar,
-      gameMode: gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3",
+      gameMode: gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch",
       userId: currentUser.id,
       username: currentUser.username,
       elo: currentUser.elo,
+      isVip,
+      customRoomSettings: showCustomRoom ? customSettings : undefined,
     }
   }
 
@@ -513,6 +547,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
   return (
     <div className="min-h-screen bg-cover bg-center bg-fixed p-2 sm:p-3 lg:p-4" style={{ backgroundImage: "url('https://i.postimg.cc/D0y9DbnS/clube.png')" }}>
+      {/* ── Banner BETA ─────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-amber-900/95 px-4 py-1.5 text-xs font-medium text-amber-100 shadow-md backdrop-blur-sm">
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+        <span>⚠️ FASE BETA: Bugs podem ocorrer. O equilíbrio de jogo está em constante ajuste.</span>
+      </div>
+
       <div className="mx-auto max-w-[1400px]">
         {/* Header with Medieval Style */}
         <header className="mb-5 text-center">
@@ -537,8 +577,10 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </Badge>
             {currentUser ? (
               <>
-                <Badge className="border-amber-600 bg-stone-900 px-3 py-1 text-amber-200">
+                <Badge className={`border-amber-600 bg-stone-900 px-3 py-1 ${isVip ? "text-yellow-300" : "text-amber-200"}`}>
+                  {isVip && <Crown className="mr-1 inline h-3.5 w-3.5 text-yellow-400" />}
                   {currentUser.username} · ELO {currentUser.elo}
+                  {isVip && <span className="ml-1 text-[10px] text-yellow-400">VIP</span>}
                 </Badge>
                 <Button
                   type="button"
@@ -588,6 +630,74 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             )}
           </div>
         </header>
+
+        {/* ── Card Apoie o Projeto ──────────────────────────────────────────── */}
+        <div className="mx-auto mb-4 max-w-xl rounded-xl border border-amber-700/40 bg-stone-900/80 px-5 py-3 shadow-lg">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-amber-300">☕ Meta para Servidor Próprio</p>
+              <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-stone-700">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all"
+                  style={{ width: `${Math.min(100, (META_CURRENT / META_GOAL) * 100)}%` }}
+                />
+              </div>
+              <p className="mt-0.5 text-[10px] text-amber-500">
+                R$ {META_CURRENT} / R$ {META_GOAL} — {META_CURRENT === 0 ? "Seja o primeiro a apoiar!" : "Obrigado!"}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setPixModal(true)}
+              className="shrink-0 border border-amber-600 bg-amber-900/60 text-amber-200 hover:bg-amber-800"
+            >
+              💛 Apoiar
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Modal PIX ────────────────────────────────────────────────────── */}
+        <Dialog open={pixModal} onOpenChange={setPixModal}>
+          <DialogContent className="border-amber-700/50 bg-stone-900 text-amber-100">
+            <DialogHeader>
+              <DialogTitle className="text-amber-300">💛 Apoie o Projeto</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-amber-200/80">
+                Este jogo é um projeto de fã, feito com amor e sem fins lucrativos.<br/>
+                Qualquer contribuição ajuda a manter o servidor no ar!
+              </p>
+              <div className="rounded-lg border border-amber-700/50 bg-stone-800 p-4 text-center">
+                <p className="mb-1 text-xs text-amber-400">Chave PIX (e-mail)</p>
+                <p className="text-lg font-bold text-amber-200">{PIX_KEY}</p>
+                <Button size="sm" variant="outline" onClick={handlePixCopy} className="mt-2 border-amber-700 text-amber-300">
+                  <Copy className="mr-1 h-3.5 w-3.5" />
+                  {pixCopied ? "Copiado! ✓" : "Copiar Chave"}
+                </Button>
+              </div>
+              <p className="text-center text-xs text-amber-500">
+                Valor sugerido: <strong>R$ 10,00</strong> = 30 dias de VIP 👑
+              </p>
+              <div className="border-t border-amber-800/40 pt-3">
+                <p className="mb-2 text-xs text-amber-400">Já pagou? Envie o comprovante para ativação:</p>
+                <textarea
+                  className="w-full rounded border border-amber-700/50 bg-stone-800 px-3 py-2 text-sm text-amber-100 placeholder:text-amber-600"
+                  rows={3}
+                  placeholder="Cole aqui seu ID de transação ou comprovante..."
+                  value={vipProof}
+                  onChange={(e) => setVipProof(e.target.value)}
+                />
+                {vipProofSent
+                  ? <p className="mt-2 text-center text-xs text-green-400">✓ Enviado! Ativação em até 24h.</p>
+                  : <Button className="mt-2 w-full bg-amber-700 text-white hover:bg-amber-600" onClick={handleVipProofSubmit} disabled={!vipProof.trim() || !currentUser}>
+                      Já Paguei — Enviar Comprovante
+                    </Button>
+                }
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <div className="mx-auto grid w-full max-w-[1320px] grid-cols-1 gap-3 lg:grid-cols-[minmax(320px,1fr)_minmax(0,2.4fr)] lg:items-start lg:gap-5">
 
         <Card className={`order-7 min-w-0 border-0 lg:order-none lg:col-start-1 lg:row-start-2 ${showSpectatePanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "mx-auto w-9 bg-transparent shadow-none"}`}>
@@ -1406,6 +1516,95 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </div>
         </div>
 
+        {/* ── Botão Sala Personalizada (VIP) ─────────────────────────────── */}
+        {isVip && gameMode && gameMode !== "teste" && gameMode !== "challenge" && (
+          <div className="mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={`w-full border text-xs ${showCustomRoom ? "border-yellow-500 bg-yellow-900/30 text-yellow-300" : "border-yellow-700/50 bg-stone-800/60 text-yellow-400 hover:bg-yellow-900/20"}`}
+              onClick={() => setShowCustomRoom((v) => !v)}
+            >
+              <Crown className="mr-1.5 h-3.5 w-3.5" />
+              {showCustomRoom ? "Ocultar Regras da Sala" : "Criar Sala Personalizada VIP"}
+            </Button>
+
+            {showCustomRoom && (
+              <div className="mt-2 rounded-lg border border-yellow-700/40 bg-stone-900/90 p-4 text-sm">
+                <p className="mb-3 font-semibold text-yellow-300">👑 Regras da Sala Personalizada</p>
+
+                {/* Timeout de turno */}
+                <div className="mb-3">
+                  <p className="mb-1 text-xs text-amber-400">⏱ Timeout de Turno</p>
+                  <div className="flex gap-2">
+                    {([30, 60, 120, 0] as const).map((t) => (
+                      <Button key={t} size="sm" variant="outline"
+                        onClick={() => setCustomSettings((s) => ({ ...s, turnTimeout: t }))}
+                        className={`text-xs ${customSettings.turnTimeout === t ? "border-yellow-500 bg-yellow-900/40 text-yellow-200" : "border-amber-800 text-amber-400"}`}
+                      >
+                        {t === 0 ? "∞" : `${t}s`}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Limite de poções */}
+                <div className="mb-3">
+                  <p className="mb-1 text-xs text-amber-400">🧪 Limite de Poções por Duelo</p>
+                  <div className="flex gap-2">
+                    {[0, 1, 2, 3, 5].map((n) => (
+                      <Button key={n} size="sm" variant="outline"
+                        onClick={() => setCustomSettings((s) => ({ ...s, potionLimit: n }))}
+                        className={`text-xs ${customSettings.potionLimit === n ? "border-yellow-500 bg-yellow-900/40 text-yellow-200" : "border-amber-800 text-amber-400"}`}
+                      >
+                        {n === 0 ? "Nenhuma" : n}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Feitiços banidos */}
+                <div className="mb-3">
+                  <p className="mb-1 text-xs text-amber-400">🚫 Banir Feitiços (clique para alternar)</p>
+                  <div className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
+                    {["Avada Kedavra", "Crucius", "Imperio", "Flagrate", "Locomotor Mortis"].map((sp) => (
+                      <button key={sp} type="button"
+                        onClick={() => setCustomSettings((s) => ({
+                          ...s,
+                          bannedSpells: s.bannedSpells.includes(sp)
+                            ? s.bannedSpells.filter((x) => x !== sp)
+                            : [...s.bannedSpells, sp],
+                        }))}
+                        className={`rounded px-2 py-0.5 text-[10px] ${customSettings.bannedSpells.includes(sp) ? "bg-red-800 text-red-100" : "bg-stone-700 text-amber-300 hover:bg-stone-600"}`}
+                      >
+                        {customSettings.bannedSpells.includes(sp) ? "✖ " : ""}{sp}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-amber-600">As regras serão compartilhadas com o oponente ao entrar na sala.</p>
+              </div>
+            )}
+          </div>
+        )}
+        {!isVip && isReady && gameMode && gameMode !== "teste" && gameMode !== "challenge" && (
+          <p className="mt-1 text-center text-[10px] text-amber-600/70">
+            👑 <button type="button" className="underline hover:text-amber-400" onClick={() => setPixModal(true)}>Torne-se VIP</button> para criar salas personalizadas
+          </p>
+        )}
+
+        {/* ── Upload de Avatar VIP ─────────────────────────────────────────── */}
+        {isVip && (
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <label className="flex cursor-pointer items-center gap-1.5 rounded border border-yellow-700/50 bg-stone-800/60 px-3 py-1 text-xs text-yellow-400 hover:bg-yellow-900/20">
+              <Upload className="h-3.5 w-3.5" />
+              👑 Trocar Avatar
+              <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+            </label>
+          </div>
+        )}
+
         {isQuidditchMode && isReady && (
           <p className="mt-2 text-center text-xs text-amber-400/80">
             Quadribol não precisa de build. Clique em Criar Sala e compartilhe o código com seu adversário.
@@ -1424,6 +1623,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         )}
         </div>
       </div>
+
+      {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
+      <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-[10px] text-amber-700/60">
+        Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling.
+        Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.
+      </footer>
     </div>
   )
 }

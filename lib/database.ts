@@ -15,6 +15,9 @@ export interface DbUser {
   losses?: number
   favoriteSpell?: string | null
   createdAt?: string
+  isVip?: boolean
+  vipExpires?: string | null
+  avatarUrl?: string | null
 }
 
 interface ProfileRow {
@@ -25,6 +28,17 @@ interface ProfileRow {
   losses?: number | null
   favorite_spell?: string | null
   created_at?: string | null
+  is_vip?: boolean | null
+  vip_expires?: string | null
+  avatar_url?: string | null
+}
+
+const PROFILE_SELECT = "id,username,elo,wins,losses,favorite_spell,created_at,is_vip,vip_expires,avatar_url"
+
+function isVipActive(row: ProfileRow): boolean {
+  if (!row.is_vip) return false
+  if (!row.vip_expires) return true
+  return new Date(row.vip_expires) > new Date()
 }
 
 function mapProfile(profile: ProfileRow, email: string): DbUser {
@@ -37,6 +51,9 @@ function mapProfile(profile: ProfileRow, email: string): DbUser {
     losses: profile.losses ?? 0,
     favoriteSpell: profile.favorite_spell ?? null,
     createdAt: profile.created_at ?? undefined,
+    isVip: isVipActive(profile),
+    vipExpires: profile.vip_expires ?? null,
+    avatarUrl: profile.avatar_url ?? null,
   }
 }
 
@@ -44,7 +61,7 @@ async function getProfileById(id: string): Promise<ProfileRow | null> {
   const supabase = getSupabaseClient()
   const { data, error } = await supabase
     .from("profiles")
-    .select("id,username,elo,wins,losses,favorite_spell,created_at")
+    .select(PROFILE_SELECT)
     .eq("id", id)
     .maybeSingle()
   if (error) return null
@@ -55,20 +72,50 @@ export async function getRankingTop(limit = 50): Promise<DbUser[]> {
   const supabase = getSupabaseClient()
   const { data, error } = await supabase
     .from("profiles")
-    .select("id,username,elo,wins,losses,favorite_spell,created_at")
+    .select(PROFILE_SELECT)
     .order("elo", { ascending: false })
     .limit(limit)
   if (error || !data) return []
-  return (data as ProfileRow[]).map((p) => ({
-    id: p.id,
-    email: "",
-    username: p.username,
-    elo: p.elo ?? ELO_START,
-    wins: p.wins ?? 0,
-    losses: p.losses ?? 0,
-    favoriteSpell: p.favorite_spell ?? null,
-    createdAt: p.created_at ?? undefined,
-  }))
+  return (data as ProfileRow[]).map((p) => mapProfile(p, ""))
+}
+
+/** Concede status VIP por N dias (padrão 30). */
+export async function grantVip(userId: string, days = 30): Promise<boolean> {
+  const supabase = getSupabaseClient()
+  const expires = new Date(Date.now() + days * 86400000).toISOString()
+  const { error } = await supabase
+    .from("profiles")
+    .update({ is_vip: true, vip_expires: expires })
+    .eq("id", userId)
+  return !error
+}
+
+/** Faz upload de avatar customizado para o Supabase Storage (bucket vip-avatars). */
+export async function uploadVipAvatar(userId: string, file: File): Promise<string | null> {
+  const supabase = getSupabaseClient()
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "png"
+  const path = `${userId}.${ext}`
+  const { error: uploadErr } = await supabase.storage
+    .from("vip-avatars")
+    .upload(path, file, { upsert: true, contentType: file.type })
+  if (uploadErr) return null
+  const { data } = supabase.storage.from("vip-avatars").getPublicUrl(path)
+  const url = data.publicUrl
+  await supabase.from("profiles").update({ avatar_url: url }).eq("id", userId)
+  return url
+}
+
+/** Registra uma solicitação manual de VIP ("Já paguei"). */
+export async function submitVipRequest(userId: string, email: string, proofNote: string): Promise<boolean> {
+  const supabase = getSupabaseClient()
+  const { error } = await supabase.from("vip_requests").insert({
+    user_id: userId,
+    email,
+    proof_note: proofNote,
+    status: "pending",
+    created_at: new Date().toISOString(),
+  })
+  return !error
 }
 
 export async function registerUser(

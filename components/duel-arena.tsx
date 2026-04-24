@@ -1586,6 +1586,9 @@ const DuelArena = (
               className="font-bold leading-tight text-amber-100"
               style={{ fontSize: "0.85rem", textShadow: "0 1px 3px #000, 0 0 8px rgba(0,0,0,0.8)" }}
             >
+              {duelist.id === selfDuelistId && playerBuild.isVip && (
+                <span className="mr-1 text-yellow-400" title="Jogador VIP">👑</span>
+              )}
               {duelist.name}
               {((duelist.circumAura ?? 0) > 0 || (circumFlames[duelist.id] ?? 0) > 0) && (
                 <span className="ml-1 text-red-500 drop-shadow-[0_0_6px_#f87171]" title="Circum Inflamare">🔥</span>
@@ -2012,7 +2015,7 @@ const DuelArena = (
 
           {/* ── Painel de Expressões (Emojis) ─────────────────────────────── */}
           {isOnlineMatch && !isReadOnlySpectator && selfDuelistId && socketRef.current?.connected && (
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs text-amber-400/70">Reações:</span>
               {["😂", "😭", "😲", "😡", "🤫", "👍"].map((emoji) => (
                 <button
@@ -2027,6 +2030,25 @@ const DuelArena = (
                   {emoji}
                 </button>
               ))}
+              {/* Emojis exclusivos VIP */}
+              {playerBuild.isVip && (
+                <>
+                  <span className="text-[10px] text-yellow-500/70">👑</span>
+                  {["✨", "🔮", "🧙", "⚡", "💀", "🏆", "🌟", "🦄"].map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className="text-xl transition-transform hover:scale-125 active:scale-95"
+                      title={`VIP: Enviar ${emoji}`}
+                      onClick={() => {
+                        socketRef.current?.emit("send_emoji", { matchId, userId: selfDuelistId, emoji })
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </>
+              )}
               {/* Botão de Denúncia */}
               <button
                 type="button"
