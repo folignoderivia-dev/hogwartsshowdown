@@ -17,6 +17,8 @@ export interface EngineAnimation {
   isBlock?: boolean
   /** Se true, o cliente deve pular o VFX e apenas exibir o FCT (floating combat text). */
   fctOnly?: boolean
+  /** Chave da poção usada (ex: "wiggenweld", "foco"), para exibir nome correto no FCT. */
+  potionType?: string
 }
 
 export interface TurnOutcome {
@@ -432,7 +434,7 @@ export function calculateTurnOutcome(params: {
         }
       }
 
-      animationsToPlay.push({ type: "potion", casterId: attacker.id, targetIds: [attacker.id], targetId: attacker.id, delay: 1000 })
+      animationsToPlay.push({ type: "potion", casterId: attacker.id, targetIds: [attacker.id], targetId: attacker.id, delay: 1000, potionType: potKey })
       if (evaluateOutcome(state)) return { newDuelists: state, logs, animationsToPlay, outcome: evaluateOutcome(state), orderedActions }
       continue
     }

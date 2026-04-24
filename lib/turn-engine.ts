@@ -17,6 +17,8 @@ export interface EngineAnimation {
   isBlock?: boolean
   /** Se true, o cliente deve pular o VFX e apenas exibir o FCT (floating combat text). */
   fctOnly?: boolean
+  /** Chave da poção usada (ex: "wiggenweld", "foco"), para exibir nome correto no FCT. */
+  potionType?: string
 }
 
 export interface TurnOutcome {
@@ -132,7 +134,9 @@ export const calculateAccuracy = (attacker: Duelist, defender: Duelist, base: nu
   ) {
     accuracy -= 15
   }
+  accuracy -= (defender.arrestoStacks ?? 0) * 5
   if (attacker.debuffs.some((d) => d.type === "lumus_acc_down")) accuracy -= 10
+  // ARESTUM MOMENTUM: -5% acerto por stack
   const arestumOnAtk = attacker.debuffs.filter((d) => d.type === "arestum_penalty").length
   if (arestumOnAtk > 0) accuracy -= arestumOnAtk * 5
   if (attacker.nextAccBonusPct) accuracy += attacker.nextAccBonusPct
@@ -395,7 +399,7 @@ export function calculateTurnOutcome(params: {
         }
       }
 
-      animationsToPlay.push({ type: "potion", casterId: attacker.id, targetIds: [attacker.id], targetId: attacker.id, delay: 1000 })
+      animationsToPlay.push({ type: "potion", casterId: attacker.id, targetIds: [attacker.id], targetId: attacker.id, delay: 1000, potionType: potKey })
       if (evaluateOutcome(state)) return { newDuelists: state, logs, animationsToPlay, outcome: evaluateOutcome(state), orderedActions }
       continue
     }
@@ -634,14 +638,16 @@ export function calculateTurnOutcome(params: {
       const ignoresDefense = spell.ignoresDefense === true
       for (const t of targets) {
         const streak = attacker.missStreakBySpell?.[sn] ?? 0
-        const hit = rollHit(attacker, t, spell, streak)
+        const occamyMirror = WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" &&
+          normSpell(params.actions.find((a) => a.casterId === t.id)?.spellName ?? "") === n
+        const hit = rollHit(attacker, t, spell, streak, sn)
         if (!hit) {
           animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: true, isCrit: false, delay: 900, damage: 0, isBlock: false, fctOnly: true })
           continue
         }
-        let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t), n)
+        let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t), n, spell, occamyMirror)
         let isCrit = false
-        if (spell.canCrit !== false && Math.random() < getCritChance(attacker, t, n)) {
+        if (Math.random() < getCritChance(attacker, t, n)) {
           damage *= 2
           isCrit = true
         }
@@ -699,9 +705,12 @@ export function calculateTurnOutcome(params: {
       // ── FLUXO PADRÃO (single target) ────────────────────────────────────────
       } else {
         const streak = attacker.missStreakBySpell?.[sn] ?? 0
-        const hit = rollHit(attacker, target, spell, streak)
+        // Occamy: verifica se o alvo usou o mesmo feitiço nesta rodada
+        const occamyMirror = WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" &&
+          normSpell(params.actions.find((a) => a.casterId === target.id)?.spellName ?? "") === n
+        const hit = rollHit(attacker, target, spell, streak, sn)
         if (hit) {
-          let damage = getSpellMaxPower(spell) > 0 ? calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n) : 0
+          let damage = getSpellMaxPower(spell) > 0 ? calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n, spell, occamyMirror) : 0
           let isCrit = false
 
           // CRUCIUS: +30% dano por debuff no alvo

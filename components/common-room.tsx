@@ -1088,13 +1088,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   ))}
                 </SelectContent>
               </Select>
-              {house && (
-                <div className="mt-3 rounded border border-amber-800/50 bg-amber-950/30 p-2">
-                  <p className="text-xs text-amber-300">
-                    <strong>Passiva:</strong> {HOUSES.find(h => h.value === house)?.modifiers}
-                  </p>
-                </div>
-              )}
+              <div className="mt-3 min-h-[2.75rem] rounded border border-amber-800/50 bg-amber-950/30 p-2">
+                <p className="text-xs text-amber-300">
+                  {house
+                    ? <><strong>Passiva:</strong> {HOUSES.find(h => h.value === house)?.modifiers}</>
+                    : <span className="text-amber-600 italic">Selecione uma casa para ver a passiva</span>
+                  }
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -1129,13 +1130,15 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   })}
                 </SelectContent>
               </Select>
-              {selectedWandCore && (
-                <div className="mt-3 rounded border border-amber-800/50 bg-amber-950/30 p-2">
-                  <p className="text-xs text-amber-300">
-                    <strong>Passiva:</strong> {selectedWandCore.desc}
-                  </p>
-                </div>
-              )}
+              {/* Painel com altura mínima fixa para evitar layout shift ao trocar varinha */}
+              <div className="mt-3 min-h-[2.75rem] rounded border border-amber-800/50 bg-amber-950/30 p-2">
+                <p className="text-xs text-amber-300">
+                  {selectedWandCore
+                    ? <><strong>Passiva:</strong> {selectedWandCore.desc}</>
+                    : <span className="text-amber-600 italic">Selecione um núcleo para ver a passiva</span>
+                  }
+                </p>
+              </div>
             </CardContent>
           </Card>
 

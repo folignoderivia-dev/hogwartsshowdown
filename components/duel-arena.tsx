@@ -1082,7 +1082,8 @@ const DuelArena = (
         } else if (anim.type === "potion" && caster) {
           const pos = getFCTPos(caster.id)
           const id = ++fctCounterRef.current
-          setFloatingTexts((prev) => [...prev, { id, text: `🧪 Poção!`, type: "heal", x: pos.x, y: pos.y }])
+          const potionLabel = anim.potionType ? (POTION_NAMES[anim.potionType] ?? anim.potionType) : "Poção"
+          setFloatingTexts((prev) => [...prev, { id, text: `🧪 ${potionLabel}!`, type: "heal", x: pos.x, y: pos.y }])
           setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2200)
           // Animação de frasco/brilho sobre o avatar
           setPotionGlowId(caster.id)
