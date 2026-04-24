@@ -14,22 +14,25 @@ import type { Duelist, HPState, DebuffType } from "./lib/arena-types"
 import type { RoundAction } from "./lib/duelActions"
 import type { PlayerBuild, GameMode } from "./lib/types"
 
-const PORT = process.env.PORT || 3001
-
 const app = express()
 
-// CORS deve vir antes de tudo no Express.
-// origin: true reflete dinamicamente a origem do cliente — única forma válida
-// com credentials: true (origin: "*" + credentials é bloqueado por todos os browsers).
-app.use(cors({ origin: true, credentials: true }))
-app.options("*", cors({ origin: true, credentials: true })) // preflight explícito
+// 1. CORS — primeira coisa no Express
+app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"], credentials: true }))
+
+// 2. Health check raiz — Railway usa para saber se o container está vivo
+app.get("/", (_req, res) => {
+  res.status(200).json({ status: "Showdown Server Online", port: process.env.PORT })
+})
+
 app.use(express.json())
 
 const httpServer = createServer(app)
+
+// 3. Socket.io com liberação total de transports
 const io = new Server(httpServer, {
   cors: {
-    origin: (origin, callback) => callback(null, true), // reflete qualquer origem
-    methods: ["GET", "POST"],
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
   },
   allowEIO3: true,
@@ -37,6 +40,9 @@ const io = new Server(httpServer, {
   pingInterval: 25000,
   transports: ["polling", "websocket"],
 })
+
+// 4. PORT injetada pelo Railway — NUNCA hardcodar
+const PORT = process.env.PORT || 3001
 
 // ─── Tipos internos ────────────────────────────────────────────────────────────
 
@@ -386,8 +392,6 @@ process.on("unhandledRejection", (reason) => {
 })
 
 // ─── Start ────────────────────────────────────────────────────────────────────
-httpServer.listen(Number(PORT), "0.0.0.0", () => {
-  console.log(`\n🟢 Servidor Showdown rodando em 0.0.0.0:${PORT}`)
-  console.log(`   Health: http://localhost:${PORT}/health`)
-  console.log(`   CORS:   origin=true (dynamic reflection)`)
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`[PRODUÇÃO] Servidor Showdown rodando na porta ${PORT} (Host: 0.0.0.0)`)
 })
