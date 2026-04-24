@@ -63,8 +63,30 @@ const AVATAR_IMAGES: Record<string, string> = {
   bruxa01: "https://i.postimg.cc/brSbWJr6/bruxa01.png",
   bruxa02: "https://i.postimg.cc/L5gfwX5D/bruxa02.png",
   bruxa03: "https://i.postimg.cc/1XV62tXH/bruxa03.png",
+  wizard10: "https://i.postimg.cc/LXbFGK31/pngwing-com-(10).png",
+  wizard11: "https://i.postimg.cc/zBcY4ZFb/pngwing-com-(11).png",
+  wizard12: "https://i.postimg.cc/XJz6tSkp/pngwing-com-(12).png",
+  wizard13: "https://i.postimg.cc/bJBf4c9Z/pngwing-com-(13).png",
+  wizard14: "https://i.postimg.cc/k4pPL3vD/pngwing-com-(14).png",
+  wizard15: "https://i.postimg.cc/C1Qp9TsK/pngwing-com-(15).png",
+  wizard16: "https://i.postimg.cc/SsvbHFfS/pngwing-com-(16).png",
+  wizard17: "https://i.postimg.cc/LXbFGK3m/pngwing-com-(17).png",
+  wizard18: "https://i.postimg.cc/RFFzPVKN/pngwing-com-(18).png",
+  wizard19: "https://i.postimg.cc/B66GhQHZ/pngwing-com-(19).png",
+  wizard20: "https://i.postimg.cc/j55r8dPK/pngwing-com-(20).png",
+  wizard21: "https://i.postimg.cc/yddzfYcH/pngwing-com-(21).png",
+  wizard22: "https://i.postimg.cc/9MMjxFZ2/pngwing-com-(22).png",
+  wizard23: "https://i.postimg.cc/d11KWtdg/pngwing-com-(23).png",
+  wizard24: "https://i.postimg.cc/xCCSsTHh/pngwing-com-(24).png",
+  wizard25: "https://i.postimg.cc/C11VvLD6/pngwing-com-(25).png",
+  wizard26: "https://i.postimg.cc/gJJPMkRf/pngwing-com-(26).png",
+  wizard05: "https://i.postimg.cc/SRYbhTgc/pngwing-com-(5).png",
+  wizard06: "https://i.postimg.cc/rsR2knfx/pngwing-com-(6).png",
+  wizard07: "https://i.postimg.cc/vBNwCFt3/pngwing-com-(7).png",
+  wizard08: "https://i.postimg.cc/Y9sBTKzf/pngwing-com-(8).png",
+  wizard09: "https://i.postimg.cc/gJTb1FHD/pngwing-com-(9).png",
 }
-const DEFAULT_AVATARS = ["bruxo01", "bruxo02", "bruxo03", "bruxa01"]
+const DEFAULT_AVATARS = ["wizard10", "wizard11", "wizard12", "wizard13", "wizard14", "wizard15", "wizard16", "wizard17"]
 const CHALLENGE_LABELS = ["Oitavas", "Quartas", "Semifinal", "Final"]
 const CHALLENGE_BOTS = [
   { name: "Sentinela de Azkaban", house: "slytherin", wand: "dragon", spells: ["Bombarda", "Confrigo", "Crucius", "Imperio", "Protego", "Expelliarmus"] },
@@ -72,11 +94,11 @@ const CHALLENGE_BOTS = [
   { name: "Alquimista Sombrio", house: "ravenclaw", wand: "acromantula", spells: ["Confundos", "Flagellum", "Lumus", "Finite Incantatem", "Fumus", "Episkey"] },
   { name: "Duelista Fantasma", house: "hufflepuff", wand: "kelpie", spells: ["Incendio", "Confrigo", "Diffindo", "Sectumsempra", "Protego Diabólico", "Protego Maximo"] },
 ]
-const HOUSE_SYMBOL: Record<string, string> = {
-  gryffindor: "🦁",
-  slytherin: "🐍",
-  ravenclaw: "🦅",
-  hufflepuff: "🦡",
+const HOUSE_CREST: Record<string, string> = {
+  gryffindor: "https://i.postimg.cc/596PnFYQ/pngwing-com-(2).png",
+  slytherin:  "https://i.postimg.cc/66yHYG2L/pngwing-com-(3).png",
+  ravenclaw:  "https://i.postimg.cc/nVCd0Qj4/pngwing-com-(4).png",
+  hufflepuff: "https://i.postimg.cc/bYs632DQ/pngwing-com-(1).png",
 }
 const POTION_NAMES: Record<string, string> = {
   wiggenweld: "Wiggenweld",
@@ -572,26 +594,27 @@ const DuelArena = (
   /** Deriva texto e tipo de FCT a partir de uma EngineAnimation. */
   const getFCTFromAnim = useCallback(
     (anim: EngineAnimation): { text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" } | null => {
-      if (anim.isMiss) return { text: "Esquivou!", type: "miss" }
-      if (anim.isBlock) return { text: "🛡 Bloqueado!", type: "block" }
+      if (anim.isMiss) return { text: "ERROU!", type: "miss" }
+      if (anim.isBlock) return { text: "🛡 BLOQUEADO!", type: "block" }
       if (!anim.damage || anim.damage <= 0) return null
-      if (anim.isCrit) return { text: `${anim.damage} (Crítico!)`, type: "crit" }
+      if (anim.isCrit) return { text: `${anim.damage} 💥 CRÍTICO!`, type: "crit" }
       return { text: `-${anim.damage}`, type: "damage" }
     },
     []
   )
 
-  /** Obtém posição (% relativa à arena) do HUD de um duelist para posicionar o FCT. */
+  /** Obtém posição (% relativa à arena) do HUD de um duelist para posicionar o FCT.
+   *  Posiciona abaixo do rosto (60% da altura do elemento) para não cobrir o avatar. */
   const getFCTPos = useCallback((targetId: string): { x: number; y: number } => {
     const arena = arenaRef.current
-    if (!arena) return { x: 50, y: 38 }
+    if (!arena) return { x: 50, y: 55 }
     const rect = arena.getBoundingClientRect()
     const el = hudRefs.current[targetId]
-    if (!el) return { x: 50, y: 38 }
+    if (!el) return { x: 50, y: 55 }
     const r = el.getBoundingClientRect()
     return {
       x: ((r.left - rect.left + r.width / 2) / rect.width) * 100,
-      y: ((r.top - rect.top) / rect.height) * 100,
+      y: ((r.top - rect.top + r.height * 0.6) / rect.height) * 100,
     }
   }, [])
 
@@ -995,7 +1018,6 @@ const DuelArena = (
           const acao = anim.isMiss ? "errou" : "conjurou"
           const critLabel = anim.isCrit ? " (Crítico!)" : ""
           setResolutionText(`${caster.name} ${acao} ${anim.spellName}!${critLabel}`)
-          setBattleMessage(`${caster.name} ${acao} ${anim.spellName}!${critLabel}`)
           await sleep(400)
           await playSpellVfx(anim.spellName, caster, targets)
 
@@ -1477,16 +1499,18 @@ const DuelArena = (
         {currentTargetId === duelist.id && <div className="absolute -top-2 left-1/2 z-50 -translate-x-1/2 text-xl text-amber-300">⬇</div>}
         <div className="mb-1 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src={avatar} alt={`Avatar ${duelist.name}`} className={`relative z-50 h-16 w-16 rounded-md border border-amber-700 object-cover ${dead ? "grayscale opacity-50" : ""}`} />
+            <img src={avatar} alt={`Avatar ${duelist.name}`} className={`relative z-50 h-20 w-20 rounded-md border-2 border-amber-700 object-cover ${dead ? "grayscale opacity-50" : ""}`} />
             <div className="text-xs">
-              <p className="relative z-50 font-semibold text-amber-100">
-                {duelist.name}{" "}
+              <p className="relative z-50 flex items-center gap-1 font-semibold text-amber-100">
+                {duelist.name}
                 {((duelist.circumAura ?? 0) > 0 || (circumFlames[duelist.id] ?? 0) > 0) && (
-                  <span className="ml-1 inline-block text-red-500 drop-shadow-[0_0_6px_#f87171]" title="Circum Inflamare">
-                    🔥
-                  </span>
-                )}{" "}
-                <span className="text-amber-300/80">{HOUSE_SYMBOL[duelist.house] || "🪄"}</span>
+                  <span className="inline-block text-red-500 drop-shadow-[0_0_6px_#f87171]" title="Circum Inflamare">🔥</span>
+                )}
+                {HOUSE_CREST[duelist.house] ? (
+                  <img src={HOUSE_CREST[duelist.house]} alt={duelist.house} className="inline-block h-5 w-5 object-contain" />
+                ) : (
+                  <span className="text-amber-300/80">🪄</span>
+                )}
               </p>
               <div className="relative z-50 mt-0.5 flex flex-wrap gap-1">
                 {duelist.debuffs.map((db, idx) => (
@@ -1506,18 +1530,6 @@ const DuelArena = (
             className="pointer-events-none absolute -right-0.5 top-0 z-[60] max-w-[140px] animate-pulse rounded border border-amber-300 bg-amber-950/95 px-1.5 py-0.5 text-center text-[9px] font-extrabold uppercase leading-tight text-amber-100 shadow-md"
           >
             {statusFloater.text}
-          </div>
-        )}
-        {feedbackTargetId === duelist.id && feedbackText && (
-          <div
-            className={`mt-1 rounded px-2 py-1 text-center font-bold ${
-              feedbackText.startsWith("CRÍTICO")
-                ? "border border-yellow-500/70 bg-black/80 text-lg text-yellow-300 shadow-[0_0_12px_rgba(250,204,21,0.5)]"
-                : "bg-black/70 text-xs text-amber-200"
-            }`}
-            style={feedbackText.startsWith("CRÍTICO") ? { animation: "duel-crit-shake 0.14s ease-in-out 10" } : undefined}
-          >
-            {feedbackText}
           </div>
         )}
         {dead && <Badge className="mt-2 border border-red-700 bg-red-950 text-[10px] text-red-200">DERROTADO</Badge>}

@@ -79,13 +79,30 @@ const POTIONS = [
 
 
 const AVATARS = [
-  { value: "bruxo01", label: "Bruxo 01", image: "https://i.postimg.cc/x8NHhC8x/bruxo01.png" },
-  { value: "bruxo02", label: "Bruxo 02", image: "https://i.postimg.cc/nr97gzrY/bruxo02.png" },
-  { value: "bruxo03", label: "Bruxo 03", image: "https://i.postimg.cc/QCK5wtCg/bruxo03.png" },
-  { value: "bruxa01", label: "Bruxa 01", image: "https://i.postimg.cc/brSbWJr6/bruxa01.png" },
-  { value: "bruxa02", label: "Bruxa 02", image: "https://i.postimg.cc/L5gfwX5D/bruxa02.png" },
-  { value: "bruxa03", label: "Bruxa 03", image: "https://i.postimg.cc/1XV62tXH/bruxa03.png" },
+  { value: "wizard10", label: "Bruxo I",    image: "https://i.postimg.cc/LXbFGK31/pngwing-com-(10).png" },
+  { value: "wizard11", label: "Bruxo II",   image: "https://i.postimg.cc/zBcY4ZFb/pngwing-com-(11).png" },
+  { value: "wizard12", label: "Bruxo III",  image: "https://i.postimg.cc/XJz6tSkp/pngwing-com-(12).png" },
+  { value: "wizard13", label: "Bruxo IV",   image: "https://i.postimg.cc/bJBf4c9Z/pngwing-com-(13).png" },
+  { value: "wizard14", label: "Bruxo V",    image: "https://i.postimg.cc/k4pPL3vD/pngwing-com-(14).png" },
+  { value: "wizard15", label: "Bruxo VI",   image: "https://i.postimg.cc/C1Qp9TsK/pngwing-com-(15).png" },
+  { value: "wizard16", label: "Bruxo VII",  image: "https://i.postimg.cc/SsvbHFfS/pngwing-com-(16).png" },
+  { value: "wizard17", label: "Bruxo VIII", image: "https://i.postimg.cc/LXbFGK3m/pngwing-com-(17).png" },
+  { value: "wizard18", label: "Bruxo IX",   image: "https://i.postimg.cc/RFFzPVKN/pngwing-com-(18).png" },
+  { value: "wizard19", label: "Bruxo X",    image: "https://i.postimg.cc/B66GhQHZ/pngwing-com-(19).png" },
+  { value: "wizard20", label: "Bruxo XI",   image: "https://i.postimg.cc/j55r8dPK/pngwing-com-(20).png" },
+  { value: "wizard21", label: "Bruxa I",    image: "https://i.postimg.cc/yddzfYcH/pngwing-com-(21).png" },
+  { value: "wizard22", label: "Bruxa II",   image: "https://i.postimg.cc/9MMjxFZ2/pngwing-com-(22).png" },
+  { value: "wizard23", label: "Bruxa III",  image: "https://i.postimg.cc/d11KWtdg/pngwing-com-(23).png" },
+  { value: "wizard24", label: "Bruxa IV",   image: "https://i.postimg.cc/xCCSsTHh/pngwing-com-(24).png" },
+  { value: "wizard25", label: "Bruxa V",    image: "https://i.postimg.cc/C11VvLD6/pngwing-com-(25).png" },
+  { value: "wizard26", label: "Bruxa VI",   image: "https://i.postimg.cc/gJJPMkRf/pngwing-com-(26).png" },
+  { value: "wizard05", label: "Mago I",     image: "https://i.postimg.cc/SRYbhTgc/pngwing-com-(5).png" },
+  { value: "wizard06", label: "Mago II",    image: "https://i.postimg.cc/rsR2knfx/pngwing-com-(6).png" },
+  { value: "wizard07", label: "Mago III",   image: "https://i.postimg.cc/vBNwCFt3/pngwing-com-(7).png" },
+  { value: "wizard08", label: "Mago IV",    image: "https://i.postimg.cc/Y9sBTKzf/pngwing-com-(8).png" },
+  { value: "wizard09", label: "Mago V",     image: "https://i.postimg.cc/gJTb1FHD/pngwing-com-(9).png" },
 ]
+const AVATARS_PER_PAGE = 6
 
 const GAME_MODES = [
   { value: "teste", label: "TESTE (BOT)" },
@@ -131,6 +148,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [wand, setWand] = useState("")
   const [potion, setPotion] = useState("")
   const [avatar, setAvatar] = useState("")
+  const [avatarPage, setAvatarPage] = useState(0)
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
   const [gameMode, setGameMode] = useState<"teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "">("")
@@ -941,15 +959,16 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               </div>
               <div>
                 <p className="mb-2 text-sm text-amber-300">Escolha seu avatar</p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {AVATARS.map((av) => (
+                {/* Galeria paginada — 6 por página */}
+                <div className="grid grid-cols-3 gap-2">
+                  {AVATARS.slice(avatarPage * AVATARS_PER_PAGE, avatarPage * AVATARS_PER_PAGE + AVATARS_PER_PAGE).map((av) => (
                     <button
                       key={av.value}
                       type="button"
                       onClick={() => setAvatar(av.value)}
                       className={`overflow-hidden rounded-lg border-2 transition-all ${
                         avatar === av.value
-                          ? "border-amber-500 ring-2 ring-amber-300/40"
+                          ? "border-amber-500 ring-2 ring-amber-300/40 shadow-[0_0_10px_rgba(251,191,36,0.5)]"
                           : "border-stone-700 hover:border-amber-700"
                       }`}
                     >
@@ -963,11 +982,33 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           target.onerror = null
                           target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(av.label)}&background=2d1a0f&color=fbbf24&size=256`
                         }}
-                        className="h-20 w-full object-cover"
+                        className="h-24 w-full object-contain bg-stone-950/60"
                       />
-                      <div className="bg-stone-900 px-2 py-1 text-xs text-amber-200">{av.label}</div>
+                      <div className="bg-stone-900/90 px-1 py-0.5 text-center text-[10px] text-amber-200">{av.label}</div>
                     </button>
                   ))}
+                </div>
+                {/* Controles de paginação */}
+                <div className="mt-2 flex items-center justify-between">
+                  <button
+                    type="button"
+                    disabled={avatarPage === 0}
+                    onClick={() => setAvatarPage((p) => Math.max(0, p - 1))}
+                    className="rounded border border-amber-800 bg-stone-800 px-3 py-1 text-sm text-amber-300 hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    ← Anterior
+                  </button>
+                  <span className="text-xs text-amber-400">
+                    {avatarPage * AVATARS_PER_PAGE + 1}–{Math.min((avatarPage + 1) * AVATARS_PER_PAGE, AVATARS.length)} de {AVATARS.length}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={(avatarPage + 1) * AVATARS_PER_PAGE >= AVATARS.length}
+                    onClick={() => setAvatarPage((p) => p + 1)}
+                    className="rounded border border-amber-800 bg-stone-800 px-3 py-1 text-sm text-amber-300 hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Próximo →
+                  </button>
                 </div>
                 {selectedAvatar && (
                   <p className="mt-2 text-xs text-amber-300">Selecionado: {selectedAvatar.label}</p>
