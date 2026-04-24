@@ -28,6 +28,10 @@ export type DebuffType =
   | "damage_reduce"
   | "protego_diabol"
   | "crit_down"
+  // Status de poções
+  | "undead"    // HP não cai abaixo de 1 (1 turno)
+  | "immunity"  // Imune a novos debuffs (1 turno)
+  | "charm"     // Se receber buff/cura, o usuário da Amortentia recebe igual
 
 export type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 
@@ -74,6 +78,10 @@ export interface Duelist {
   defense?: number
   /** Dano recebido neste turno (para Locomotor Mortis) */
   damageReceivedThisTurn?: number
+  /** Poções já usadas nesta batalha (uso único garantido pelo servidor) */
+  usedPotions?: string[]
+  /** Bônus permanente de acurácia (Poção Foco) */
+  permanentAccBonus?: number
 }
 
 export type Point = { x: number; y: number }

@@ -109,6 +109,9 @@ const POTION_NAMES: Record<string, string> = {
   maxima: "Maxima",
   foco: "Foco",
   merlin: "Poção de Merlin",
+  felix: "Felix Felicis",
+  aconito: "Acônito",
+  amortentia: "Amortentia",
 }
 const DEBUFF_LABEL: Record<DebuffType, string> = {
   burn: "🔥 BURN",
@@ -139,6 +142,9 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   damage_reduce: "⬇️ DANO-25%",
   protego_diabol: "🛡️ DIABÓLICO",
   crit_down: "⬇️ CRIT-10%",
+  undead: "💀 IMORTAL(1t)",
+  immunity: "🛡️ IMUNIDADE",
+  charm: "💖 ENCANTO",
 }
 /** Mensagem flutuante curta ao aplicar debuff do grimório. */
 const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
@@ -163,6 +169,9 @@ const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
   crit_boost: "CRÍTICO+!",
   unforgivable_acc_down: "IMPERDOÁVEIS -15% ACC!",
   protego_maximo: "PROTEGO MAXIMO!",
+  undead: "IMORTAL!",
+  immunity: "IMUNE!",
+  charm: "ENCANTOU!",
 }
 const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
 
@@ -539,6 +548,8 @@ const DuelArena = (
   const [currentTargetId, setCurrentTargetId] = useState<string | null>(null)
   const [impactTargetId, setImpactTargetId] = useState<string | null>(null)
   const [arenaVfx, setArenaVfx] = useState<ArenaVfxState>(null)
+  /** ID do avatar recebendo animação de poção (frasco brilhante) */
+  const [potionGlowId, setPotionGlowId] = useState<string | null>(null)
   const [circumFlames, setCircumFlames] = useState<Record<string, number>>({})
   const arenaVfxKeyRef = useRef(0)
   const resolvingRef = useRef(false)
@@ -1049,7 +1060,10 @@ const DuelArena = (
           const id = ++fctCounterRef.current
           setFloatingTexts((prev) => [...prev, { id, text: `🧪 Poção!`, type: "heal", x: pos.x, y: pos.y }])
           setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 2200)
-          await sleep(300)
+          // Animação de frasco/brilho sobre o avatar
+          setPotionGlowId(caster.id)
+          setTimeout(() => setPotionGlowId(null), 1200)
+          await sleep(400)
         }
         await sleep(anim.delay ?? 900)
       }
@@ -1526,11 +1540,20 @@ const DuelArena = (
         {currentTargetId === duelist.id && <div className="absolute -top-2 left-1/2 z-50 -translate-x-1/2 text-xl text-amber-300">⬇</div>}
         <div className="mb-1 flex items-start gap-2">
           {/* Avatar */}
-          <img
-            src={avatar}
-            alt={`Avatar ${duelist.name}`}
-            className={`relative z-50 h-[88px] w-[72px] flex-shrink-0 rounded-md border-2 border-amber-700 object-contain ${dead ? "grayscale opacity-50" : ""}`}
-          />
+          <div className="relative flex-shrink-0">
+            <img
+              src={avatar}
+              alt={`Avatar ${duelist.name}`}
+              className={`relative z-50 h-[88px] w-[72px] rounded-md border-2 border-amber-700 object-contain ${dead ? "grayscale opacity-50" : ""}`}
+            />
+            {/* Animação de frasco de poção */}
+            {potionGlowId === duelist.id && (
+              <div className="pointer-events-none absolute inset-0 z-[60] flex flex-col items-center justify-center rounded-md animate-pulse">
+                <span className="text-3xl drop-shadow-[0_0_12px_#a855f7]">🧪</span>
+                <div className="absolute inset-0 rounded-md bg-purple-400/30 ring-2 ring-purple-400" />
+              </div>
+            )}
+          </div>
           {/* Info */}
           <div className="relative z-50 flex min-w-0 flex-1 flex-col gap-1">
             {/* Nome + chama */}
@@ -1940,23 +1963,25 @@ const DuelArena = (
                   </Button>
                 )
               })}
-              {!potionUsed && (
-                <Button
-                  disabled={
-                    !!gameOver ||
-                    battleStatus !== "selecting" ||
-                    playerDefeated ||
-                    !isBattleReady ||
-                    (isOnlineMatch && !gameStartAcknowledged) ||
-                    awaitingServerAck
-                  }
-                  onClick={usePotion}
-                  className="border border-purple-700 bg-purple-900 text-purple-100 hover:bg-purple-800"
-                >
-                  <FlaskConical className="mr-1 h-3.5 w-3.5" />
-                  {POTION_NAMES[playerBuild.potion] || "Pocao"}
-                </Button>
-              )}
+              <Button
+                disabled={
+                  potionUsed ||
+                  !!gameOver ||
+                  battleStatus !== "selecting" ||
+                  playerDefeated ||
+                  !isBattleReady ||
+                  (isOnlineMatch && !gameStartAcknowledged) ||
+                  awaitingServerAck ||
+                  !!(player?.debuffs.some((d) => d.type === "no_potion"))
+                }
+                onClick={usePotion}
+                title={potionUsed ? "Poção já usada nesta batalha" : undefined}
+                className={`border border-purple-700 text-purple-100 ${potionUsed ? "bg-stone-800 opacity-50 cursor-not-allowed" : "bg-purple-900 hover:bg-purple-800"}`}
+              >
+                <FlaskConical className="mr-1 h-3.5 w-3.5" />
+                {POTION_NAMES[playerBuild.potion] || "Poção"}
+                {potionUsed && " (usada)"}
+              </Button>
             </div>
           )}
 

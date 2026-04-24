@@ -128,6 +128,7 @@ export const calculateAccuracy = (attacker: Duelist, defender: Duelist, base: nu
   const arestumOnAtk = attacker.debuffs.filter((d) => d.type === "arestum_penalty").length
   if (arestumOnAtk > 0) accuracy -= arestumOnAtk * 5
   if (attacker.nextAccBonusPct) accuracy += attacker.nextAccBonusPct
+  if (attacker.permanentAccBonus) accuracy += attacker.permanentAccBonus
   return Math.max(5, Math.min(100, accuracy))
 }
 
@@ -281,21 +282,105 @@ export function calculateTurnOutcome(params: {
 
     if (action.type === "potion") {
       const potKey = action.potionType || "foco"
-      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} usou poção (${potKey})!`)
-      if (potKey === "wiggenweld") {
-        state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healCurrentBar(d.hp, 100) } : d))
-      } else if (potKey === "edurus") {
-        state = state.map((d) => (d.id === attacker.id ? { ...d, debuffs: [] } : d))
-      } else if (potKey === "mortovivo") {
-        state = state.map((d) => (d.id === attacker.id ? { ...d, destinyBond: true } : d))
-      } else if (potKey === "maxima") {
-        state = state.map((d) => {
-          if (d.id === attacker.id) return { ...d, nextDamagePotionMult: 2 }
-          return { ...d, debuffs: [...d.debuffs, { type: "damage_amp" as const, duration: 1 }] }
-        })
-      } else if (potKey === "foco") {
-        state = state.map((d) => (d.id === attacker.id ? { ...d, nextAccBonusPct: 30 } : d))
+
+      // USO ÚNICO: rejeita se a poção já foi usada nesta batalha
+      if (attacker.usedPotions?.includes(potKey)) {
+        logs.push(`→ ${attacker.name} já usou a poção (${potKey}) nesta batalha!`)
+        continue
       }
+      state = state.map((d) => d.id === attacker.id ? { ...d, usedPotions: [...(d.usedPotions ?? []), potKey] } : d)
+
+      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} usou poção (${potKey})!`)
+
+      if (potKey === "wiggenweld") {
+        const lastDmg = params.duelists.find((d) => d.id === attacker.id)?.damageReceivedThisTurn ?? 0
+        const healAmt = Math.max(0, lastDmg)
+        state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healAmt > 0 ? healFlatTotal(d.hp, healAmt) : d.hp } : d))
+        const charmDebuff = attacker.debuffs.find((x) => x.type === "charm")
+        if (charmDebuff?.meta && healAmt > 0) {
+          state = state.map((d) => d.id === charmDebuff.meta ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d)
+          logs.push(`→ CHARM: ${charmDebuff.meta} também recuperou ${healAmt} HP!`)
+        }
+        logs.push(`→ ${attacker.name} usou Wiggenweld! Recuperou ${healAmt} HP (= dano anterior).`)
+
+      } else if (potKey === "edurus") {
+        state = state.map((d) =>
+          d.id === attacker.id
+            ? { ...d, debuffs: [...d.debuffs.filter((x) => x.irremovable), { type: "immunity" as DebuffType, duration: 1 }] }
+            : d
+        )
+        logs.push(`→ ${attacker.name} usou Edurus! Todos os debuffs limpos + Imunidade por 1 turno.`)
+
+      } else if (potKey === "mortovivo") {
+        state = state.map((d) =>
+          d.id === attacker.id
+            ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "undead"), { type: "undead" as DebuffType, duration: 1 }] }
+            : d
+        )
+        logs.push(`→ ${attacker.name} usou Morto Vivo! HP não cairá abaixo de 1 por 1 turno.`)
+
+      } else if (potKey === "maxima") {
+        state = state.map((d) => (d.id === attacker.id ? { ...d, nextDamagePotionMult: 1.5 } : d))
+        logs.push(`→ ${attacker.name} usou Maxima! +50% dano no próximo turno.`)
+
+      } else if (potKey === "foco") {
+        state = state.map((d) => (d.id === attacker.id ? { ...d, permanentAccBonus: (d.permanentAccBonus ?? 0) + 10 } : d))
+        logs.push(`→ ${attacker.name} usou Foco! +10% Accuracy permanente.`)
+
+      } else if (potKey === "merlin") {
+        const opponent = state.find((d) => d.team !== attacker.team && !isDefeated(d.hp))
+        if (opponent?.spellMana && attacker.spellMana) {
+          const atkEntries = Object.entries(attacker.spellMana)
+          const oppEntries = Object.entries(opponent.spellMana)
+          if (atkEntries.length && oppEntries.length) {
+            const minAtkEntry = atkEntries.reduce((a, b) => a[1].current <= b[1].current ? a : b)
+            const maxOppEntry = oppEntries.reduce((a, b) => a[1].current >= b[1].current ? a : b)
+            const gainedMana = maxOppEntry[1].current
+            state = state.map((d) => {
+              if (d.id !== attacker.id) return d
+              const sm = { ...(d.spellMana ?? {}) }
+              sm[minAtkEntry[0]] = { ...sm[minAtkEntry[0]], current: Math.min(sm[minAtkEntry[0]].max, gainedMana) }
+              return { ...d, spellMana: sm }
+            })
+            logs.push(`→ ${attacker.name} usou Poção de Merlin! "${minAtkEntry[0]}" ganhou ${Math.min(attacker.spellMana[minAtkEntry[0]].max, gainedMana)} de mana.`)
+          }
+        }
+
+      } else if (potKey === "felix") {
+        state = state.map((d) => {
+          if (d.id !== attacker.id) return d
+          const sm = { ...(d.spellMana ?? {}) }
+          const entries = Object.entries(sm)
+          if (!entries.length) return d
+          const minEntry = entries.reduce((a, b) => (a[1].current / a[1].max) <= (b[1].current / b[1].max) ? a : b)
+          sm[minEntry[0]] = { ...sm[minEntry[0]], current: sm[minEntry[0]].max }
+          return { ...d, spellMana: sm }
+        })
+        logs.push(`→ ${attacker.name} usou Felix Felicis! Mana de uma spell totalmente restaurada.`)
+
+      } else if (potKey === "aconito") {
+        const target = state.find((d) => d.team !== attacker.team && !isDefeated(d.hp))
+        if (target) {
+          state = state.map((d) =>
+            d.id === target.id
+              ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "poison"), { type: "poison" as DebuffType, duration: 4 }] }
+              : d
+          )
+          logs.push(`→ ${attacker.name} usou Acônito! ${target.name} envenenado por 4 turnos.`)
+        }
+
+      } else if (potKey === "amortentia") {
+        const target = state.find((d) => d.team !== attacker.team && !isDefeated(d.hp))
+        if (target) {
+          state = state.map((d) =>
+            d.id === target.id
+              ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "charm"), { type: "charm" as DebuffType, duration: 2, meta: attacker.id }] }
+              : d
+          )
+          logs.push(`→ ${attacker.name} usou Amortentia! ${target.name} está encantado por 2 turnos.`)
+        }
+      }
+
       animationsToPlay.push({ type: "potion", casterId: attacker.id, targetIds: [attacker.id], targetId: attacker.id, delay: 1000 })
       if (evaluateOutcome(state)) return { newDuelists: state, logs, animationsToPlay, outcome: evaluateOutcome(state), orderedActions }
       continue
@@ -350,6 +435,8 @@ export function calculateTurnOutcome(params: {
       if (!spell.debuff) return
       const before = state.find((d) => d.id === defenderId)
       if (before?.debuffs.some((d) => d.type === "anti_debuff")) return
+      // IMMUNITY (Edurus): bloqueia todos os novos debuffs por 1 turno
+      if (before?.debuffs.some((d) => d.type === "immunity")) return
       if (Math.random() * 100 <= spell.debuff.chance) {
         let dur = spell.debuff.duration || 1
         if (WAND_PASSIVES[attacker.wand]?.effect === "basilisk_debuff_duration") dur += 1
@@ -366,9 +453,15 @@ export function calculateTurnOutcome(params: {
     const applyDamageWithCircum = (defId: string, dmg: number, dealerId: string, sourceSpellNorm?: string) => {
       const def = state.find((d) => d.id === defId)
       if (!def) return
+      // UNDEAD: HP não pode cair abaixo de 1 neste turno
+      let effectiveDmg = dmg
+      if (def.debuffs.some((x) => x.type === "undead")) {
+        const totalHp = getTotalHP(def.hp)
+        effectiveDmg = Math.max(0, Math.min(effectiveDmg, totalHp - 1))
+      }
       state = state.map((d) =>
         d.id === defId
-          ? { ...d, hp: applyDamage(d.hp, dmg, { thestral: d.wand === "thestral" }), damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + dmg }
+          ? { ...d, hp: applyDamage(d.hp, effectiveDmg, { thestral: d.wand === "thestral" }), damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + effectiveDmg }
           : d
       )
       if (def.debuffs.some((d) => d.type === "salvio_reflect") && dealerId !== defId && dmg > 0) {
@@ -399,6 +492,12 @@ export function calculateTurnOutcome(params: {
         if (!bloqueiosCura) {
           const healAmt = Math.floor(Math.random() * 126) + 25
           state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d))
+          // CHARM: espelha a cura para quem encantou o atacante
+          const charmDebuff = attacker.debuffs.find((x) => x.type === "charm")
+          if (charmDebuff?.meta) {
+            state = state.map((d) => d.id === charmDebuff.meta ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d)
+            logs.push(`→ CHARM: ${charmDebuff.meta} também recuperou ${healAmt} HP!`)
+          }
         } else {
           logs.push(`→ ${attacker.name} tentou usar ${sn}, mas cura está bloqueada!`)
         }
@@ -423,6 +522,14 @@ export function calculateTurnOutcome(params: {
               }
             : d
         )
+        // CHARM: espelha a cura de Episkey para quem encantou o atacante
+        if (!bloqueiosCura) {
+          const charmDebuff = attacker.debuffs.find((x) => x.type === "charm")
+          if (charmDebuff?.meta) {
+            state = state.map((d) => d.id === charmDebuff.meta ? { ...d, hp: healFlatTotal(d.hp, 50) } : d)
+            logs.push(`→ CHARM: ${charmDebuff.meta} também recuperou 50 HP!`)
+          }
+        }
       } else if (n.includes("protego") && n.includes("maximo")) {
         state = state.map((d) =>
           d.id === attacker.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "protego_maximo"), { type: "protego_maximo", duration: 2 }] } : d
@@ -449,6 +556,8 @@ export function calculateTurnOutcome(params: {
         maximosChargePct: undefined,
         circumAura: undefined,
         destinyBond: false,
+        permanentAccBonus: undefined,
+        usedPotions: [],
       }))
     } else if (n.includes("circum")) {
       for (const t of targets) {
@@ -692,6 +801,11 @@ export function calculateTurnOutcome(params: {
     if (atkAfter && WAND_PASSIVES[atkAfter.wand]?.effect === "phoenix_regen") {
       const pct = Math.floor(Math.random() * 21) + 5
       state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healCurrentBar(d.hp, pct) } : d))
+      // CHARM: espelha a cura de Phoenix para quem encantou o atacante
+      const charmDebuff = atkAfter.debuffs.find((x) => x.type === "charm")
+      if (charmDebuff?.meta) {
+        state = state.map((d) => d.id === charmDebuff.meta ? { ...d, hp: healCurrentBar(d.hp, pct) } : d)
+      }
     }
 
     const outcomeMid = evaluateOutcome(state)
