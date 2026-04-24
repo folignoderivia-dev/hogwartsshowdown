@@ -1448,7 +1448,7 @@ const DuelArena = (
   const bottomDuelists = useMemo(() => duelists.filter((d) => d.team === "player"), [duelists])
 
   return (
-    <div className="min-h-screen bg-cover bg-center bg-fixed font-serif text-amber-100" style={{ backgroundImage: "url('https://i.postimg.cc/D0y9DbnS/clube.png')" }}>
+    <div className="min-h-screen bg-stone-800 font-serif text-amber-100">
       <header className="border-b-4 border-amber-900 bg-stone-950/90 px-4 py-3">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <h1 className="text-2xl font-bold text-amber-300">⚔️ Arena de Duelo</h1>

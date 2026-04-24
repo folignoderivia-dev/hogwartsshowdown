@@ -413,13 +413,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const effectiveName = currentUser?.username || name
 
   return (
-    <div className="min-h-screen wood-bg p-2 sm:p-3 lg:p-4">
+    <div className="min-h-screen bg-cover bg-center bg-fixed p-2 sm:p-3 lg:p-4" style={{ backgroundImage: "url('https://i.postimg.cc/D0y9DbnS/clube.png')" }}>
       <div className="mx-auto max-w-[1400px]">
         {/* Header with Medieval Style */}
         <header className="mb-5 text-center">
           <div className="medieval-frame mx-auto mb-3 inline-block rounded-lg bg-gradient-to-b from-amber-900/80 to-amber-950/90 px-6 py-3">
             <h1 className="text-3xl font-bold tracking-tight text-amber-200" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>
-              🪄 Hogwarts Showdown 🪄
+              ✦ Hogwarts Showdown ✦
             </h1>
             <p className="mt-1 text-amber-100/90">Monte sua Build e duele! Pvp Multiplayer</p>
           </div>

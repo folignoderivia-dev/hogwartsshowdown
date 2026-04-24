@@ -242,7 +242,7 @@ export default function PageClient() {
   }
 
   return (
-    <main className="min-h-screen bg-cover bg-center bg-fixed" style={{ backgroundImage: "url('https://i.postimg.cc/D0y9DbnS/clube.png')" }}>
+    <main className="min-h-screen">
       {screen === "setup" ? (
         <CommonRoom
           currentUser={accountUser}
