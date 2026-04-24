@@ -690,31 +690,81 @@ io.on("connection", (socket: Socket) => {
   // ── LEAVE_MATCH ───────────────────────────────────────────────────────────────
   socket.on("LEAVE_MATCH", ({ matchId, userId }: { matchId: string; userId: string }) => {
     socket.leave(matchId)
+
+    // ── Duelo normal ─────────────────────────────────────────────────────────
     const room = activeMatches.get(matchId)
-    if (!room) return
-    console.log(`[Server] LEAVE_MATCH: ${userId.slice(0, 8)}… saiu de ${matchId}`)
-    // Remove espectador se for o caso
-    if (room.spectators.has(userId)) {
-      room.spectators.delete(userId)
-      broadcastActiveMatches()
+    if (room) {
+      console.log(`[Server] LEAVE_MATCH: ${userId.slice(0, 8)}… saiu de ${matchId}`)
+
+      // Remove espectador
+      if (room.spectators.has(userId)) {
+        room.spectators.delete(userId)
+        broadcastActiveMatches()
+      } else if (room.players.has(userId)) {
+        // Remove jogador do mapa da sala
+        room.players.delete(userId)
+        if (room.gameStarted) {
+          clearIdleTimer(room)
+          socket.to(matchId).emit("OPPONENT_LEFT", { userId })
+        }
+        // Se não sobrou nenhum jogador, limpa a sala completamente
+        if (room.players.size === 0) {
+          clearIdleTimer(room)
+          activeMatches.delete(matchId)
+          console.log(`[Server] Sala ${matchId} removida (sem jogadores).`)
+        }
+        broadcastActiveMatches()
+      }
       return
     }
-    if (room.gameStarted && room.players.has(userId)) {
-      clearIdleTimer(room)
+
+    // ── Quadribol ────────────────────────────────────────────────────────────
+    const qRoom = quidditchRooms.get(matchId)
+    if (qRoom && qRoom.players.has(userId)) {
+      console.log(`[Server] LEAVE_MATCH (Quidditch): ${userId.slice(0, 8)}… saiu de ${matchId}`)
+      qRoom.players.delete(userId)
       socket.to(matchId).emit("OPPONENT_LEFT", { userId })
+      if (qRoom.players.size === 0) {
+        quidditchRooms.delete(matchId)
+        console.log(`[Server] Sala Quidditch ${matchId} removida.`)
+      }
     }
   })
 
   // ── disconnect ────────────────────────────────────────────────────────────────
   socket.on("disconnect", () => {
-    const matchId = (socket as any)._arenaMatchId as string | undefined
-    const userId = (socket as any)._arenaUserId as string | undefined
+    const matchId     = (socket as any)._arenaMatchId as string | undefined
+    const userId      = (socket as any)._arenaUserId as string | undefined
+    const qMatchId    = (socket as any)._quidditchMatchId as string | undefined
+    const qUserId     = (socket as any)._quidditchUserId as string | undefined
     console.log(`[Server] Desconectado: ${socket.id} (userId=${userId?.slice(0, 8)}…)`)
-    if (!matchId || !userId) return
-    const room = activeMatches.get(matchId)
-    if (!room) return
-    if (room.gameStarted) {
-      socket.to(matchId).emit("OPPONENT_DISCONNECTED", { userId })
+
+    // Duelo normal
+    if (matchId && userId) {
+      const room = activeMatches.get(matchId)
+      if (room) {
+        if (room.gameStarted) {
+          socket.to(matchId).emit("OPPONENT_DISCONNECTED", { userId })
+        }
+        // Remove da sala; se vazia, limpa
+        room.players.delete(userId)
+        if (room.players.size === 0) {
+          clearIdleTimer(room)
+          activeMatches.delete(matchId)
+        }
+      }
+    }
+
+    // Quadribol
+    if (qMatchId && qUserId) {
+      const qRoom = quidditchRooms.get(qMatchId)
+      if (qRoom) {
+        qRoom.players.delete(qUserId)
+        socket.to(qMatchId).emit("OPPONENT_DISCONNECTED", { userId: qUserId })
+        if (qRoom.players.size === 0) {
+          quidditchRooms.delete(qMatchId)
+        }
+      }
     }
   })
 

@@ -92,6 +92,25 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Safe area para Capacitor/APK (notch, home bar do Android) */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  /* Garante que 100vh inclua a área de safe-area em WebViews do Capacitor */
+  html {
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+  body {
+    min-height: 100%;
+    min-height: -webkit-fill-available;
+  }
+  /* Scrollbars (desktop) — invisíveis no mobile */
+  * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

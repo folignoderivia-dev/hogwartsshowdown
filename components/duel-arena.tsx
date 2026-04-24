@@ -1510,12 +1510,15 @@ const DuelArena = (
       const supabase = getSupabaseClient()
       const leavingId = selfDuelistId
       if (matchId && leavingId && !isOfflineMode && !isReadOnlySpectator) {
+        // Remove o jogador da partida no banco
         await supabase
           .from("match_players")
           .delete()
           .eq("match_id", matchId)
           .eq("player_id", leavingId)
-        if (playerBuild.gameMode === "1v1") {
+        // Marca a partida como finalizada para TODOS os modos online
+        const onlineModes = ["1v1", "2v2", "ffa", "ffa3", "quidditch"]
+        if (playerBuild.gameMode && onlineModes.includes(playerBuild.gameMode)) {
           const remaining = participantIds.filter((id) => id !== leavingId)
           await supabase
             .from("matches")
