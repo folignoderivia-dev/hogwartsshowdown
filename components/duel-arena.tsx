@@ -977,6 +977,18 @@ const DuelArena = (
 
       setDuelists(state)
       setBattleLog((prev) => [...prev, ...outcome.logs])
+
+      // Flash visual para debuffs recém-aplicados (comparação com snapshot pré-turno)
+      for (const newD of state) {
+        const oldD = snapshot.find((d) => d.id === newD.id)
+        if (!oldD) continue
+        const oldTypes = new Set(oldD.debuffs.map((x) => x.type))
+        const fresh = newD.debuffs.find((db) => !oldTypes.has(db.type) && DEBUFF_FLASH[db.type as DebuffType])
+        if (fresh) {
+          setStatusFloater({ text: DEBUFF_FLASH[fresh.type as DebuffType]!, targetId: newD.id, key: Date.now() })
+          setTimeout(() => setStatusFloater(null), 1800)
+        }
+      }
       const resolvedTurn = roundTurn
       const roundHash = computeRoundHash(resolvedTurn, state)
       if (lastRoundHashRef.current !== roundHash) {
@@ -1049,12 +1061,25 @@ const DuelArena = (
       setBattleMessage("")
       setDebugLastEvent(`TURN_RESOLVED T${data.nextTurn - 1}`)
 
+      const oldStateOnline = [...duelistsRef.current]
       const state = data.newDuelists
       await playAnimations(data.animationsToPlay, state)
 
       setDuelists(state)
       duelistsRef.current = state
       setBattleLog((prev) => [...prev, ...data.logs])
+
+      // Flash visual para debuffs recém-aplicados (online)
+      for (const newD of state) {
+        const oldD = oldStateOnline.find((d) => d.id === newD.id)
+        if (!oldD) continue
+        const oldTypes = new Set(oldD.debuffs.map((x) => x.type))
+        const fresh = newD.debuffs.find((db) => !oldTypes.has(db.type) && DEBUFF_FLASH[db.type as DebuffType])
+        if (fresh) {
+          setStatusFloater({ text: DEBUFF_FLASH[fresh.type as DebuffType]!, targetId: newD.id, key: Date.now() })
+          setTimeout(() => setStatusFloater(null), 1800)
+        }
+      }
       turnNumberRef.current = data.nextTurn
       setTurnNumber(data.nextTurn)
       if (data.circumFlames) setCircumFlames(data.circumFlames)

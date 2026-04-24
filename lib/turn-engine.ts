@@ -607,6 +607,7 @@ export function calculateTurnOutcome(params: {
         logs.push(`→ ${attacker.name} usou Fiantu Dure! Restaurou +${restore} de mana em todos os feitiços.`)
       }
     } else if (n.includes("fumus")) {
+      logs.push(`→ 💨 ${attacker.name} lançou Fumus! Todos os efeitos de todos os bruxos foram removidos!`)
       state = state.map((d) => ({
         ...d,
         debuffs: [],
@@ -675,6 +676,8 @@ export function calculateTurnOutcome(params: {
         const piercesDefense = ignoresDefense || (n.includes("bombarda") && n.includes("maxima") && Math.random() < 0.25)
         if (!bloqueadoArea && !piercesDefense) damage = Math.max(0, damage - (t.defense ?? 0))
         if (bloqueadoArea) damage = 0
+        // Dano mínimo garantido de 25 para spells de área não bloqueadas
+        if (!bloqueadoArea && getSpellMaxPower(spell) > 0 && damage < 25) damage = 25
         applyDamageWithCircum(t.id, damage, attacker.id, n)
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900, damage, isBlock: bloqueadoArea, fctOnly: true })
         applySpellDebuffTo(t.id)
@@ -750,6 +753,8 @@ export function calculateTurnOutcome(params: {
             logs.push(`→ ${sn} foi bloqueado pelo Protego de ${target.name}!`)
           } else if (damage > 0) {
             if (!ignoresDefense) damage = Math.max(0, damage - (target.defense ?? 0))
+            // Dano mínimo garantido de 25 para spells ofensivas não bloqueadas
+            if (getSpellMaxPower(spell) > 0 && damage < 25) damage = 25
             if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${target.name}!`)
           }
           if (damage > 0) applyDamageWithCircum(target.id, damage, attacker.id, n)
@@ -851,6 +856,42 @@ export function calculateTurnOutcome(params: {
             const passive = freshTarget?.wand ? WAND_PASSIVES[freshTarget.wand] : null
             logs.push(`🔍 Revele seus Segredos! Núcleo de ${target.name}: ${passive?.name ?? "Desconhecido"} — ${passive?.description ?? ""}`)
           }
+
+          // EXPULSO: substitui 1 spell aleatória do alvo por outra do grimório
+          if (spell.special === "expulso_swap" && !bloqueado) {
+            const freshTarget = state.find((d) => d.id === target.id)
+            if (freshTarget?.spellMana) {
+              const targetSpells = Object.keys(freshTarget.spellMana)
+              if (targetSpells.length > 0) {
+                const removedSpell = targetSpells[Math.floor(Math.random() * targetSpells.length)]
+                const existingSet = new Set(targetSpells)
+                const available = params.spellDatabase.filter((s) => !existingSet.has(s.name) && !(s as any).isVipOnly && (s.power ?? s.powerMin ?? 0) >= 0)
+                if (available.length > 0) {
+                  const newSpell = available[Math.floor(Math.random() * available.length)]
+                  state = state.map((d) => {
+                    if (d.id !== target.id) return d
+                    const newSm = { ...(d.spellMana ?? {}) }
+                    delete newSm[removedSpell]
+                    newSm[newSpell.name] = { current: newSpell.pp, max: newSpell.pp }
+                    return { ...d, spellMana: newSm }
+                  })
+                  logs.push(`→ Expulso! ${attacker.name} substituiu "${removedSpell}" de ${target.name} por "${newSpell.name}"!`)
+                }
+              }
+            }
+          }
+
+          // FLAGRATE: remove a passiva da varinha do alvo
+          if (spell.special === "flagrate_strip" && !bloqueado && damage > 0) {
+            const freshTarget = state.find((d) => d.id === target.id)
+            if (freshTarget?.wand && WAND_PASSIVES[freshTarget.wand]) {
+              const strippedName = WAND_PASSIVES[freshTarget.wand].name
+              state = state.map((d) => (d.id === target.id ? { ...d, wand: "" } : d))
+              logs.push(`→ 🔥 Flagrate! Núcleo "${strippedName}" de ${target.name} foi destruído!`)
+            } else {
+              logs.push(`→ Flagrate: ${target.name} não possui passiva de núcleo ativa.`)
+            }
+          }
         } else if (spell.special === "avada_miss_hp" && n.includes("avada")) {
           state = state.map((d) => {
             if (d.id !== attacker.id) return d
@@ -888,6 +929,7 @@ export function calculateTurnOutcome(params: {
       // Fênix: cura 25-75 HP fixo por turno (atualizado)
       const healAmt = Math.floor(Math.random() * 51) + 25
       state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d))
+      logs.push(`→ 🦅 Pena de Fênix! ${attacker.name} se regenerou ${healAmt} HP!`)
       // CHARM: espelha a cura de Phoenix para quem encantou o atacante
       const charmDebuff = atkAfter.debuffs.find((x) => x.type === "charm")
       if (charmDebuff?.meta) {
@@ -899,12 +941,26 @@ export function calculateTurnOutcome(params: {
     if (outcomeMid) return { newDuelists: state, logs, animationsToPlay, outcome: outcomeMid, orderedActions }
   }
 
+  // ── Dano periódico (DoT) com FCT visível ───────────────────────────────────
+  const dotInfo: Array<{ id: string; name: string; burnDmg: number; poisonDmg: number }> = []
   state = state.map((d) => {
     let hp = d.hp
-    if (d.debuffs.some((x) => x.type === "burn")) hp = applyDamage(hp, 25, { thestral: d.wand === "thestral" })
-    if (d.debuffs.some((x) => x.type === "poison")) hp = applyDamage(hp, 50, { thestral: d.wand === "thestral" })
-    return hp !== d.hp ? { ...d, hp } : d
+    let burnDmg = 0, poisonDmg = 0
+    if (d.debuffs.some((x) => x.type === "burn")) { burnDmg = 25; hp = applyDamage(hp, burnDmg, { thestral: d.wand === "thestral" }) }
+    if (d.debuffs.some((x) => x.type === "poison")) { poisonDmg = 50; hp = applyDamage(hp, poisonDmg, { thestral: d.wand === "thestral" }) }
+    if (burnDmg > 0 || poisonDmg > 0) dotInfo.push({ id: d.id, name: d.name, burnDmg, poisonDmg })
+    return { ...d, hp }
   })
+  for (const dot of dotInfo) {
+    if (dot.burnDmg > 0) {
+      logs.push(`🔥 ${dot.name} sofreu ${dot.burnDmg} de dano por queimadura!`)
+      animationsToPlay.push({ type: "cast", casterId: dot.id, spellName: "Queimadura", targetId: dot.id, isMiss: false, isCrit: false, delay: 500, damage: dot.burnDmg, isBlock: false, fctOnly: true })
+    }
+    if (dot.poisonDmg > 0) {
+      logs.push(`☠️ ${dot.name} sofreu ${dot.poisonDmg} de dano por veneno!`)
+      animationsToPlay.push({ type: "cast", casterId: dot.id, spellName: "Veneno", targetId: dot.id, isMiss: false, isCrit: false, delay: 500, damage: dot.poisonDmg, isBlock: false, fctOnly: true })
+    }
+  }
   // BOMBA: explode quando o contador expira (duration === 1, prestes a ser removido)
   const bombaTargets = state.filter((d) => d.debuffs.some((x) => x.type === "bomba" && x.duration === 1))
   for (const bd of bombaTargets) {
