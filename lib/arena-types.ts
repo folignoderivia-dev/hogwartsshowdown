@@ -32,6 +32,7 @@ export type DebuffType =
   | "undead"    // HP não cai abaixo de 1 (1 turno)
   | "immunity"  // Imune a novos debuffs (1 turno)
   | "charm"     // Se receber buff/cura, o usuário da Amortentia recebe igual
+  | "unforgivable_block" // Expecto Patronum: bloqueia Maldições do alvo (1t)
 
 export type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 

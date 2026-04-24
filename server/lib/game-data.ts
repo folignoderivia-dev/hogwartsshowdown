@@ -51,6 +51,7 @@ export type SpellDebuffType =
   | "silence_defense"
   | "damage_amp"
   | "arestum_penalty"
+  | "unforgivable_block"
 
 export interface SpellInfo {
   name: string
@@ -65,6 +66,8 @@ export interface SpellInfo {
   isUnforgivable?: boolean
   debuff?: { type: SpellDebuffType; chance: number; duration?: number }
   special?: string
+  /** true = feitiço exclusivo para jogadores VIP */
+  isVipOnly?: boolean
 }
 
 export function rollSpellPower(spell: SpellInfo): number {
@@ -124,4 +127,10 @@ export const SPELL_DATABASE: SpellInfo[] = [
   { name: "Protego Diabólico", power: 0, accuracy: 100, pp: 3, cost: 1, priority: 4, special: "protego_diabolico_unforgivable_acc_down", effect: "Área (exceto em si): reduz em 15% a precisão de Crucius, Avada Kedavra e Imperio por 2 turnos." },
   { name: "Protego Maximo", power: 0, accuracy: 100, pp: 2, cost: 1, priority: 6, special: "protego_maximo_unforgivable_heal", effect: "Self: ao receber Crucius/Avada/Imperio, cura totalmente a vida." },
   { name: "Maximos", power: 0, accuracy: 100, pp: 5, cost: 1, priority: 0, special: "maximos_charge", effect: "Self: proximo feitico +10% a +100% poder" },
+  // ── Feitiços Exclusivos VIP ──────────────────────────────────────────────
+  { name: "Legilimens", power: 0, accuracy: 100, pp: 5, cost: 2, isVipOnly: true, special: "legilimens_reveal", effect: "VIP: Revela o Grimório atual do oponente" },
+  { name: "Fogo Maldito", powerMin: 100, powerMax: 100, accuracy: 44, pp: 5, cost: 2, isVipOnly: true, debuff: { type: "burn", chance: 100, duration: 2 }, special: "fogo_maldito_scale", effect: "VIP: Área; poder +50 por 100 HP perdido; BURN (2t)" },
+  { name: "Revele seus Segredos", power: 0, accuracy: 100, pp: 5, cost: 2, isVipOnly: true, special: "reveal_wand_core", effect: "VIP: Revela o Núcleo da varinha do oponente" },
+  { name: "Bombarda Maxima", powerMin: 100, powerMax: 200, accuracy: 65, pp: 8, cost: 3, isVipOnly: true, special: "bombarda_maxima_pierce", effect: "VIP: Área; 25% chance de ignorar defesa" },
+  { name: "Expecto Patronum", power: 0, accuracy: 100, pp: 5, cost: 2, isVipOnly: true, priority: 4, debuff: { type: "unforgivable_block", chance: 100, duration: 1 }, effect: "VIP: Prioridade +4; bloqueia Maldições do alvo (1t)" },
 ]

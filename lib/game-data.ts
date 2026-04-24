@@ -55,6 +55,7 @@ export type SpellDebuffType =
   | "bloqueio_cura"
   | "damage_reduce"
   | "crit_down"
+  | "unforgivable_block"
 
 export interface SpellInfo {
   name: string
@@ -73,6 +74,8 @@ export interface SpellInfo {
   ignoresDefense?: boolean
   /** false = este feitiço nunca pode causar crítico */
   canCrit?: boolean
+  /** true = feitiço exclusivo para jogadores VIP */
+  isVipOnly?: boolean
 }
 
 export function rollSpellPower(spell: SpellInfo): number {
@@ -135,4 +138,10 @@ export const SPELL_DATABASE: SpellInfo[] = [
   // Novas spells
   { name: "Locomotor Mortis", power: 0, accuracy: 100, pp: 10, cost: 1, priority: -1, canCrit: false, special: "locomotor_retaliate", effect: "Prioridade -1; devolve 25-150% do dano recebido no turno (sem crítico)" },
   { name: "Fiantu Dure", power: 0, accuracy: 100, pp: 3, cost: 1, special: "fiantu_mana_restore", effect: "Self: recupera 1-3 de mana em todos os feitiços do usuário" },
+  // ── Feitiços Exclusivos VIP ──────────────────────────────────────────────
+  { name: "Legilimens", power: 0, accuracy: 100, pp: 5, cost: 2, isVipOnly: true, canCrit: false, special: "legilimens_reveal", effect: "👑 VIP: Revela o Grimório atual do oponente" },
+  { name: "Fogo Maldito", powerMin: 100, powerMax: 100, accuracy: 44, pp: 5, cost: 2, isVipOnly: true, debuff: { type: "burn", chance: 100, duration: 2 }, special: "fogo_maldito_scale", effect: "👑 VIP: Área; poder +50 por 100 HP perdido; BURN (2t)" },
+  { name: "Revele seus Segredos", power: 0, accuracy: 100, pp: 5, cost: 2, isVipOnly: true, canCrit: false, special: "reveal_wand_core", effect: "👑 VIP: Revela o Núcleo da varinha do oponente" },
+  { name: "Bombarda Maxima", powerMin: 100, powerMax: 200, accuracy: 65, pp: 8, cost: 3, isVipOnly: true, special: "bombarda_maxima_pierce", effect: "👑 VIP: Área; 25% chance de ignorar defesa" },
+  { name: "Expecto Patronum", power: 0, accuracy: 100, pp: 5, cost: 2, isVipOnly: true, canCrit: false, priority: 4, debuff: { type: "unforgivable_block", chance: 100, duration: 1 }, effect: "👑 VIP: Prioridade +4; bloqueia Maldições do alvo (1t)" },
 ]

@@ -57,7 +57,8 @@ export const isAreaSpell = (spellName: string): boolean => {
     n.includes("fumus") ||
     (n.includes("protego") && n.includes("diabol")) ||
     n.includes("circum") ||
-    n.includes("arestum")
+    n.includes("arestum") ||
+    (n.includes("fogo") && n.includes("maldito"))
   )
 }
 
@@ -135,6 +136,13 @@ export const calculateAccuracy = (attacker: Duelist, defender: Duelist, base: nu
     (spellNorm.includes("crucius") || spellNorm.includes("avada") || spellNorm.includes("imperio") || spellNorm.includes("imperius"))
   ) {
     accuracy -= 15
+  }
+  // Expecto Patronum: bloqueia completamente Maldições do alvo (1t)
+  if (
+    attacker.debuffs.some((d) => d.type === "unforgivable_block") &&
+    (spellNorm.includes("crucius") || spellNorm.includes("avada") || spellNorm.includes("imperio") || spellNorm.includes("imperius"))
+  ) {
+    return 0
   }
   accuracy -= (defender.arrestoStacks ?? 0) * 5
   if (attacker.debuffs.some((d) => d.type === "lumus_acc_down")) accuracy -= 10
@@ -700,17 +708,24 @@ export function calculateTurnOutcome(params: {
           continue
         }
         let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t), n, spell, occamyMirror)
+        // FOGO MALDITO: +50 de poder por 100 HP perdido pelo atacante
+        if (n.includes("fogo") && n.includes("maldito")) {
+          const lostHp = 500 - getTotalHP(attacker.hp)
+          damage += Math.floor(lostHp / 100) * 50
+        }
         let isCrit = false
         if (Math.random() < getCritChance(attacker, t, n)) {
           damage *= 2
           isCrit = true
         }
         const bloqueadoArea = protegoBlocks(t)
+        // BOMBARDA MAXIMA: 25% chance de ignorar defesa
+        const piercesDefense = ignoresDefense || (n.includes("bombarda") && n.includes("maxima") && Math.random() < 0.25)
         if (bloqueadoArea) {
           damage = 0
           logs.push(`→ ${sn} foi bloqueado pelo Protego de ${t.name}!`)
         } else {
-          if (!ignoresDefense) damage = Math.max(0, damage - (t.defense ?? 0))
+          if (!piercesDefense) damage = Math.max(0, damage - (t.defense ?? 0))
           if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${t.name}!${occamyMirror ? " (Occamy mirror!)" : ""}`)
         }
         applyDamageWithCircum(t.id, damage, attacker.id, n)
@@ -876,6 +891,20 @@ export function calculateTurnOutcome(params: {
             } else {
               logs.push(`→ Finite Incantatem: ${attacker.name} não tinha debuffs removíveis para transferir.`)
             }
+          }
+
+          // LEGILIMENS (VIP): revela o grimório atual do oponente
+          if (spell.special === "legilimens_reveal" && !bloqueado) {
+            const freshTarget = state.find((d) => d.id === target.id)
+            const spellList = Object.keys(freshTarget?.spellMana ?? {}).join(", ") || "?"
+            logs.push(`🔮 Legilimens! ${attacker.name} penetrou na mente de ${target.name}! Grimório revelado: [${spellList}]`)
+          }
+
+          // REVELE SEUS SEGREDOS (VIP): revela o núcleo da varinha do oponente
+          if (spell.special === "reveal_wand_core" && !bloqueado) {
+            const freshTarget = state.find((d) => d.id === target.id)
+            const passive = freshTarget?.wand ? WAND_PASSIVES[freshTarget.wand] : null
+            logs.push(`🔍 Revele seus Segredos! Núcleo de ${target.name}: ${passive?.name ?? "Desconhecido"} — ${passive?.description ?? ""}`)
           }
         } else if (spell.special === "avada_miss_hp" && n.includes("avada")) {
           state = state.map((d) => {

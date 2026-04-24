@@ -238,9 +238,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     }
   }
 
-  const filteredSpells = SPELL_DATABASE.filter((spell) =>
-    spell.name.toLowerCase().includes(spellSearch.toLowerCase())
-  ).sort((a, b) => {
+  const filteredSpells = SPELL_DATABASE.filter((spell) => {
+    if (!spell.name.toLowerCase().includes(spellSearch.toLowerCase())) return false
+    // Spells VIP-only só aparecem para VIPs
+    if (spell.isVipOnly && !isVip) return false
+    return true
+  }).sort((a, b) => {
     if (spellSort === "name") return a.name.localeCompare(b.name, "pt")
     if (spellSort === "power") {
       const pa = a.powerMax ?? a.powerMin ?? a.power ?? 0
@@ -667,8 +670,31 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 Este jogo é um projeto de fã, feito com amor e sem fins lucrativos.<br/>
                 Qualquer contribuição ajuda a manter o servidor no ar!
               </p>
+              {/* QR Code Nubank */}
+              <div className="flex flex-col items-center gap-2 rounded-lg border border-purple-700/50 bg-stone-800 p-4">
+                <p className="text-xs font-semibold text-purple-300">Pagar via Nubank (QR Code)</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent("https://nubank.com.br/cobrar/nxdtl/69ebd870-ceda-4047-bb7d-98aff93278a5")}&size=180x180&margin=8&color=6d28d9&bgcolor=ffffff`}
+                  alt="QR Code Nubank"
+                  width={180}
+                  height={180}
+                  className="rounded-lg border-4 border-purple-700"
+                />
+                <a
+                  href="https://nubank.com.br/cobrar/nxdtl/69ebd870-ceda-4047-bb7d-98aff93278a5"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-purple-400 underline"
+                >
+                  Abrir link de cobrança Nubank
+                </a>
+                <p className="text-center text-[11px] text-amber-400">
+                  Após o pagamento, anexe o código/comprovante abaixo para ativação manual pelo Admin.
+                </p>
+              </div>
               <div className="rounded-lg border border-amber-700/50 bg-stone-800 p-4 text-center">
-                <p className="mb-1 text-xs text-amber-400">Chave PIX (e-mail)</p>
+                <p className="mb-1 text-xs text-amber-400">Ou pague com a Chave PIX (e-mail)</p>
                 <p className="text-lg font-bold text-amber-200">{PIX_KEY}</p>
                 <Button size="sm" variant="outline" onClick={handlePixCopy} className="mt-2 border-amber-700 text-amber-300">
                   <Copy className="mr-1 h-3.5 w-3.5" />
@@ -1368,28 +1394,33 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   {filteredSpells.map((spell) => {
                     const isSelected = selectedSpells.includes(spell.name)
                     const canSelect = canSelectSpell(spell)
-                    const isDisabled = !isSelected && !canSelect
+                    const isBanned = showCustomRoom && customSettings.bannedSpells.includes(spell.name)
+                    const isDisabled = isBanned || (!isSelected && !canSelect)
                     
                     return (
                       <button
                         key={spell.name}
-                        onClick={() => toggleSpell(spell.name)}
+                        onClick={() => !isBanned && toggleSpell(spell.name)}
                         disabled={isDisabled}
                         className={`flex items-center justify-between rounded border-2 p-3 text-left transition-all ${
-                          isSelected
-                            ? spell.isUnforgivable
-                              ? "border-red-700 bg-red-900/40"
-                              : "border-amber-600 bg-amber-900/40"
-                            : isDisabled
-                              ? "cursor-not-allowed border-stone-500 bg-stone-700/30 opacity-50"
-                              : spell.isUnforgivable
-                                ? "border-red-900/50 bg-stone-700/50 hover:border-red-700/70"
-                                : "border-stone-500 bg-stone-700/50 hover:border-amber-700"
+                          isBanned
+                            ? "cursor-not-allowed border-stone-600 bg-stone-800/60 opacity-40 grayscale"
+                            : isSelected
+                              ? spell.isUnforgivable
+                                ? "border-red-700 bg-red-900/40"
+                                : "border-amber-600 bg-amber-900/40"
+                              : isDisabled
+                                ? "cursor-not-allowed border-stone-500 bg-stone-700/30 opacity-50"
+                                : spell.isVipOnly
+                                  ? "border-yellow-700/60 bg-yellow-900/20 hover:border-yellow-600"
+                                  : spell.isUnforgivable
+                                    ? "border-red-900/50 bg-stone-700/50 hover:border-red-700/70"
+                                    : "border-stone-500 bg-stone-700/50 hover:border-amber-700"
                         }`}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className={`font-medium ${isSelected ? (spell.isUnforgivable ? "text-red-300" : "text-amber-300") : "text-stone-900"}`}>
+                            <span className={`font-medium ${isSelected ? (spell.isUnforgivable ? "text-red-300" : "text-amber-300") : isBanned ? "text-stone-500 line-through" : "text-stone-900"}`}>
                               {spell.name}
                             </span>
                             <Badge
@@ -1397,9 +1428,19 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                             >
                               {spell.cost} pt{spell.cost > 1 ? "s" : ""}
                             </Badge>
+                            {spell.isVipOnly && (
+                              <Badge className="border-yellow-600 bg-yellow-900/50 text-xs text-yellow-300">
+                                👑 VIP
+                              </Badge>
+                            )}
                             {spell.isUnforgivable && (
                               <Badge className="border-red-600 bg-red-900/50 text-xs text-red-300">
                                 Imperdoavel
+                              </Badge>
+                            )}
+                            {isBanned && (
+                              <Badge className="border-stone-600 bg-stone-700 text-xs text-stone-400">
+                                🚫 Banida
                               </Badge>
                             )}
                           </div>

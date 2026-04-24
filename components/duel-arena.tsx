@@ -145,6 +145,7 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   undead: "💀 IMORTAL(1t)",
   immunity: "🛡️ IMUNIDADE",
   charm: "💖 ENCANTO",
+  unforgivable_block: "🕊️ PATRONUM(1t)",
 }
 /** Mensagem flutuante curta ao aplicar debuff do grimório. */
 const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
@@ -172,6 +173,7 @@ const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
   undead: "IMORTAL!",
   immunity: "IMUNE!",
   charm: "ENCANTOU!",
+  unforgivable_block: "PATRONUM! SEM MALDIÇÕES!",
 }
 const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
 
