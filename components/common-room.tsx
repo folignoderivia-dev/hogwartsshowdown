@@ -672,6 +672,16 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 >
                   Limpar Sessão e Sair
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-stone-600 text-stone-300 hover:bg-stone-700"
+                  title="Recarregar a página"
+                  onClick={() => window.location.reload()}
+                >
+                  ↻
+                </Button>
               </>
             ) : (
               <Button
