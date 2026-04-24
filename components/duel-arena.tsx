@@ -989,6 +989,7 @@ const DuelArena = (
         matchId,
         userId: selfDuelistId,
         build: playerBuild,
+        isSpectator: isReadOnlySpectator,
       })
     })
 

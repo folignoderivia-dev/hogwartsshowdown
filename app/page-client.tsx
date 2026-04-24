@@ -106,7 +106,7 @@ export default function PageClient() {
     if (!userId) return
     if (playerBuild?.gameMode === "teste") return
     void (async () => {
-      await applyMatchElo(userId, outcome)
+      await applyMatchElo(userId, outcome, playerBuild?.gameMode)
       const u = await getUserById(userId)
       if (u) setAccountUser(u)
     })()

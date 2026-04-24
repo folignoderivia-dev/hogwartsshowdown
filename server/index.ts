@@ -59,8 +59,9 @@ interface MatchRoom {
   matchId: string
   gameMode: GameMode
   expectedPlayers: number
-  players: Map<string, PlayerSlot> // key = userId
-  duelists: Duelist[]              // estado canônico server-side
+  players: Map<string, PlayerSlot>     // key = userId — jogadores ativos
+  spectators: Map<string, string>      // userId → socketId — espectadores
+  duelists: Duelist[]                  // estado canônico server-side
   turnNumber: number
   pendingActions: Map<string, RoundAction>
   circumFlames: Record<string, number>
@@ -68,7 +69,33 @@ interface MatchRoom {
   idleTimer?: ReturnType<typeof setTimeout>
 }
 
+interface RecentResult {
+  matchId: string
+  gameMode: GameMode
+  winnerNames: string[]
+  loserNames: string[]
+  eloDeltas: Record<string, number>   // userId → delta
+  finishedAt: string
+}
+
+/** Histórico das últimas 30 partidas finalizadas (em memória). */
+const recentMatches: RecentResult[] = []
+
 const activeMatches = new Map<string, MatchRoom>()
+
+/** Emite snapshot de salas ativas para todos os sockets conectados. */
+function broadcastActiveMatches() {
+  const rooms = [...activeMatches.values()].map((r) => ({
+    matchId: r.matchId,
+    gameMode: r.gameMode,
+    playersJoined: r.players.size,
+    playersExpected: r.expectedPlayers,
+    turnNumber: r.turnNumber,
+    gameStarted: r.gameStarted,
+    playerNames: [...r.players.values()].map((p) => p.build.name),
+  }))
+  io.emit("active_matches_update", { rooms, recentMatches: recentMatches.slice(0, 10) })
+}
 
 // ─── Helpers de construção de Duelist ─────────────────────────────────────────
 
@@ -118,12 +145,19 @@ function buildDuelist(
 }
 
 /** Retorna os duelistas no ponto de vista de um jogador específico (isPlayer e team corretos).
- *  Remove o campo `defense` para manter a defesa como status oculto no cliente. */
+ *  - Em 2v2: preserva o time canônico do servidor, invertendo tudo se o viewer é "enemy"
+ *    (garante que o viewer veja seu time embaixo e o time adversário em cima).
+ *  - Em 1v1/FFA: usa o time canônico do servidor como base e inverte se necessário.
+ *  - Remove o campo `defense` para manter a defesa como status oculto no cliente. */
 function personalizeDuelists(duelists: Duelist[], forUserId: string): Omit<Duelist, "defense">[] {
+  const viewerCanonicalTeam = duelists.find((d) => d.id === forUserId)?.team ?? "player"
+  const flip = viewerCanonicalTeam === "enemy"
   return duelists.map(({ defense: _hidden, ...d }) => ({
     ...d,
     isPlayer: d.id === forUserId,
-    team: d.id === forUserId ? "player" : "enemy",
+    team: flip
+      ? (d.team === "player" ? "enemy" : "player")
+      : d.team,
   }))
 }
 
@@ -202,14 +236,15 @@ io.on("connection", (socket: Socket) => {
   // ── JOIN_MATCH ──────────────────────────────────────────────────────────────
   socket.on(
     "JOIN_MATCH",
-    ({ matchId, userId, build }: { matchId: string; userId: string; build: PlayerBuild }) => {
+    ({ matchId, userId, build, isSpectator }: { matchId: string; userId: string; build: PlayerBuild; isSpectator?: boolean }) => {
       if (!matchId || !userId || !build) {
         socket.emit("ERROR", { message: "JOIN_MATCH: matchId, userId e build são obrigatórios." })
         return
       }
 
       socket.join(matchId)
-      console.log(`[Server] JOIN_MATCH: ${userId.slice(0, 8)}… → sala ${matchId}`)
+      ;(socket as any)._arenaMatchId = matchId
+      ;(socket as any)._arenaUserId = userId
 
       // Cria sala se não existe
       if (!activeMatches.has(matchId)) {
@@ -218,6 +253,7 @@ io.on("connection", (socket: Socket) => {
           gameMode: build.gameMode,
           expectedPlayers: expectedPlayerCount(build.gameMode),
           players: new Map(),
+          spectators: new Map(),
           duelists: [],
           turnNumber: 1,
           pendingActions: new Map(),
@@ -227,8 +263,24 @@ io.on("connection", (socket: Socket) => {
       }
 
       const room = activeMatches.get(matchId)!
+
+      // ── Espectador ─────────────────────────────────────────────────────────
+      if (isSpectator) {
+        room.spectators.set(userId, socket.id)
+        console.log(`[Server] SPECTATOR entrou: ${userId.slice(0, 8)}… → sala ${matchId}`)
+        if (room.gameStarted) {
+          socket.emit("RECONNECT_STATE", {
+            duelists: personalizeDuelists(room.duelists, userId),
+            turnNumber: room.turnNumber,
+            circumFlames: room.circumFlames,
+          })
+        }
+        broadcastActiveMatches()
+        return
+      }
+
+      // ── Reconexão mid-game ─────────────────────────────────────────────────
       if (room.gameStarted) {
-        // Reconexão mid-game: reenvia o estado atual para o jogador
         const pd = personalizeDuelists(room.duelists, userId)
         socket.emit("RECONNECT_STATE", {
           duelists: pd,
@@ -239,10 +291,14 @@ io.on("connection", (socket: Socket) => {
         return
       }
 
-      // Atribui slot (ignora se já está na sala)
+      // ── Atribui slot (ignora se já está na sala) ───────────────────────────
       if (!room.players.has(userId)) {
         const seatIndex = room.players.size
-        const team: "player" | "enemy" = seatIndex === 0 ? "player" : "enemy"
+        // Em 2v2: seats 0,1 → "player" (Time A), seats 2,3 → "enemy" (Time B)
+        // Em outros modos: seat 0 → "player", demais → "enemy"
+        const team: "player" | "enemy" = room.gameMode === "2v2"
+          ? (seatIndex < 2 ? "player" : "enemy")
+          : (seatIndex === 0 ? "player" : "enemy")
         const duelist = buildDuelist(build, userId, team, seatIndex)
         room.players.set(userId, {
           socketId: socket.id,
@@ -252,21 +308,18 @@ io.on("connection", (socket: Socket) => {
           team,
           index: seatIndex,
         })
-        console.log(`[Server] Player ${seatIndex + 1} entrou: ${build.name} (${userId.slice(0, 8)}…)`)
+        console.log(`[Server] Player ${seatIndex + 1} (${team}) entrou: ${build.name} (${userId.slice(0, 8)}…)`)
       } else {
-        // Atualiza socketId (reconexão antes de iniciar)
         room.players.get(userId)!.socketId = socket.id
       }
-
-      // Associa socket → userId para desconexão
-      ;(socket as any)._arenaMatchId = matchId
-      ;(socket as any)._arenaUserId = userId
 
       // Informa a sala quantos players já entraram
       io.to(matchId).emit("ROOM_STATUS", {
         playersJoined: room.players.size,
         playersExpected: room.expectedPlayers,
       })
+
+      broadcastActiveMatches()
 
       // Inicia a partida quando a sala está cheia
       if (room.players.size >= room.expectedPlayers && !room.gameStarted) {
@@ -288,8 +341,21 @@ io.on("connection", (socket: Socket) => {
           }
         }
 
-        // Inicia cronômetro de inatividade para o primeiro turno
+        // Espectadores também recebem o estado inicial
+        for (const [uid, sid] of room.spectators) {
+          const specSocket = io.sockets.sockets.get(sid)
+          if (specSocket) {
+            specSocket.emit("GAME_START", {
+              duelists: personalizeDuelists(room.duelists, uid),
+              turnNumber: 1,
+              gameMode: room.gameMode,
+              yourPlayerId: uid,
+            })
+          }
+        }
+
         startIdleTimer(room, matchId)
+        broadcastActiveMatches()
       }
     }
   )
@@ -368,26 +434,97 @@ io.on("connection", (socket: Socket) => {
       }
       room.circumFlames = newCircumFlames
 
-      console.log(`[Server] TURN_RESOLVED T${resolvedTurn} → ${room.gameMode} outcome=${outcome.outcome ?? "null"}`)
+      console.log(`[Server] TURN_RESOLVED T${resolvedTurn} → ${room.gameMode} outcome=${outcome.outcome ?? "null"} ffaWinner=${outcome.ffaWinnerId ?? "-"}`)
 
-      // Envia resolução personalizada para cada jogador
-      for (const [uid, slot] of room.players) {
-        const clientSocket = io.sockets.sockets.get(slot.socketId)
-        if (clientSocket) {
-          clientSocket.emit("TURN_RESOLVED", {
-            animationsToPlay: outcome.animationsToPlay,
-            newDuelists: personalizeDuelists(room.duelists, uid),
-            outcome: outcome.outcome,
-            logs: outcome.logs,
-            nextTurn: room.turnNumber,
-            circumFlames: room.circumFlames,
-          })
+      // ─── Envia resolução personalizada para cada jogador ──────────────────
+      const isFfaMode = room.gameMode === "ffa" || room.gameMode === "ffa3"
+      const ffaWinnerId = outcome.ffaWinnerId
+
+      const emitResolution = (uid: string, sock: ReturnType<typeof io.sockets.sockets.get>) => {
+        if (!sock) return
+        // Em FFA, distribui win/lose baseado no vencedor real (ffaWinnerId)
+        let personalOutcome: typeof outcome.outcome = outcome.outcome
+        if (isFfaMode && ffaWinnerId && outcome.outcome) {
+          personalOutcome = uid === ffaWinnerId ? "win" : "lose"
         }
+        sock.emit("TURN_RESOLVED", {
+          animationsToPlay: outcome.animationsToPlay,
+          newDuelists: personalizeDuelists(room.duelists, uid),
+          outcome: personalOutcome,
+          logs: outcome.logs,
+          nextTurn: room.turnNumber,
+          circumFlames: room.circumFlames,
+        })
       }
 
-      // Fim de jogo ou reinicia cronômetro de inatividade para o próximo turno
+      for (const [uid, slot] of room.players) {
+        emitResolution(uid, io.sockets.sockets.get(slot.socketId))
+      }
+      // Espectadores recebem o estado sem voto pessoal (outcome neutro)
+      for (const [uid, sid] of room.spectators) {
+        emitResolution(uid, io.sockets.sockets.get(sid))
+      }
+
+      // ─── Fim de jogo ─────────────────────────────────────────────────────
       if (outcome.outcome) {
         console.log(`[Server] Fim de jogo sala ${matchId}: ${outcome.outcome}`)
+
+        // Calcula deltas de ELO por modo
+        const eloDeltas: Record<string, number> = {}
+        const winnerNames: string[] = []
+        const loserNames: string[] = []
+
+        for (const [uid, slot] of room.players) {
+          let delta = 0
+          let isWinner = false
+
+          if (isFfaMode) {
+            isWinner = uid === ffaWinnerId
+            delta = isWinner ? 25 : 0 // FFA: sobrevivente +25, mortos sem penalidade
+          } else if (room.gameMode === "2v2") {
+            const playerTeam = slot.team
+            // Quem está no time que ganhou recebe +20; perdedor -25
+            if (outcome.outcome === "win") {
+              isWinner = playerTeam === "player"
+            } else {
+              isWinner = playerTeam === "enemy"
+            }
+            delta = isWinner ? 20 : -25
+          } else {
+            // 1v1
+            const isPlayerSide = slot.team === "player"
+            isWinner = outcome.outcome === "win" ? isPlayerSide : !isPlayerSide
+            delta = isWinner ? 20 : -25
+          }
+
+          eloDeltas[uid] = delta
+          if (isWinner) winnerNames.push(slot.build.name)
+          else loserNames.push(slot.build.name)
+        }
+
+        // Emite MATCH_RESULT para jogadores e espectadores
+        const matchResultPayload = { matchId, gameMode: room.gameMode, eloDeltas, winnerNames, loserNames }
+        for (const [uid, slot] of room.players) {
+          const cs = io.sockets.sockets.get(slot.socketId)
+          if (cs) cs.emit("MATCH_RESULT", { ...matchResultPayload, yourDelta: eloDeltas[uid] ?? 0 })
+        }
+        for (const [, sid] of room.spectators) {
+          const ss = io.sockets.sockets.get(sid)
+          if (ss) ss.emit("MATCH_RESULT", matchResultPayload)
+        }
+
+        // Guarda no histórico em memória
+        recentMatches.unshift({
+          matchId,
+          gameMode: room.gameMode,
+          winnerNames,
+          loserNames,
+          eloDeltas,
+          finishedAt: new Date().toISOString(),
+        })
+        if (recentMatches.length > 30) recentMatches.splice(30)
+
+        broadcastActiveMatches()
         setTimeout(() => activeMatches.delete(matchId), 60_000)
       } else {
         startIdleTimer(room, matchId)
@@ -403,12 +540,32 @@ io.on("connection", (socket: Socket) => {
     }
   )
 
+  // ── LIST_ACTIVE_MATCHES ───────────────────────────────────────────────────────
+  socket.on("LIST_ACTIVE_MATCHES", () => {
+    const rooms = [...activeMatches.values()].map((r) => ({
+      matchId: r.matchId,
+      gameMode: r.gameMode,
+      playersJoined: r.players.size,
+      playersExpected: r.expectedPlayers,
+      turnNumber: r.turnNumber,
+      gameStarted: r.gameStarted,
+      playerNames: [...r.players.values()].map((p) => p.build.name),
+    }))
+    socket.emit("active_matches_update", { rooms, recentMatches: recentMatches.slice(0, 10) })
+  })
+
   // ── LEAVE_MATCH ───────────────────────────────────────────────────────────────
   socket.on("LEAVE_MATCH", ({ matchId, userId }: { matchId: string; userId: string }) => {
     socket.leave(matchId)
     const room = activeMatches.get(matchId)
     if (!room) return
     console.log(`[Server] LEAVE_MATCH: ${userId.slice(0, 8)}… saiu de ${matchId}`)
+    // Remove espectador se for o caso
+    if (room.spectators.has(userId)) {
+      room.spectators.delete(userId)
+      broadcastActiveMatches()
+      return
+    }
     if (room.gameStarted && room.players.has(userId)) {
       clearIdleTimer(room)
       socket.to(matchId).emit("OPPONENT_LEFT", { userId })
@@ -448,6 +605,6 @@ process.on("unhandledRejection", (reason) => {
 })
 
 // ─── Start ────────────────────────────────────────────────────────────────────
-httpServer.listen(PORT, "0.0.0.0", () => {
+httpServer.listen(Number(PORT), "0.0.0.0", () => {
   console.log(`[PRODUÇÃO] Servidor Showdown rodando na porta ${PORT} (Host: 0.0.0.0)`)
 })

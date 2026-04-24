@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo, useEffect, type FormEvent } from "react"
+import { useState, useMemo, useEffect, useRef, type FormEvent } from "react"
+import { io as ioClient, type Socket } from "socket.io-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -115,7 +116,10 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [friendMessageInput, setFriendMessageInput] = useState("")
   const [onlineWizards, setOnlineWizards] = useState(0)
   const [duelsInProgress, setDuelsInProgress] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; p1: string; p2: string }>>([])
+  const [recentResults, setRecentResults] = useState<Array<{ matchId: string; gameMode: string; winnerNames: string[]; loserNames: string[]; finishedAt: string }>>([])
+  const [showRecentPanel, setShowRecentPanel] = useState(false)
   const [showSpectatePanel, setShowSpectatePanel] = useState(false)
+  const lobbySocketRef = useRef<Socket | null>(null)
   const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [showRankingPanel, setShowRankingPanel] = useState(true)
@@ -241,6 +245,30 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   useEffect(() => {
     void refreshFriends()
   }, [currentUser?.id])
+
+  // Conecta ao servidor Socket.io para receber duelos ao vivo e resultados recentes
+  useEffect(() => {
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL?.trim()
+    if (!socketUrl) return
+    const sock = ioClient(socketUrl, { transports: ["polling", "websocket"], autoConnect: true })
+    lobbySocketRef.current = sock
+    sock.on("connect", () => { sock.emit("LIST_ACTIVE_MATCHES") })
+    sock.on("active_matches_update", (data: { rooms: any[]; recentMatches: any[] }) => {
+      // Converte formato de rooms do servidor para o formato do state local
+      setDuelsInProgress(
+        (data.rooms || [])
+          .filter((r) => r.gameStarted)
+          .map((r) => ({
+            matchId: r.matchId,
+            mode: r.gameMode as PlayerBuild["gameMode"],
+            p1: r.playerNames?.[0] || "Bruxo",
+            p2: r.playerNames?.[1] || "Bruxo",
+          }))
+      )
+      setRecentResults(data.recentMatches || [])
+    })
+    return () => { sock.disconnect(); lobbySocketRef.current = null }
+  }, [])
 
   useEffect(() => {
     const supabase = getSupabaseClient()
@@ -531,6 +559,41 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 ))}
               </div>
               {shareFeedback && <p className="mt-2 text-xs text-amber-300">{shareFeedback}</p>}
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Resultados Recentes */}
+        <Card className={`order-8 min-w-0 border-0 lg:order-none lg:col-start-1 ${showRecentPanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "mx-auto w-9 bg-transparent shadow-none"}`}>
+          <CardHeader className={showRecentPanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
+            <CardTitle className={`flex items-center text-sm text-amber-200 ${showRecentPanel ? "justify-between" : "justify-center"}`}>
+              {showRecentPanel ? <span>🏆 Resultados Recentes</span> : <span className="sr-only">Resultados Recentes</span>}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 w-7 border-amber-700 p-0 text-base font-bold leading-none text-amber-300"
+                onClick={() => setShowRecentPanel((v) => !v)}
+                aria-label={showRecentPanel ? "Recolher resultados recentes" : "Expandir resultados recentes"}
+              >
+                {showRecentPanel ? "-" : "🏆"}
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          {showRecentPanel && (
+            <CardContent className="max-h-[36vh] overflow-y-auto pt-2">
+              {recentResults.length === 0 && <p className="text-xs text-amber-200/95">Nenhum duelo finalizado ainda.</p>}
+              <div className="space-y-2">
+                {recentResults.map((r) => (
+                  <div key={r.matchId + r.finishedAt} className="rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-amber-300">{r.gameMode.toUpperCase()}</span>
+                      <span className="text-amber-200/60">{new Date(r.finishedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                    <p className="mt-0.5 text-green-400">🏆 {r.winnerNames.join(" & ") || "?"}</p>
+                    {r.loserNames.length > 0 && <p className="text-red-400/80">💀 {r.loserNames.join(", ")}</p>}
+                  </div>
+                ))}
+              </div>
             </CardContent>
           )}
         </Card>

@@ -1,8 +1,10 @@
 import { getSupabaseClient } from "@/lib/supabase"
 
 export const ELO_START = 500
-export const ELO_WIN = 15
-export const ELO_LOSS = 25
+export const ELO_WIN = 20      // 1v1 e 2v2 vitória
+export const ELO_LOSS = 25     // 1v1 e 2v2 derrota
+export const ELO_WIN_FFA = 25  // FFA sobrevivente
+export const ELO_LOSS_FFA = 0  // FFA morto (sem penalidade)
 
 export interface DbUser {
   id: string
@@ -150,8 +152,11 @@ export async function updateUserElo(userId: string, delta: number): Promise<DbUs
   }
 }
 
-export async function applyMatchElo(userId: string, outcome: "win" | "lose"): Promise<DbUser | null> {
-  const delta = outcome === "win" ? ELO_WIN : -ELO_LOSS
+export async function applyMatchElo(userId: string, outcome: "win" | "lose", mode?: string): Promise<DbUser | null> {
+  const isFfa = mode === "ffa" || mode === "ffa3"
+  const winDelta = isFfa ? ELO_WIN_FFA : ELO_WIN
+  const lossDelta = isFfa ? ELO_LOSS_FFA : ELO_LOSS
+  const delta = outcome === "win" ? winDelta : -lossDelta
   const supabase = getSupabaseClient()
   const profile = await getProfileById(userId)
   if (!profile) return null

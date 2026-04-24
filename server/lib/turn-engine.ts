@@ -21,6 +21,8 @@ export interface TurnOutcome {
   animationsToPlay: EngineAnimation[]
   outcome: "win" | "lose" | "timeout" | null
   orderedActions: RoundAction[]
+  /** Preenchido apenas em modos FFA quando o jogo termina; server usa para distribuir win/lose personalizado. */
+  ffaWinnerId?: string
 }
 
 export const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
@@ -207,6 +209,7 @@ export function calculateTurnOutcome(params: {
   let state = [...params.duelists]
   const logs: string[] = []
   const animationsToPlay: EngineAnimation[] = []
+  let ffaWinnerId: string | undefined
 
   const evaluateOutcome = (s: Duelist[]) => {
     const playerAliveCount = s.filter((d) => d.team === "player" && !isDefeated(d.hp)).length
@@ -220,6 +223,8 @@ export function calculateTurnOutcome(params: {
     if (params.gameMode === "ffa" || params.gameMode === "ffa3") {
       if (totalAliveCount === 1) {
         const winner = s.find((d) => !isDefeated(d.hp))
+        if (winner) ffaWinnerId = winner.id // captura para distribuição no servidor
+        // isPlayer sempre false no servidor; o cliente usa a prop isPlayer corretamente
         return winner?.isPlayer ? "win" : "lose"
       }
       return null
@@ -293,12 +298,15 @@ export function calculateTurnOutcome(params: {
       continue
     }
 
+    const isFFAMode = params.gameMode === "ffa" || params.gameMode === "ffa3"
     let targets: Duelist[] = []
     if (isSelfTargetSpell(sn)) {
       if (!isDefeated(attacker.hp)) targets = [attacker]
     } else if (isAreaSpell(sn)) {
       if (n.includes("desumo")) targets = state.filter((d) => !isDefeated(d.hp))
       else if (n.includes("protego") && n.includes("diabol")) targets = state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
+      // Em FFA, área atinge todos os outros duelistas (não há times)
+      else if (isFFAMode) targets = state.filter((d) => d.id !== attacker.id && !isDefeated(d.hp))
       else targets = state.filter((d) => d.team !== attacker.team && !isDefeated(d.hp))
     } else {
       const t = state.find((d) => d.id === action.targetId)
@@ -487,7 +495,7 @@ export function calculateTurnOutcome(params: {
     }
 
     const outcomeMid = evaluateOutcome(state)
-    if (outcomeMid) return { newDuelists: state, logs, animationsToPlay, outcome: outcomeMid, orderedActions }
+    if (outcomeMid) return { newDuelists: state, logs, animationsToPlay, outcome: outcomeMid, orderedActions, ffaWinnerId }
   }
 
   state = state.map((d) => {
@@ -507,5 +515,5 @@ export function calculateTurnOutcome(params: {
     turnsInBattle: (d.turnsInBattle ?? 0) + 1,
   }))
 
-  return { newDuelists: state, logs, animationsToPlay, outcome: evaluateOutcome(state), orderedActions }
+  return { newDuelists: state, logs, animationsToPlay, outcome: evaluateOutcome(state), orderedActions, ffaWinnerId }
 }
