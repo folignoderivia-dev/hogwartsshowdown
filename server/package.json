@@ -3,18 +3,21 @@
   "version": "1.0.0",
   "private": true,
   "description": "Servidor autoritativo Socket.io — protocolo Pokémon Showdown",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "start": "ts-node --transpile-only index.ts",
-    "dev": "ts-node --transpile-only index.ts"
+    "start": "tsx index.ts",
+    "dev": "tsx index.ts"
   },
   "dependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.0",
     "cors": "^2.8.5",
     "express": "^4.18.3",
     "socket.io": "^4.7.5",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/node": "^20.12.0"
+    "tsx": "^4.21.0",
+    "typescript": "^5.4.5"
   }
 }
