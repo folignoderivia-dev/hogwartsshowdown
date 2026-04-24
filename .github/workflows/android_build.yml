@@ -25,11 +25,8 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # ── 3. Node.js 22 via nvm + GITHUB_PATH (persiste em todos os steps) ─────
-      #    ubuntu-latest já vem com nvm pré-instalado.
-      #    Adicionar o binário ao GITHUB_PATH garante que TODOS os steps
-      #    seguintes usem Node 22, independente do runner padrão.
-      - name: Install and activate Node.js 22
+      # ── 3. Node.js 22 via nvm + GITHUB_PATH ──────────────────────────────────
+      - name: Install Node.js 22
         shell: bash
         run: |
           export NVM_DIR="${HOME}/.nvm"
@@ -39,31 +36,54 @@ jobs:
           nvm alias default 22
           NODE_BIN=$(nvm which 22 | xargs dirname)
           echo "$NODE_BIN" >> $GITHUB_PATH
-          echo "Node path added: $NODE_BIN"
 
-      # ── 4. Verificar versão ativas ────────────────────────────────────────────
+      # ── 4. Verificar Node ─────────────────────────────────────────────────────
       - name: Verify Node version
         run: |
           node --version
           npm --version
 
-      # ── 5. Instalar dependências npm ──────────────────────────────────────────
+      # ── 5. Instalar dependências ──────────────────────────────────────────────
       - name: Install dependencies
         run: npm install
 
-      # ── 6. Aceitar licenças Android SDK ──────────────────────────────────────
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
+      # ── 6. Diagnóstico do Android SDK ─────────────────────────────────────────
+      - name: Android SDK info
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_SDK_ROOT/cmdline-tools/" 2>/dev/null || echo "cmdline-tools nao encontrado"
+          ls "$ANDROID_SDK_ROOT/build-tools/"   2>/dev/null || echo "build-tools nao encontrado"
 
-      # ── 7. Capacitor sync ────────────────────────────────────────────────────
+      # ── 7. Aceitar licenças Android SDK ──────────────────────────────────────
+      - name: Accept Android SDK licenses
+        run: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || \
+          yes | sdkmanager --licenses 2>/dev/null || \
+          echo "sdkmanager nao disponivel, continuando..."
+
+      # ── 8. Instalar build-tools necessários ───────────────────────────────────
+      - name: Install Android build-tools
+        run: |
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "platform-tools" 2>/dev/null || \
+          sdkmanager \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "platform-tools" 2>/dev/null || \
+          echo "sdkmanager nao disponivel, assumindo SDK preinstalado..."
+
+      # ── 9. Capacitor sync ────────────────────────────────────────────────────
       - name: Capacitor sync
         run: npx cap sync android
 
-      # ── 8. Capacitor copy ─────────────────────────────────────────────────────
+      # ── 10. Capacitor copy ────────────────────────────────────────────────────
       - name: Capacitor copy
         run: npx cap copy android
 
-      # ── 9. Cache Gradle ───────────────────────────────────────────────────────
+      # ── 11. Cache Gradle ──────────────────────────────────────────────────────
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -73,26 +93,28 @@ jobs:
           key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
-      # ── 10. Permissão gradlew ─────────────────────────────────────────────────
+      # ── 12. Permissão gradlew ─────────────────────────────────────────────────
       - name: Make gradlew executable
         working-directory: android
         run: chmod +x gradlew
 
-      # ── 11. Build APK debug ───────────────────────────────────────────────────
+      # ── 13. Build APK debug (com stacktrace para erros detalhados) ────────────
       - name: Build APK (debug)
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      # ── 12. Upload artefato ───────────────────────────────────────────────────
+      # ── 14. Upload artefato ───────────────────────────────────────────────────
       - name: Upload APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: hogwarts-showdown-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 
-      # ── 13. Criar GitHub Release ──────────────────────────────────────────────
+      # ── 15. Criar GitHub Release ──────────────────────────────────────────────
       - name: Create Release
+        if: success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}
