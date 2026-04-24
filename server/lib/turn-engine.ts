@@ -40,12 +40,12 @@ export const isSelfTargetSpell = (spellName: string): boolean => {
     (n.includes("protego") && !n.includes("diabol")) ||
     n.includes("ferula") ||
     n.includes("episkey") ||
-    (n.includes("finite") && n.includes("incantatem")) ||
     n.includes("circum") ||
     n.includes("maximos") ||
     (n.includes("aqua") && n.includes("eructo")) ||
     (n.includes("salvio") && n.includes("hexia")) ||
-    (n.includes("vulnera") && n.includes("sanetur"))
+    (n.includes("vulnera") && n.includes("sanetur")) ||
+    (n.includes("fiantu") && n.includes("dure"))
   )
 }
 
@@ -190,6 +190,8 @@ const getSpellCastPriority = (spellName: string, spell: SpellInfo | undefined, a
     if (hg && "attackPriorityBonus" in hg) p += hg.attackPriorityBonus as number
   }
   if (attacker.wand === "thunderbird") p += 1
+  // PARALISIA: força prioridade máxima 0 para todos os feitiços do paralisado
+  if (attacker.debuffs.some((d) => d.type === "paralysis")) p = Math.min(0, p)
   return p
 }
 
@@ -218,7 +220,7 @@ export function calculateTurnOutcome(params: {
   gameMode: "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3"
   circumFlames: Record<string, number>
 }): TurnOutcome {
-  let state = [...params.duelists]
+  let state: Duelist[] = params.duelists.map((d) => ({ ...d, damageReceivedThisTurn: 0 }))
   const logs: string[] = []
   const animationsToPlay: EngineAnimation[] = []
   let ffaWinnerId: string | undefined
@@ -310,6 +312,14 @@ export function calculateTurnOutcome(params: {
       continue
     }
 
+    // IMPERIO: só pode usar o último feitiço (IRREMOVÍVEL)
+    if (attacker.debuffs.some((d) => d.type === "taunt") && attacker.lastSpellUsed && action.type === "cast") {
+      if (normSpell(sn) !== normSpell(attacker.lastSpellUsed)) {
+        logs.push(`→ ${attacker.name} está sob Imperio! Somente "${attacker.lastSpellUsed}" pode ser lançado (tentou: ${sn}).`)
+        continue
+      }
+    }
+
     const isFFAMode = params.gameMode === "ffa" || params.gameMode === "ffa3"
     let targets: Duelist[] = []
     if (isSelfTargetSpell(sn)) {
@@ -329,11 +339,17 @@ export function calculateTurnOutcome(params: {
     animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetIds: targets.map((t) => t.id), targetId: targets[0]?.id, delay: 1200 })
     logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} lançou ${sn}${isAreaSpell(sn) ? " em área" : ` em ${targets[0].name}`}!`)
 
-    const protegoBlocks = (def: Duelist) =>
-      def.debuffs.some((d) => d.type === "protego") &&
-      !def.debuffs.some((d) => d.type === "silence_defense") &&
-      !n.includes("diffindo") &&
-      !(spell?.isUnforgivable ?? false) // Protego não bloqueia Maldições Imperdoáveis
+    const protegoBlocks = (def: Duelist) => {
+      const silenced = def.debuffs.some((d) => d.type === "silence_defense")
+      const isDiffindo = n.includes("diffindo")
+      const isUnforgivable = spell?.isUnforgivable ?? false
+      if (silenced || isDiffindo) return false
+      // Protego normal bloqueia tudo exceto maldições
+      if (def.debuffs.some((d) => d.type === "protego") && !isUnforgivable) return true
+      // Protego Diabólico bloqueia apenas maldições
+      if (def.debuffs.some((d) => d.type === "protego_diabol") && isUnforgivable) return true
+      return false
+    }
 
     const applySpellDebuffTo = (defenderId: string) => {
       if (!spell.debuff) return
@@ -343,24 +359,24 @@ export function calculateTurnOutcome(params: {
         let dur = spell.debuff.duration || 1
         if (WAND_PASSIVES[attacker.wand]?.effect === "basilisk_debuff_duration") dur += 1
         const meta = spell.debuff.type === "provoke" ? attacker.id : undefined
-        state = state.map((d) => (d.id === defenderId ? { ...d, debuffs: [...d.debuffs, { type: spell.debuff!.type as DebuffType, duration: dur, meta }] } : d))
+        // Imperio é IRREMOVÍVEL
+        const irremovable = n.includes("imperio") ? true : undefined
+        state = state.map((d) =>
+          d.id === defenderId
+            ? { ...d, debuffs: [...d.debuffs, { type: spell.debuff!.type as DebuffType, duration: dur, meta, irremovable }] }
+            : d
+        )
       }
     }
 
     const applyDamageWithCircum = (defId: string, dmg: number, dealerId: string, sourceSpellNorm?: string) => {
       const def = state.find((d) => d.id === defId)
       if (!def) return
-      if (
-        sourceSpellNorm &&
-        def.debuffs.some((d) => d.type === "protego_maximo") &&
-        (sourceSpellNorm.includes("crucius") || sourceSpellNorm.includes("avada") || sourceSpellNorm.includes("imperio") || sourceSpellNorm.includes("imperius"))
-      ) {
-        state = state.map((d) =>
-          d.id === defId ? { ...d, hp: healFlatTotal(d.hp, 500), debuffs: d.debuffs.filter((x) => x.type !== "protego_maximo") } : d
-        )
-        return
-      }
-      state = state.map((d) => (d.id === defId ? { ...d, hp: applyDamage(d.hp, dmg, { thestral: d.wand === "thestral" }) } : d))
+      state = state.map((d) =>
+        d.id === defId
+          ? { ...d, hp: applyDamage(d.hp, dmg, { thestral: d.wand === "thestral" }), damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + dmg }
+          : d
+      )
       if (def.debuffs.some((d) => d.type === "salvio_reflect") && dealerId !== defId && dmg > 0) {
         state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, Math.round(dmg), { thestral: d.wand === "thestral" }) } : d))
       }
@@ -419,8 +435,17 @@ export function calculateTurnOutcome(params: {
         state = state.map((d) =>
           d.id === attacker.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "protego_maximo"), { type: "protego_maximo", duration: 2 }] } : d
         )
-      } else if (n.includes("finite") && n.includes("incantatem")) {
-        state = state.map((d) => (d.id === attacker.id ? { ...d, debuffs: [] } : d))
+      } else if (n.includes("fiantu") && n.includes("dure")) {
+        const restore = Math.floor(Math.random() * 3) + 1
+        state = state.map((d) => {
+          if (d.id !== attacker.id) return d
+          const sm = { ...(d.spellMana ?? {}) }
+          for (const key of Object.keys(sm)) {
+            sm[key] = { ...sm[key], current: Math.min(sm[key].max, sm[key].current + restore) }
+          }
+          return { ...d, spellMana: sm }
+        })
+        logs.push(`→ ${attacker.name} usou Fiantu Dure! Restaurou +${restore} de mana em todos os feitiços.`)
       }
     } else if (n.includes("fumus")) {
       state = state.map((d) => ({
@@ -433,6 +458,24 @@ export function calculateTurnOutcome(params: {
         circumAura: undefined,
         destinyBond: false,
       }))
+    } else if (n.includes("protego") && n.includes("diabol")) {
+      // Protego Diabólico: -15% precisão Maldições (todos inimigos) + escudo pessoal vs Maldições
+      for (const t of targets) {
+        const isEnemy = isFFAMode ? t.id !== attacker.id : t.team !== attacker.team
+        if (isEnemy) {
+          state = state.map((d) =>
+            d.id === t.id
+              ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "unforgivable_acc_down"), { type: "unforgivable_acc_down" as const, duration: 2 }] }
+              : d
+          )
+        }
+      }
+      state = state.map((d) =>
+        d.id === attacker.id
+          ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "protego_diabol"), { type: "protego_diabol" as const, duration: 2 }] }
+          : d
+      )
+      logs.push(`→ ${attacker.name} lançou Protego Diabólico! Escudo vs Maldições + -15% precisão inimiga (2t).`)
     } else if (isAreaSpell(sn) && getSpellMaxPower(spell) > 0) {
       const ignoresDefense = spell.ignoresDefense === true
       for (const t of targets) {
@@ -464,42 +507,118 @@ export function calculateTurnOutcome(params: {
     } else {
       const ignoresDefense = spell.ignoresDefense === true
       const target = targets[0]
-      const streak = attacker.missStreakBySpell?.[sn] ?? 0
-      const hit = rollHit(attacker, target, spell, streak)
-      if (hit) {
-        let damage = getSpellMaxPower(spell) > 0 ? calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n) : 0
-        let isCrit = false
-        if (damage > 0 && Math.random() < getCritChance(attacker, target, n)) {
-          damage *= 2
-          isCrit = true
+
+      // ── FLAGELLUM: multi-hit 1-4x, sem crítico ──────────────────────────────
+      if (spell.special === "flagellum_multi") {
+        const hitCount = Math.floor(Math.random() * 4) + 1
+        let totalDmg = 0
+        for (let h = 0; h < hitCount; h++) {
+          const hitRoll = rollHit(attacker, target, spell, 0)
+          if (!hitRoll) {
+            animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 400, damage: 0, isBlock: false, fctOnly: true })
+            continue
+          }
+          let dmg = calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n)
+          const bloq = protegoBlocks(target)
+          if (!bloq) dmg = ignoresDefense ? dmg : Math.max(0, dmg - (target.defense ?? 0))
+          else dmg = 0
+          if (dmg > 0) applyDamageWithCircum(target.id, dmg, attacker.id, n)
+          totalDmg += dmg
+          animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit: false, delay: 400, damage: dmg, isBlock: bloq, fctOnly: true })
+          applySpellDebuffTo(target.id)
         }
-        const bloqueado = protegoBlocks(target)
-        if (bloqueado) {
-          damage = 0
-          logs.push(`→ ${sn} foi bloqueado pelo Protego de ${target.name}!`)
-        } else if (damage > 0) {
-          if (!ignoresDefense) damage = Math.max(0, damage - (target.defense ?? 0))
-          if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${target.name}!`)
+        logs.push(`→ Flagellum! ${hitCount} golpe(s) → ${totalDmg} dano total em ${target.name}!`)
+
+      // ── LOCOMOTOR MORTIS: devolve 25-150% do dano recebido no turno ─────────
+      } else if (spell.special === "locomotor_retaliate") {
+        const freshAtk = state.find((d) => d.id === attacker.id)
+        const dmgReceived = freshAtk?.damageReceivedThisTurn ?? 0
+        const pct = Math.floor(Math.random() * 126) + 25
+        const retalDmg = Math.round(dmgReceived * pct / 100)
+        const bloq = protegoBlocks(target)
+        if (retalDmg > 0 && !bloq) {
+          // ignoreBuffs: aplica dano direto sem defesa nem modifiers
+          state = state.map((d) =>
+            d.id === target.id
+              ? { ...d, hp: applyDamage(d.hp, retalDmg, { thestral: d.wand === "thestral" }), damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + retalDmg }
+              : d
+          )
+          logs.push(`→ 💀 Locomotor Mortis! ${attacker.name} devolveu ${retalDmg} dano (${pct}% de ${dmgReceived}) para ${target.name}!`)
+        } else if (dmgReceived === 0) {
+          logs.push(`→ Locomotor Mortis: ${attacker.name} não recebeu dano neste turno.`)
         }
-        if (damage > 0) applyDamageWithCircum(target.id, damage, attacker.id, n)
-        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000, damage, isBlock: bloqueado, fctOnly: true })
-        applySpellDebuffTo(target.id)
-      } else if (spell.special === "avada_miss_hp" && n.includes("avada")) {
-        state = state.map((d) => {
-          if (d.id !== attacker.id) return d
-          const bars = [...d.hp.bars]
-          for (let i = bars.length - 1; i >= 0; i--) {
-            if (bars[i] > 0) {
-              bars[i] = 0
-              break
+        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit: false, delay: 1000, damage: retalDmg, isBlock: bloq, fctOnly: true })
+
+      // ── FLUXO PADRÃO (single target) ────────────────────────────────────────
+      } else {
+        const streak = attacker.missStreakBySpell?.[sn] ?? 0
+        const hit = rollHit(attacker, target, spell, streak)
+        if (hit) {
+          let damage = getSpellMaxPower(spell) > 0 ? calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n) : 0
+          let isCrit = false
+
+          // CRUCIUS: +30% dano por debuff no alvo
+          if (n.includes("crucius") && damage > 0 && target.debuffs.length > 0) {
+            damage = Math.round(damage * (1 + 0.3 * target.debuffs.length))
+          }
+
+          // Crit (canCrit: false bloqueia)
+          if (damage > 0 && spell.canCrit !== false && Math.random() < getCritChance(attacker, target, n)) {
+            damage *= 2
+            isCrit = true
+          }
+
+          const bloqueado = protegoBlocks(target)
+          if (bloqueado) {
+            damage = 0
+            logs.push(`→ ${sn} foi bloqueado pelo Protego de ${target.name}!`)
+          } else if (damage > 0) {
+            if (!ignoresDefense) damage = Math.max(0, damage - (target.defense ?? 0))
+            if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${target.name}!`)
+          }
+          if (damage > 0) applyDamageWithCircum(target.id, damage, attacker.id, n)
+
+          // PROTEGO MAXIMO: cura 200 HP se o atacante critar enquanto ativo
+          if (isCrit && damage > 0 && !bloqueado) {
+            const refreshedT = state.find((d) => d.id === target.id)
+            if (refreshedT?.debuffs.some((d) => d.type === "protego_maximo")) {
+              state = state.map((d) => (d.id === target.id ? { ...d, hp: healFlatTotal(d.hp, 200) } : d))
+              logs.push(`→ 🛡️ Protego Maximo! ${target.name} curou 200 HP (crítico no escudo)!`)
             }
           }
-          return { ...d, hp: { bars } }
-        })
-        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 1000, fctOnly: true })
-      } else {
-        logs.push(`→ ${attacker.name} errou ${sn} em ${target.name}!`)
-        animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 900, fctOnly: true })
+
+          animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000, damage, isBlock: bloqueado, fctOnly: true })
+          applySpellDebuffTo(target.id)
+
+          // FINITE INCANTATEM: transfere debuffs do usuário para o alvo (exceto irremovíveis)
+          if (spell.special === "finite_transfer") {
+            const freshCaster = state.find((d) => d.id === attacker.id)
+            const casterDebuffs = (freshCaster?.debuffs ?? []).filter((dd) => !dd.irremovable)
+            if (casterDebuffs.length > 0) {
+              state = state.map((d) => {
+                if (d.id === target.id) return { ...d, debuffs: [...d.debuffs, ...casterDebuffs] }
+                if (d.id === attacker.id) return { ...d, debuffs: d.debuffs.filter((dd) => dd.irremovable) }
+                return d
+              })
+              logs.push(`→ Finite Incantatem! ${attacker.name} transferiu ${casterDebuffs.length} debuff(s) para ${target.name}!`)
+            } else {
+              logs.push(`→ Finite Incantatem: ${attacker.name} não tinha debuffs removíveis para transferir.`)
+            }
+          }
+        } else if (spell.special === "avada_miss_hp" && n.includes("avada")) {
+          state = state.map((d) => {
+            if (d.id !== attacker.id) return d
+            const bars = [...d.hp.bars]
+            for (let i = bars.length - 1; i >= 0; i--) {
+              if (bars[i] > 0) { bars[i] = 0; break }
+            }
+            return { ...d, hp: { bars } }
+          })
+          animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 1000, fctOnly: true })
+        } else {
+          logs.push(`→ ${attacker.name} errou ${sn} em ${target.name}!`)
+          animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 900, fctOnly: true })
+        }
       }
     }
 
@@ -532,7 +651,7 @@ export function calculateTurnOutcome(params: {
   state = state.map((d) => {
     let hp = d.hp
     if (d.debuffs.some((x) => x.type === "burn")) hp = applyDamage(hp, 25, { thestral: d.wand === "thestral" })
-    if (d.debuffs.some((x) => x.type === "poison")) hp = applyDamage(hp, 10, { thestral: d.wand === "thestral" })
+    if (d.debuffs.some((x) => x.type === "poison")) hp = applyDamage(hp, 50, { thestral: d.wand === "thestral" })
     return hp !== d.hp ? { ...d, hp } : d
   })
   // BOMBA: explode quando o contador expira (duration === 1, prestes a ser removido)

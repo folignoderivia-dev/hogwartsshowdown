@@ -134,6 +134,10 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   crit_boost: "🎯 CRIT+",
   unforgivable_acc_down: "🜏 IMPERDOÁVEIS ACC-15%",
   protego_maximo: "🛡️ MAXIMO",
+  bomba: "💣 BOMBA",
+  bloqueio_cura: "🚫 SEM CURA",
+  damage_reduce: "⬇️ DANO-25%",
+  protego_diabol: "🛡️ DIABÓLICO",
 }
 /** Mensagem flutuante curta ao aplicar debuff do grimório. */
 const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {

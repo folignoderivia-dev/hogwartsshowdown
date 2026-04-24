@@ -26,6 +26,7 @@ export type DebuffType =
   | "bomba"
   | "bloqueio_cura"
   | "damage_reduce"
+  | "protego_diabol"
 
 export type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 
@@ -33,6 +34,8 @@ export interface Debuff {
   type: DebuffType
   duration: number
   meta?: string
+  /** Não pode ser removido por Finite Incantatem nem transferido */
+  irremovable?: boolean
 }
 
 export interface HPState {
@@ -66,6 +69,10 @@ export interface Duelist {
   disabledSpells?: Record<string, number>
   missStreakBySpell?: Record<string, number>
   turnsInBattle?: number
+  /** Redução fixa de dano (bônus de defesa) */
+  defense?: number
+  /** Dano recebido neste turno (para Locomotor Mortis) */
+  damageReceivedThisTurn?: number
 }
 
 export type Point = { x: number; y: number }

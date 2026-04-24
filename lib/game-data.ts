@@ -59,6 +59,8 @@ export interface SpellInfo {
   special?: string
   /** Dano ignora a subtração de Defesa do alvo */
   ignoresDefense?: boolean
+  /** false = este feitiço nunca pode causar crítico */
+  canCrit?: boolean
 }
 
 export function rollSpellPower(spell: SpellInfo): number {
@@ -94,28 +96,31 @@ export const SPELL_DATABASE: SpellInfo[] = [
   { name: "Arestum Momentum", power: 40, accuracy: 100, pp: 5, cost: 1, special: "arestum_penalty", effect: "-5% dano e acerto do alvo (partida)" },
   { name: "Obliviate", power: 0, accuracy: 55, pp: 3, cost: 1, special: "obliviate_mana", effect: "-5 mana ultimo feitico alvo" },
   { name: "Confundos", powerMin: 30, powerMax: 80, accuracy: 100, pp: 10, cost: 1, debuff: { type: "confusion", chance: 40, duration: 2 }, effect: "40% confusao, 25% recoil proprio" },
-  { name: "Crucius", powerMin: 150, powerMax: 200, accuracy: 70, pp: 3, cost: 3, isUnforgivable: true, special: "crucius_weakness", effect: "Outros feiticos -50% poder apos uso" },
-  { name: "Imperio", power: 0, accuracy: 80, pp: 3, cost: 3, isUnforgivable: true, priority: 3, debuff: { type: "taunt", chance: 100, duration: 3 }, effect: "TAUNT: so ultimo feitico 3 turnos" },
-  { name: "Avada Kedavra", power: 300, accuracy: 40, pp: 5, cost: 3, isUnforgivable: true, special: "avada_miss_hp", effect: "Erro: perde 100% HP (1 coracao)" },
-  { name: "Flagrate", powerMin: 10, powerMax: 70, accuracy: 50, pp: 10, cost: 1, special: "flagrate_strip", effect: "30% remove passiva nucleo + DISARM 3t" },
+  { name: "Crucius", power: 150, accuracy: 80, pp: 3, cost: 3, isUnforgivable: true, special: "crucius_weakness", effect: "+30% dano por debuff no alvo (acumula)" },
+  { name: "Imperio", power: 0, accuracy: 100, pp: 3, cost: 3, isUnforgivable: true, priority: 3, debuff: { type: "taunt", chance: 100, duration: 2 }, effect: "Bloqueia todos feitiços exceto o último (2t, IRREMOVÍVEL)" },
+  { name: "Avada Kedavra", power: 300, accuracy: 40, pp: 3, cost: 3, isUnforgivable: true, special: "avada_miss_hp", effect: "Erro: atacante perde 100 HP (1 coração)" },
+  { name: "Flagrate", power: 50, accuracy: 70, pp: 10, cost: 1, special: "flagrate_strip", effect: "Desativa passiva/núcleo do alvo" },
   { name: "Aqua Eructo", powerMin: 5, powerMax: 25, accuracy: 100, pp: 10, cost: 1, priority: 0, special: "aqua_cleanse", effect: "Self, limpa BURN (prioridade +5 na arena)" },
-  { name: "Eletricus", powerMin: 40, powerMax: 80, accuracy: 80, pp: 15, cost: 1, debuff: { type: "paralysis", chance: 20, duration: 2 }, effect: "PARALISIA: sem prioridade >0" },
+  { name: "Eletricus", powerMin: 50, powerMax: 100, accuracy: 80, pp: 10, cost: 1, debuff: { type: "paralysis", chance: 100, duration: 2 }, effect: "PARALISIA: todos feitiços do alvo ficam com prioridade 0 (2t)" },
   { name: "Trevus", power: 80, accuracy: 50, pp: 10, cost: 1, special: "trevus_random", effect: "2 debuffs aleatorios 1 turno" },
   { name: "Pericullum", powerMin: 0, powerMax: 40, accuracy: 100, pp: 15, cost: 1, debuff: { type: "provoke", chance: 100, duration: 1 }, effect: "PROVOQUE proximo turno" },
   { name: "Rictumsempra", powerMin: 10, powerMax: 40, accuracy: 90, pp: 15, cost: 1, debuff: { type: "provoke", chance: 100, duration: 1 }, special: "rictum_crit_mana", effect: "+30% crit base; 25% -1 mana feitico aleatorio alvo" },
   { name: "Expulso", power: 0, accuracy: 65, pp: 5, cost: 1, special: "expulso_swap", effect: "Substitui 1 feitico do oponente por um aleatorio do grimorio global" },
-  { name: "Cara de Lesma", powerMin: 20, powerMax: 50, accuracy: 100, pp: 15, cost: 1, debuff: { type: "poison", chance: 40, duration: 3 }, effect: "40% POISON -10%/turno" },
-  { name: "Flagellum", powerMin: 10, powerMax: 75, accuracy: 65, pp: 15, cost: 1, special: "flagellum_multi", effect: "Multi-hit: 1 a 3 golpes no mesmo turno (RNG)" },
+  { name: "Cara de Lesma", power: 50, accuracy: 100, pp: 15, cost: 1, debuff: { type: "poison", chance: 40, duration: 2 }, effect: "40% POISON (50 dano/turno, 2t)" },
+  { name: "Flagellum", power: 75, accuracy: 70, pp: 10, cost: 1, canCrit: false, special: "flagellum_multi", effect: "Multi-hit 1-4x; sem crítico" },
   { name: "Lumus", power: 0, accuracy: 100, pp: 15, cost: 1, special: "lumus_acc_down", effect: "Reduz ACC do alvo em 20% por 2 turnos. Falha se consecutivo." },
   { name: "Petrificus Totales", power: 0, accuracy: 70, pp: 3, cost: 1, special: "petrificus_disable", effect: "Desabilita magia aleatória do alvo por 2 turnos." },
   { name: "Salvio Hexia", power: 0, accuracy: 100, pp: 5, cost: 1, special: "salvio_reflect", effect: "Self: reflete 100% do dano recebido por 1 turno." },
   { name: "Sectumsempra", power: 50, accuracy: 50, pp: 5, cost: 1, special: "sectum_multi", effect: "Se acerta, desfere de 1 a 5 golpes no mesmo turno." },
   { name: "Vermillious", power: 25, accuracy: 90, pp: 15, cost: 1, special: "vermillious_dynamic_hits", effect: "1 hit + 1 por coração perdido." },
   { name: "Vulnera Sanetur", power: 0, accuracy: 100, pp: 5, cost: 1, special: "vulnera_anti_debuff", effect: "Self: imunidade a novos debuffs por 3 turnos." },
-  { name: "Finite Incantatem", power: 0, accuracy: 100, pp: 5, cost: 1, special: "finite_cleanse", effect: "Self: remove todo e qualquer debuff em si mesmo." },
+  { name: "Finite Incantatem", power: 0, accuracy: 100, pp: 5, cost: 1, special: "finite_transfer", effect: "Transfere todos debuffs do usuário para o alvo (exceto IRREMOVÍVEIS)" },
   { name: "Fumus", power: 0, accuracy: 100, pp: 10, cost: 1, special: "fumus_cleanse_all", effect: "Limpa buffs e debuffs de todos em campo." },
   { name: "Episkey", power: 0, accuracy: 100, pp: 5, cost: 1, special: "episkey_heal_crit", effect: "Self: cura fixa de 50 e ganha buff de crítico por 2 turnos." },
-  { name: "Protego Diabólico", power: 0, accuracy: 100, pp: 3, cost: 1, priority: 4, special: "protego_diabolico_unforgivable_acc_down", effect: "Área (exceto em si): reduz em 15% a precisão de Crucius, Avada Kedavra e Imperio por 2 turnos." },
-  { name: "Protego Maximo", power: 0, accuracy: 100, pp: 2, cost: 1, priority: 6, special: "protego_maximo_unforgivable_heal", effect: "Self: ao receber Crucius/Avada/Imperio, cura totalmente a vida." },
+  { name: "Protego Diabólico", power: 0, accuracy: 100, pp: 3, cost: 1, priority: 6, special: "protego_diabolico_shield", effect: "Área: -15% precisão de Maldições + escudo pessoal vs Maldições (2t)" },
+  { name: "Protego Maximo", power: 0, accuracy: 100, pp: 3, cost: 1, priority: 6, special: "protego_maximo_crit_heal", effect: "Self: cura 200 HP se o oponente critar enquanto escudo ativo" },
   { name: "Maximos", power: 0, accuracy: 100, pp: 5, cost: 1, priority: 0, special: "maximos_charge", effect: "Self: proximo feitico +10% a +100% poder" },
+  // Novas spells
+  { name: "Locomotor Mortis", power: 0, accuracy: 100, pp: 10, cost: 1, priority: -1, canCrit: false, special: "locomotor_retaliate", effect: "Devolve 25-150% do dano recebido no turno (ignora buffs; sem crítico)" },
+  { name: "Fiantu Dure", power: 0, accuracy: 100, pp: 3, cost: 1, special: "fiantu_mana_restore", effect: "Self: restaura 1-3 de mana em todos os feitiços do usuário" },
 ]
