@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload, X } from "lucide-react"
+import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload, X, Save, FolderOpen, Trash2 } from "lucide-react"
 import { formatSpellPower, INITIAL_PLAYER_BUILD, SPELL_DATABASE, type SpellInfo } from "@/lib/data-store"
 import type { PlayerBuild, CustomRoomSettings } from "@/lib/types"
 import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
@@ -167,6 +167,62 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [spellSearch, setSpellSearch] = useState("")
   const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
   const [gameMode, setGameMode] = useState<"teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "">("")
+
+  // ── Builds Salvas ────────────────────────────────────────────────────────
+  interface SavedBuild {
+    id: string
+    name: string
+    createdAt: string
+    spells: string[]
+    wand: string
+    house: string
+    potion: string
+    avatar: string
+  }
+  const savedBuildsKey = currentUser?.id ? `duel:savedBuilds:${currentUser.id}` : null
+  const [savedBuilds, setSavedBuilds] = useState<SavedBuild[]>(() => {
+    if (typeof window === "undefined") return []
+    const key = currentUser?.id ? `duel:savedBuilds:${currentUser.id}` : null
+    if (!key) return []
+    try { return JSON.parse(window.localStorage.getItem(key) ?? "[]") } catch { return [] }
+  })
+  const [saveBuildName, setSaveBuildName] = useState("")
+  const [showSavePanel, setShowSavePanel] = useState(false)
+
+  const persistBuilds = (builds: SavedBuild[]) => {
+    if (!savedBuildsKey) return
+    window.localStorage.setItem(savedBuildsKey, JSON.stringify(builds))
+    setSavedBuilds(builds)
+  }
+
+  const handleSaveBuild = () => {
+    const bname = saveBuildName.trim() || `Build ${savedBuilds.length + 1}`
+    const newBuild: SavedBuild = {
+      id: Date.now().toString(),
+      name: bname,
+      createdAt: new Date().toISOString(),
+      spells: selectedSpells,
+      wand,
+      house,
+      potion,
+      avatar,
+    }
+    persistBuilds([...savedBuilds, newBuild])
+    setSaveBuildName("")
+    setShowSavePanel(false)
+  }
+
+  const handleLoadBuild = (b: SavedBuild) => {
+    if (b.house) setHouse(b.house)
+    if (b.wand) setWand(b.wand)
+    if (b.potion) setPotion(b.potion)
+    if (b.avatar) setAvatar(b.avatar)
+    if (b.spells?.length) setSelectedSpells(b.spells.filter((s) => SPELL_DATABASE.some((sp) => sp.name === s)))
+  }
+
+  const handleDeleteBuild = (id: string) => {
+    persistBuilds(savedBuilds.filter((b) => b.id !== id))
+  }
 
   useEffect(() => {
     if (!currentUser?.id) return
@@ -1409,6 +1465,38 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 </p>
               </div>
               
+              {/* ── Builds Salvas ────────────────────────────────────────────── */}
+              {currentUser && savedBuilds.length > 0 && (
+                <div className="mb-3">
+                  <p className="mb-1.5 flex items-center gap-1 text-xs text-amber-400">
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    Builds Salvas — clique para carregar
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {savedBuilds.map((b) => (
+                      <div key={b.id} className="flex items-center gap-0.5 rounded-full border border-amber-700/50 bg-stone-800 pl-2.5 pr-1 py-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleLoadBuild(b)}
+                          className="text-xs text-amber-300 hover:text-amber-100 transition-colors"
+                          title={`Feitiços: ${b.spells.join(", ")}`}
+                        >
+                          {b.name}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBuild(b.id)}
+                          className="ml-1 rounded-full p-0.5 text-stone-500 hover:bg-red-900/40 hover:text-red-400 transition-colors"
+                          title="Excluir build"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Search + Sort */}
               <div className="mb-3 flex flex-col gap-2">
                 <div className="relative">
@@ -1564,6 +1652,54 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     : `Use exatamente ${MAX_SPELL_POINTS} pontos de feitiço (atual: ${totalCost}/${MAX_SPELL_POINTS})`
                 }
               </div>
+
+              {/* ── Salvar Build ─────────────────────────────────────────────── */}
+              {currentUser && totalCost === MAX_SPELL_POINTS && wand && house && potion && (
+                <div className="mt-3">
+                  {!showSavePanel ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowSavePanel(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-amber-700/50 bg-stone-800/40 py-2 text-xs text-amber-400 hover:border-amber-500 hover:bg-amber-900/20 hover:text-amber-200 transition-colors"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      Salvar esta Build
+                    </button>
+                  ) : (
+                    <div className="rounded-lg border border-amber-700/40 bg-stone-800/60 p-3">
+                      <p className="mb-2 text-xs font-semibold text-amber-300">
+                        <Save className="mr-1 inline h-3.5 w-3.5" />
+                        Nome da Build
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={saveBuildName}
+                          onChange={(e) => setSaveBuildName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleSaveBuild() }}
+                          placeholder={`Build ${savedBuilds.length + 1}`}
+                          maxLength={24}
+                          className="flex-1 rounded border border-amber-800/50 bg-stone-900 px-2 py-1 text-xs text-amber-100 placeholder:text-stone-500 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveBuild}
+                          className="rounded border border-green-700/60 bg-green-900/30 px-3 py-1 text-xs text-green-300 hover:bg-green-900/60 transition-colors"
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowSavePanel(false)}
+                          className="rounded border border-stone-700 bg-stone-800 px-2 py-1 text-xs text-stone-400 hover:text-stone-200 transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
