@@ -31,6 +31,10 @@ export function getSupabaseClient(): SupabaseClient {
     global: {
       headers: { "X-Client-Info": "duel-arena" },
     },
+    realtime: {
+      // Limita flood; não afeta latência em mobile.
+      params: { eventsPerSecond: 10 },
+    },
   })
   return singleton
 }

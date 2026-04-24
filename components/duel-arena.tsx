@@ -1094,86 +1094,158 @@ const DuelArena = (
     [tryFlushOnlineTurnFromServer]
   )
 
+  const forceReconnectRef = useRef<(() => void) | null>(null)
+
   useEffect(() => {
     if (!isOnlineMatch || !matchId || !selfDuelistId || isReadOnlySpectator) return
     const supabase = getSupabaseClient()
     const presenceKey = playerBuild.userId || selfDuelistId
     const channelName = `match-${matchId}`
-    const fullTopic = `realtime:${channelName}`
-    for (const existing of supabase.getChannels()) {
-      if (existing.topic === channelName || existing.topic === fullTopic) {
-        void supabase.removeChannel(existing)
-      }
-    }
+    let active = true
 
-    const channel = supabase.channel(channelName, {
-      config: { presence: { key: presenceKey } },
-    })
-
-    const syncPresenceRoster = () => {
-      const raw = channel.presenceState() as Record<string, unknown[]>
-      const uuidRe =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      const merged = Object.keys(raw || {})
-        .filter((k) => uuidRe.test(k))
-        .sort()
-      setKnownBroadcastPlayers(merged.length > 0 ? merged : [selfDuelistId])
-      if (merged.length > 0) mergeDuelistsFromPlayerIds(merged)
-      if (merged.length >= expectedOnlinePlayers) {
-        setGameStartAcknowledged(true)
-        setBattleMessage("")
-        setDebugLastEvent(`presence:${merged.length}`)
-      } else {
-        setGameStartAcknowledged(false)
-      }
-    }
-
-    const onMatchTurnChange = (payload: { eventType?: string; new?: Record<string, unknown> }) => {
-      if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") return
-      const row = payload.new as { id?: number | string; match_id?: string; turn_number?: number; player_id?: string; action_payload?: RoundAction }
-      if (!row) return
-      if (row.match_id != null && String(row.match_id) !== matchId) return
-      ingestMatchTurnRow(row)
-    }
-
-    // Supabase Realtime: todos os .on() devem ser registados antes de subscribe() (não encadear subscribe no retorno de .on).
-    channel.on("presence", { event: "sync" }, syncPresenceRoster)
-    channel.on("postgres_changes", { event: "*", schema: "public", table: "match_turns", filter: `match_id=eq.${matchId}` }, onMatchTurnChange)
-
-    channel.subscribe(async (status, err) => {
-      if (err) {
-        const em = err instanceof Error ? err.message : String(err)
-        setChannelSubscribeError(em)
-        console.warn("[Arena] Realtime:", err)
-      }
-      if (status === "SUBSCRIBED") {
-        setMatchChannelConnected(true)
-        setChannelSubscribeError("")
-        setDebugLastEvent("match channel SUBSCRIBED")
-        try {
-          await channel.track({
-            user_id: selfDuelistId,
-            name: playerBuild.name,
-            online_at: new Date().toISOString(),
-          })
-        } catch (trackErr) {
-          console.warn("[Arena] presence.track", trackErr)
+    const openChannel = () => {
+      for (const existing of supabase.getChannels()) {
+        const t = existing.topic
+        if (t === channelName || t === `realtime:${channelName}`) {
+          void supabase.removeChannel(existing)
         }
-        syncPresenceRoster()
       }
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        setMatchChannelConnected(false)
-        setDebugLastEvent(`match channel ${status}`)
-      }
-    })
+      const ch = supabase.channel(channelName, {
+        config: { presence: { key: presenceKey } },
+      })
 
-    matchRealtimeChannelRef.current = channel
+      const syncPresenceRoster = () => {
+        if (!active) return
+        const raw = ch.presenceState() as Record<string, unknown[]>
+        const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        const merged = Object.keys(raw || {}).filter((k) => uuidRe.test(k)).sort()
+        setKnownBroadcastPlayers(merged.length > 0 ? merged : [selfDuelistId])
+        if (merged.length > 0) mergeDuelistsFromPlayerIds(merged)
+        if (merged.length >= expectedOnlinePlayers) {
+          setGameStartAcknowledged(true)
+          setBattleMessage("")
+          setDebugLastEvent(`presence:${merged.length}`)
+        } else {
+          setGameStartAcknowledged(false)
+        }
+      }
+
+      const onMatchTurnChange = (payload: { eventType?: string; new?: Record<string, unknown> }) => {
+        if (!active) return
+        if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") return
+        const row = payload.new as { id?: number | string; match_id?: string; turn_number?: number; player_id?: string; action_payload?: RoundAction }
+        if (!row) return
+        if (row.match_id != null && String(row.match_id) !== matchId) return
+        ingestMatchTurnRow(row)
+      }
+
+      ch.on("presence", { event: "sync" }, syncPresenceRoster)
+      ch.on("postgres_changes", { event: "*", schema: "public", table: "match_turns", filter: `match_id=eq.${matchId}` }, onMatchTurnChange)
+
+      ch.subscribe(async (status, err) => {
+        if (!active) return
+        if (err) {
+          const em = err instanceof Error ? err.message : String(err)
+          setChannelSubscribeError(em)
+          console.warn("[Arena] Realtime:", err)
+        }
+        if (status === "SUBSCRIBED") {
+          setMatchChannelConnected(true)
+          setChannelSubscribeError("")
+          setDebugLastEvent("match channel SUBSCRIBED")
+          try {
+            await ch.track({
+              user_id: selfDuelistId,
+              name: playerBuild.name,
+              online_at: new Date().toISOString(),
+            })
+          } catch (trackErr) {
+            console.warn("[Arena] presence.track", trackErr)
+          }
+          syncPresenceRoster()
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          if (!active) return
+          setMatchChannelConnected(false)
+          setDebugLastEvent(`match channel ${status}`)
+        }
+      })
+
+      matchRealtimeChannelRef.current = ch
+      return ch
+    }
+
+    openChannel()
+
+    // "Forçar Conexão" reutilizável pelo botão do painel de debug.
+    forceReconnectRef.current = () => {
+      if (!active) return
+      setMatchChannelConnected(false)
+      setDebugLastEvent("force reconnect…")
+      const c = matchRealtimeChannelRef.current
+      if (c) void supabase.removeChannel(c)
+      matchRealtimeChannelRef.current = null
+      openChannel()
+    }
+
     return () => {
+      active = false
+      forceReconnectRef.current = null
+      const c = matchRealtimeChannelRef.current
+      if (c) void supabase.removeChannel(c)
       matchRealtimeChannelRef.current = null
       setMatchChannelConnected(false)
-      void supabase.removeChannel(channel)
     }
   }, [expectedOnlinePlayers, ingestMatchTurnRow, isOnlineMatch, isReadOnlySpectator, matchId, mergeDuelistsFromPlayerIds, playerBuild.name, playerBuild.userId, selfDuelistId])
+
+  // Wake Lock: impede o celular de suspender o JS enquanto a batalha estiver ativa.
+  useEffect(() => {
+    if (isOfflineMode || gameOver || battleStatus === "idle") return
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return
+    let lock: { release: () => Promise<void> } | null = null
+    let mounted = true
+    void (async () => {
+      try {
+        lock = await (navigator as any).wakeLock.request("screen")
+        console.log("[Arena] Wake Lock adquirido.")
+        lock.addEventListener?.("release", () => {
+          if (mounted) console.log("[Arena] Wake Lock liberado pelo sistema.")
+        })
+      } catch (e) {
+        console.warn("[Arena] Wake Lock não suportado ou negado:", e)
+      }
+    })()
+    return () => {
+      mounted = false
+      lock?.release().catch(() => {})
+    }
+  }, [isOfflineMode, gameOver, battleStatus])
+
+  // Fallback HTTP: quando desconectado do Realtime, busca ações do turno via SELECT a cada 3 s.
+  useEffect(() => {
+    if (!isOnlineMatch || !matchId || matchChannelConnected || gameOver) return
+    let cancelled = false
+    const pollHttp = async () => {
+      if (cancelled) return
+      const tn = turnNumberRef.current
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase
+        .from("match_turns")
+        .select("id,turn_number,player_id,action_payload,match_id")
+        .eq("match_id", matchId)
+        .eq("turn_number", tn)
+      if (cancelled || error || !data?.length) return
+      for (const row of data) {
+        ingestMatchTurnRow(row as { id?: number | string; turn_number?: number; player_id?: string; action_payload?: RoundAction })
+      }
+    }
+    const id = window.setInterval(() => void pollHttp(), 3000)
+    void pollHttp()
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [isOnlineMatch, matchId, matchChannelConnected, gameOver, ingestMatchTurnRow])
 
   useEffect(() => {
     if (!isOnlineMatch || !matchId || !gameStartAcknowledged || isReadOnlySpectator) return
@@ -1902,19 +1974,28 @@ const DuelArena = (
 
       {!isOfflineMode && matchId && (
         <div
-          className="pointer-events-none fixed bottom-20 right-3 z-[90] max-w-[13rem] rounded border border-stone-600/90 bg-black/85 px-2 py-1 font-mono text-[10px] leading-tight text-stone-300 shadow-md backdrop-blur-sm"
-          aria-hidden
+          className="pointer-events-auto fixed bottom-20 right-3 z-[90] max-w-[13rem] rounded border border-stone-600/90 bg-black/85 px-2 py-1 font-mono text-[10px] leading-tight text-stone-300 shadow-md backdrop-blur-sm"
         >
-          <p>[Conectado: {matchChannelConnected ? "Sim" : "Não"}]</p>
-          <p>
-            [Players: {knownBroadcastPlayers.length}/{expectedOnlinePlayers}]
-          </p>
+          {matchChannelConnected ? (
+            <p className="text-green-400">[Conectado: Sim]</p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => forceReconnectRef.current?.()}
+              className="w-full rounded border border-red-500/80 bg-red-900/60 px-2 py-0.5 text-left text-[10px] font-bold text-red-200 hover:bg-red-800/80 active:scale-95"
+            >
+              ⚡ FORÇAR CONEXÃO
+            </button>
+          )}
+          <p>[Players: {knownBroadcastPlayers.length}/{expectedOnlinePlayers}]</p>
           <p className="truncate" title={debugLastEvent}>
             [Último Evento: {debugLastEvent || "—"}]
           </p>
-          <p className="truncate text-amber-400/90" title={channelSubscribeError}>
-            [Canal Erro: {channelSubscribeError || "—"}]
-          </p>
+          {channelSubscribeError && (
+            <p className="truncate text-amber-400/90" title={channelSubscribeError}>
+              [Erro: {channelSubscribeError}]
+            </p>
+          )}
         </div>
       )}
 
