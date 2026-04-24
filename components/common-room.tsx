@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload } from "lucide-react"
+import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload, X } from "lucide-react"
 import { formatSpellPower, INITIAL_PLAYER_BUILD, SPELL_DATABASE, type SpellInfo } from "@/lib/data-store"
 import type { PlayerBuild, CustomRoomSettings } from "@/lib/types"
 import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
@@ -674,9 +674,19 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
         {/* ── Modal PIX ────────────────────────────────────────────────────── */}
         <Dialog open={pixModal} onOpenChange={setPixModal}>
-          <DialogContent className="border-amber-700/50 bg-stone-900 text-amber-100">
+          <DialogContent className="max-h-[92vh] overflow-y-auto border-amber-700/50 bg-stone-900 text-amber-100">
             <DialogHeader>
-              <DialogTitle className="text-amber-300">💛 Apoie o Projeto</DialogTitle>
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-amber-300">💛 Apoie o Projeto</DialogTitle>
+                <button
+                  type="button"
+                  onClick={() => setPixModal(false)}
+                  className="rounded-full p-1 text-amber-500 hover:bg-stone-700 hover:text-amber-200 transition-colors"
+                  aria-label="Fechar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-amber-200/80">
@@ -734,6 +744,16 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 }
               </div>
             </div>
+            <DialogFooter className="mt-2">
+              <Button
+                variant="outline"
+                className="w-full border-stone-700 text-stone-400 hover:bg-stone-800 hover:text-stone-200"
+                onClick={() => setPixModal(false)}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Fechar
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -1652,22 +1672,67 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
                 {/* Feitiços banidos */}
                 <div className="mb-3">
-                  <p className="mb-1 text-xs text-amber-400">🚫 Banir Feitiços (clique para alternar)</p>
-                  <div className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
-                    {["Avada Kedavra", "Crucius", "Imperio", "Flagrate", "Locomotor Mortis"].map((sp) => (
-                      <button key={sp} type="button"
-                        onClick={() => setCustomSettings((s) => ({
-                          ...s,
-                          bannedSpells: s.bannedSpells.includes(sp)
-                            ? s.bannedSpells.filter((x) => x !== sp)
-                            : [...s.bannedSpells, sp],
-                        }))}
-                        className={`rounded px-2 py-0.5 text-[10px] ${customSettings.bannedSpells.includes(sp) ? "bg-red-800 text-red-100" : "bg-stone-700 text-amber-300 hover:bg-stone-600"}`}
-                      >
-                        {customSettings.bannedSpells.includes(sp) ? "✖ " : ""}{sp}
-                      </button>
-                    ))}
+                  <p className="mb-1 text-xs text-amber-400">🚫 Banir Feitiços <span className="text-stone-500">(clique para alternar)</span></p>
+                  <div className="mb-1 text-[10px] text-stone-500">
+                    Maldições: <span className="text-red-400">vermelho</span> · Controle: <span className="text-purple-400">roxo</span> · Dano alto: <span className="text-orange-400">laranja</span>
                   </div>
+                  <div className="flex max-h-36 flex-wrap gap-1 overflow-y-auto">
+                    {([
+                      // Maldições Imperdoáveis
+                      { name: "Avada Kedavra", cat: "red" },
+                      { name: "Crucius",        cat: "red" },
+                      { name: "Imperio",         cat: "red" },
+                      // Controle / utilidade abusiva
+                      { name: "Estupefaca",      cat: "purple" },
+                      { name: "Eletricus",       cat: "purple" },
+                      { name: "Petrificus Totales", cat: "purple" },
+                      { name: "Obliviate",       cat: "purple" },
+                      { name: "Expulso",         cat: "purple" },
+                      { name: "Fumus",           cat: "purple" },
+                      // Dano / mecânicas especiais
+                      { name: "Flagrate",        cat: "orange" },
+                      { name: "Locomotor Mortis",cat: "orange" },
+                      { name: "Scarlatum",       cat: "orange" },
+                      { name: "Desumo Tempestas",cat: "orange" },
+                      { name: "Sectumsempra",    cat: "orange" },
+                      { name: "Salvio Hexia",    cat: "orange" },
+                      { name: "Flagellum",       cat: "orange" },
+                      // VIP
+                      { name: "Legilimens",      cat: "yellow" },
+                      { name: "Fogo Maldito",    cat: "yellow" },
+                      { name: "Bombarda Maxima", cat: "yellow" },
+                      { name: "Expecto Patronum",cat: "yellow" },
+                    ] as { name: string; cat: string }[]).map(({ name: sp, cat }) => {
+                      const banned = customSettings.bannedSpells.includes(sp)
+                      const colorIdle =
+                        cat === "red"    ? "bg-red-950/60 text-red-400 hover:bg-red-900/60" :
+                        cat === "purple" ? "bg-purple-950/60 text-purple-400 hover:bg-purple-900/60" :
+                        cat === "orange" ? "bg-orange-950/60 text-orange-400 hover:bg-orange-900/60" :
+                                           "bg-yellow-950/60 text-yellow-400 hover:bg-yellow-900/60"
+                      return (
+                        <button key={sp} type="button"
+                          onClick={() => setCustomSettings((s) => ({
+                            ...s,
+                            bannedSpells: banned
+                              ? s.bannedSpells.filter((x) => x !== sp)
+                              : [...s.bannedSpells, sp],
+                          }))}
+                          className={`rounded border px-2 py-0.5 text-[10px] transition-colors ${
+                            banned
+                              ? "border-red-600 bg-red-800 text-red-100"
+                              : `border-transparent ${colorIdle}`
+                          }`}
+                        >
+                          {banned ? "✖ " : ""}{sp}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {customSettings.bannedSpells.length > 0 && (
+                    <p className="mt-1 text-[10px] text-red-400">
+                      Banidos ({customSettings.bannedSpells.length}): {customSettings.bannedSpells.join(", ")}
+                    </p>
+                  )}
                 </div>
 
                 <p className="text-[10px] text-amber-600">As regras serão compartilhadas com o oponente ao entrar na sala.</p>
