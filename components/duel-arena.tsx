@@ -541,6 +541,7 @@ const DuelArena = (
           disabledSpells: old.disabledSpells,
           missStreakBySpell: old.missStreakBySpell,
           turnsInBattle: old.turnsInBattle,
+          parryUses: old.parryUses,
         }
       })
       console.log("[Arena:init] setDuelists from participants", {
@@ -908,6 +909,7 @@ const DuelArena = (
       prev.map((d) => ({
         ...d,
         circumAura: d.circumAura != null && d.circumAura > 1 ? d.circumAura - 1 : d.circumAura === 1 ? undefined : d.circumAura,
+        parryUses: undefined,
       }))
     )
     setBattleStatus("selecting")
@@ -1049,6 +1051,7 @@ const DuelArena = (
           setPotionUsed(false)
           setPendingSpell(null)
           setGameOver(null)
+          setIsParryingActive(false)
           turnNumberRef.current = 1
           setTurnNumber(1)
           setBattleStatus("selecting")
@@ -1059,6 +1062,7 @@ const DuelArena = (
           setChallengeStage(0)
         }
         setGameOver(outcome.outcome)
+        setIsParryingActive(false)
         if ((outcome.outcome === "win" || outcome.outcome === "lose") && playerBuild.gameMode !== "torneio-offline") {
           onBattleEnd?.(outcome.outcome, playerBuild.userId)
         } else if (playerBuild.gameMode === "torneio-offline" && outcome.outcome === "win") {
@@ -1123,6 +1127,7 @@ const DuelArena = (
 
       if (data.outcome) {
         setGameOver(data.outcome)
+        setIsParryingActive(false)
         // Em FFA, não chamamos onBattleEnd aqui para evitar múltiplas contagens de derrota
         // Apenas MATCH_RESULT deve processar o resultado final
         const isFfaMode = playerBuild.gameMode === "ffa" || playerBuild.gameMode === "ffa3"
@@ -1542,6 +1547,7 @@ const DuelArena = (
       } else {
         setPendingActions((prev) => ({ ...prev, [sid]: localAction }))
       }
+      setIsParryingActive(false)
     }
 
     if (isSelfTargetSpell(spellName)) {
@@ -1602,6 +1608,7 @@ const DuelArena = (
     } else {
       setPendingActions((prev) => ({ ...prev, [selfDuelistId!]: localAction }))
     }
+    setIsParryingActive(false)
     setPendingSpell(null)
   }
 
@@ -2196,13 +2203,14 @@ const DuelArena = (
                   !isBattleReady ||
                   (isOnlineMatch && !gameStartAcknowledged) ||
                   awaitingServerAck ||
-                  playerCannotAct
+                  playerCannotAct ||
+                  (player?.parryUses ?? 0) >= 3
                 }
                 onClick={() => setIsParryingActive(!isParryingActive)}
-                title="PARRY: Se o oponente usar o mesmo feitiço, você reflete o dobro de dano (custo: 3 mana)"
-                className={`touch-manipulation select-none border border-green-700 text-green-100 ${isParryingActive ? "bg-green-600 animate-pulse shadow-[0_0_20px_rgba(34,197,94,0.8)]" : "bg-gradient-to-b from-green-800 to-green-900 hover:from-green-700 hover:to-green-800"}`}
+                title={`PARRY: Se o oponente usar o mesmo feitiço, você reflete o dobro de dano (custo: 1 mana). Usos restantes: ${3 - (player?.parryUses ?? 0)}/3`}
+                className={`touch-manipulation select-none border border-green-700 text-green-100 ${isParryingActive ? "bg-green-600 animate-pulse shadow-[0_0_20px_rgba(34,197,94,0.8)]" : "bg-gradient-to-b from-green-800 to-green-900 hover:from-green-700 hover:to-green-800"} ${(player?.parryUses ?? 0) >= 3 ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                ⚔️ PARRY
+                ⚔️ PARRY ({3 - (player?.parryUses ?? 0)}/3)
               </Button>
             </div>
           )}

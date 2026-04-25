@@ -1632,7 +1632,7 @@ export function calculateTurnOutcome(params: {
         if (d.id === actionA.casterId) {
           // Restore HP to pre-turn state
           const prev = params.duelists.find((p) => p.id === d.id)
-          return prev ? { ...d, hp: prev.hp } : d
+          return prev ? { ...d, hp: prev.hp, parryUses: (d.parryUses ?? 0) + 1 } : d
         }
         return d
       })
@@ -1651,18 +1651,18 @@ export function calculateTurnOutcome(params: {
 
       logs.push(`⚔️ PARRY PERFEITO! ${state.find((d) => d.id === actionA.casterId)?.name} refletiu o ${spellA} de ${state.find((d) => d.id === actionB.casterId)?.name} com o dobro de força!`)
     } else if (isParryingA) {
-      // Parry failed: subtract 3 mana from PlayerA
+      // Parry failed: subtract 1 mana from PlayerA (cost of attempting parry)
       state = state.map((d) => {
         if (d.id === actionA.casterId && d.spellMana && spellA) {
           const sm = { ...d.spellMana }
           if (sm[spellA]) {
-            sm[spellA] = { ...sm[spellA], current: Math.max(0, sm[spellA].current - 3) }
+            sm[spellA] = { ...sm[spellA], current: Math.max(0, sm[spellA].current - 1) }
           }
-          return { ...d, spellMana: sm }
+          return { ...d, spellMana: sm, parryUses: (d.parryUses ?? 0) + 1 }
         }
         return d
       })
-      logs.push(`⚔️ PARRY falhou! ${state.find((d) => d.id === actionA.casterId)?.name} perdeu 3 de mana (feitiços diferentes).`)
+      logs.push(`⚔️ PARRY falhou! ${state.find((d) => d.id === actionA.casterId)?.name} perdeu 1 de mana (feitiços diferentes).`)
     }
 
     // Same logic for PlayerB parrying
@@ -1675,7 +1675,7 @@ export function calculateTurnOutcome(params: {
       state = state.map((d) => {
         if (d.id === actionB.casterId) {
           const prev = params.duelists.find((p) => p.id === d.id)
-          return prev ? { ...d, hp: prev.hp } : d
+          return prev ? { ...d, hp: prev.hp, parryUses: (d.parryUses ?? 0) + 1 } : d
         }
         return d
       })
@@ -1694,22 +1694,31 @@ export function calculateTurnOutcome(params: {
 
       logs.push(`⚔️ PARRY PERFEITO! ${state.find((d) => d.id === actionB.casterId)?.name} refletiu o ${spellB} de ${state.find((d) => d.id === actionA.casterId)?.name} com o dobro de força!`)
     } else if (isParryingB && !isParryingA) {
-      // Parry failed: subtract 3 mana from PlayerB
+      // Parry failed: subtract 1 mana from PlayerB (cost of attempting parry)
       state = state.map((d) => {
         if (d.id === actionB.casterId && d.spellMana && spellB) {
           const sm = { ...d.spellMana }
           if (sm[spellB]) {
-            sm[spellB] = { ...sm[spellB], current: Math.max(0, sm[spellB].current - 3) }
+            sm[spellB] = { ...sm[spellB], current: Math.max(0, sm[spellB].current - 1) }
           }
-          return { ...d, spellMana: sm }
+          return { ...d, spellMana: sm, parryUses: (d.parryUses ?? 0) + 1 }
         }
         return d
       })
-      logs.push(`⚔️ PARRY falhou! ${state.find((d) => d.id === actionB.casterId)?.name} perdeu 3 de mana (feitiços diferentes).`)
+      logs.push(`⚔️ PARRY falhou! ${state.find((d) => d.id === actionB.casterId)?.name} perdeu 1 de mana (feitiços diferentes).`)
     }
 
-    // Both parrying with same spell: both take 0 damage
+    // Both parrying with same spell: both take 0 damage, both increment parryUses
     if (isParryingA && isParryingB && spellA === spellB) {
+      state = state.map((d) => {
+        if (d.id === actionA.casterId) {
+          return { ...d, parryUses: (d.parryUses ?? 0) + 1 }
+        }
+        if (d.id === actionB.casterId) {
+          return { ...d, parryUses: (d.parryUses ?? 0) + 1 }
+        }
+        return d
+      })
       logs.push(`⚔️ EMPATE TÉCNICO DE PARRY! Ambos refletiram o ${spellA} simultaneamente!`)
     }
   }

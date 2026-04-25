@@ -101,6 +101,8 @@ export interface Duelist {
   unforgivableUsedCount?: number
   /** Silêncio: array de magias silenciadas por 1 turno */
   silencedSpells?: string[]
+  /** Parry: contador de usos do Parry (limite 3 por batalha) */
+  parryUses?: number
 }
 
 export type Point = { x: number; y: number }
