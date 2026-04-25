@@ -42,7 +42,6 @@ interface UserProfile {
 type AdminTab = "vip" | "users" | "reports" | "ranking"
 
 export default function AdminPage() {
-  const [secret, setSecret] = useState("")
   const [authenticated, setAuthenticated] = useState(false)
   const [requests, setRequests] = useState<VipRequest[]>([])
   const [reports, setReports] = useState<Report[]>([])
@@ -52,10 +51,38 @@ export default function AdminPage() {
   const [approving, setApproving] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<Record<string, string>>({})
   const [checkingSession, setCheckingSession] = useState(true)
-  const [adminSecret, setAdminSecret] = useState("")
   const [activeTab, setActiveTab] = useState<AdminTab>("vip")
   const [userSearch, setUserSearch] = useState("")
   const [resettingRanking, setResettingRanking] = useState(false)
+  const [metaGlobal, setMetaGlobal] = useState(60)
+
+  const handleUpdateMetaGlobal = async () => {
+    try {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError("Sessão não encontrada")
+        return
+      }
+      
+      const res = await fetch("/api/admin/update-meta", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ meta: metaGlobal }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        alert("Meta global atualizada com sucesso!")
+      } else {
+        setError(data.error ?? "Erro ao atualizar meta")
+      }
+    } catch {
+      setError("Falha de conexão")
+    }
+  }
 
   const fetchRequests = useCallback(async () => {
     setLoading(true)
@@ -219,10 +246,19 @@ export default function AdminPage() {
     setResettingRanking(true)
     setError("")
     try {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError("Sessão não encontrada")
+        return
+      }
+      
       const res = await fetch("/api/admin/reset-ranking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret: adminSecret }),
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
       })
       const data = await res.json()
       if (res.ok) {
@@ -239,10 +275,20 @@ export default function AdminPage() {
 
   const handleToggleVip = async (userId: string, currentVip: boolean | null) => {
     try {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError("Sessão não encontrada")
+        return
+      }
+      
       const res = await fetch("/api/admin/toggle-vip", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret: adminSecret, userId, setVip: !currentVip }),
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ userId, setVip: !currentVip }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -261,10 +307,20 @@ export default function AdminPage() {
 
   const handleToggleAdmin = async (userId: string, currentAdmin: boolean | null) => {
     try {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError("Sessão não encontrada")
+        return
+      }
+      
       const res = await fetch("/api/admin/toggle-admin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret: adminSecret, userId, setAdmin: !currentAdmin }),
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ userId, setAdmin: !currentAdmin }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -281,10 +337,20 @@ export default function AdminPage() {
 
   const handleUpdateElo = async (userId: string, newElo: number) => {
     try {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError("Sessão não encontrada")
+        return
+      }
+      
       const res = await fetch("/api/admin/update-elo", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret: adminSecret, userId, elo: newElo }),
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ userId, elo: newElo }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -301,10 +367,20 @@ export default function AdminPage() {
 
   const handleResolveReport = async (reportId: string, status: "resolved" | "dismissed") => {
     try {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError("Sessão não encontrada")
+        return
+      }
+      
       const res = await fetch("/api/admin/resolve-report", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret: adminSecret, reportId, status }),
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ reportId, status }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -354,20 +430,38 @@ export default function AdminPage() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-amber-300">� Painel Admin</h1>
+            <h1 className="text-2xl font-bold text-amber-300">🔒 Painel Admin</h1>
             <p className="text-xs text-stone-500">Hogwarts Showdown</p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-amber-700 text-amber-400"
-            onClick={() => {
-              setAuthenticated(false)
-              setSecret("")
-            }}
-          >
-            Sair
-          </Button>
+          <div className="flex gap-2">
+            <div className="flex items-center gap-2 rounded border border-amber-700/50 bg-stone-800 px-3 py-2">
+              <span className="text-xs text-amber-400">Meta Global (R$):</span>
+              <input
+                type="number"
+                value={metaGlobal}
+                onChange={(e) => setMetaGlobal(Number(e.target.value))}
+                className="w-16 rounded border border-amber-700 bg-stone-900 px-2 py-1 text-xs text-amber-200 text-right"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 border-amber-600 text-xs text-amber-300"
+                onClick={handleUpdateMetaGlobal}
+              >
+                Salvar
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-700 text-amber-400"
+              onClick={() => {
+                setAuthenticated(false)
+              }}
+            >
+              Sair
+            </Button>
+          </div>
         </div>
 
         {/* Tabs */}
