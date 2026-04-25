@@ -80,6 +80,7 @@ const WAND_CORES = [
   { value: "cinzal",      label: "Presa de Cinzal",         desc: "Cada 100+ dmg recebido: atacante acumula −15% dano", icon: AlertTriangle },
   { value: "centauro",    label: "Pelo de Centauro",         desc: "No campo: Ferula/Episkey/Vulnera com mana 0 para todos", icon: Wind },
   { value: "hippogriff",  label: "Pena de Hipogrifo",       desc: "Imunidade total a MARCA e BOMBA",               icon: Shield },
+  { value: "troll",       label: "Pele de Trasgo",          desc: "Estabiliza o dano recebido no valor médio (não permite dano máximo)", icon: AlertTriangle },
 ]
 
 const POTIONS = [
