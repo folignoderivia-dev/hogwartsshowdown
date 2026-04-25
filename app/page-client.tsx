@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { LanguageProvider } from "@/contexts/language-context"
 import { applyMatchElo, getSessionUserId, getUserById } from "@/lib/database"
 import type { DbUser } from "@/lib/database"
 import { useMatchManager, type ExternalMatchState } from "@/hooks/useMatchManager"
@@ -23,6 +24,8 @@ export default function PageClient() {
   const [pendingSpectate, setPendingSpectate] = useState<{ matchId: string; mode: PlayerBuild["gameMode"] } | null>(null)
   const [openRooms, setOpenRooms] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number }>>([])
   const { isOnlineMode, applyExternalState, externalMatchState, joinMatchmaker, createRoom, joinRoomById, fetchOpenRooms, findActiveMatchForPlayer } = useMatchManager()
+  /** Evita +1 derrota duplicada no FFA (derrota na eliminação + no fim). */
+  const ffaStatsAppliedRef = useRef<Set<string>>(new Set())
   const [isSpectator, setIsSpectator] = useState(false)
   const [resumableMatch, setResumableMatch] = useState<{ matchId: string; mode: PlayerBuild["gameMode"]; status: "waiting" | "in_progress" } | null>(null)
   useEffect(() => {
@@ -121,6 +124,7 @@ export default function PageClient() {
   }, [])
 
   const handleReturnToCommonRoom = () => {
+    ffaStatsAppliedRef.current.clear()
     setScreen("setup")
     setMatchPending(false)
     setActiveMatchId(null)
@@ -134,11 +138,40 @@ export default function PageClient() {
     })()
   }
 
+  useEffect(() => {
+    ffaStatsAppliedRef.current.clear()
+  }, [activeMatchId])
+
+  const handleFfaPlayerEliminated = useCallback(
+    (userId: string) => {
+      const mode = playerBuild?.gameMode
+      if (mode !== "ffa" && mode !== "ffa3") return
+      if (ffaStatsAppliedRef.current.has(userId)) return
+      ffaStatsAppliedRef.current.add(userId)
+      void (async () => {
+        await applyMatchElo(userId, "lose", mode)
+        const self = await getSessionUserId()
+        if (self === userId) {
+          const u = await getUserById(userId)
+          if (u) setAccountUser(u)
+        }
+      })()
+    },
+    [playerBuild?.gameMode]
+  )
+
   const handleBattleEnd = (outcome: "win" | "lose", userId?: string) => {
     if (!userId) return
     if (playerBuild?.gameMode === "teste") return
+    const mode = playerBuild?.gameMode
     void (async () => {
-      await applyMatchElo(userId, outcome, playerBuild?.gameMode)
+      if ((mode === "ffa" || mode === "ffa3") && outcome === "lose" && ffaStatsAppliedRef.current.has(userId)) {
+        return
+      }
+      if ((mode === "ffa" || mode === "ffa3") && outcome === "lose") {
+        ffaStatsAppliedRef.current.add(userId)
+      }
+      await applyMatchElo(userId, outcome, mode)
       const u = await getUserById(userId)
       if (u) setAccountUser(u)
     })()
@@ -274,6 +307,7 @@ export default function PageClient() {
   }
 
   return (
+    <LanguageProvider>
     <main className="min-h-screen">
       {screen === "setup" ? (
         <CommonRoom
@@ -300,6 +334,7 @@ export default function PageClient() {
           playerBuild={playerBuild!}
           onReturn={handleReturnToCommonRoom}
           onBattleEnd={handleBattleEnd}
+          onFfaPlayerEliminated={handleFfaPlayerEliminated}
           matchId={activeMatchId || undefined}
           isSpectator={isSpectator}
           participantIds={externalMatchState?.participantIds || []}
@@ -315,5 +350,6 @@ export default function PageClient() {
         </section>
       )}
     </main>
+    </LanguageProvider>
   )
 }

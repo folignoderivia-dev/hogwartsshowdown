@@ -65,6 +65,8 @@ export interface Duelist {
   /** Oculto do frontend: absorção de dano gerada no início da partida (10–50). */
   defense?: number
   damageReceivedThisTurn?: number
+  /** Último dano em um único evento (Wiggenweld). */
+  lastSingleHitDamageReceived?: number
   usedPotions?: string[]
   permanentAccBonus?: number
   cinzalWeakenStacks?: number

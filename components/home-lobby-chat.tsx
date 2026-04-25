@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 
 const STORAGE_KEY = "hs:lobbyChat:v1"
 const MAX_MESSAGES = 80
@@ -34,19 +35,35 @@ function saveMessages(list: LobbyChatMessage[]) {
   }
 }
 
-/** Bate-papo simples no fim da Sala Comum (mensagens guardadas só neste dispositivo / navegador). */
-export default function HomeLobbyChat({ authorName }: { authorName: string }) {
+type LayoutMode = "default" | "topBanner"
+
+/** Bate-papo simples na Sala Comum (mensagens locais). */
+export default function HomeLobbyChat({
+  authorName,
+  layout = "default",
+  className,
+}: {
+  authorName: string
+  /** `topBanner`: barra horizontal compacta no topo (mobile: altura reduzida). */
+  layout?: LayoutMode
+  className?: string
+}) {
   const [messages, setMessages] = useState<LobbyChatMessage[]>([])
   const [draft, setDraft] = useState("")
   const listRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setMessages(loadMessages())
   }, [])
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" })
-  }, [messages])
+    if (layout === "topBanner") {
+      trackRef.current?.scrollTo({ left: trackRef.current.scrollWidth, behavior: "smooth" })
+    } else {
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" })
+    }
+  }, [messages, layout])
 
   const send = useCallback(() => {
     const text = draft.trim()
@@ -66,8 +83,64 @@ export default function HomeLobbyChat({ authorName }: { authorName: string }) {
     setDraft("")
   }, [authorName, draft])
 
+  if (layout === "topBanner") {
+    return (
+      <section
+        className={cn(
+          "w-full border-b border-amber-900/50 bg-stone-950/90 shadow-md backdrop-blur-sm",
+          "md:sticky md:top-0 md:z-40",
+          className
+        )}
+      >
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-1 px-2 py-1.5 sm:flex-row sm:items-stretch sm:gap-2 sm:px-3 sm:py-2">
+          <div className="min-h-0 flex-1 sm:flex sm:min-w-0 sm:flex-1 sm:flex-col">
+            <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-500/90 sm:shrink-0">
+              Bate-papo da Sala <span className="font-normal text-amber-700">(local)</span>
+            </p>
+            <div
+              ref={trackRef}
+              className="flex max-h-10 min-h-[2.25rem] w-full min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden scroll-smooth rounded border border-amber-900/35 bg-stone-900/70 px-2 py-1 text-xs md:max-h-12"
+            >
+              {messages.length === 0 ? (
+                <span className="shrink-0 text-[11px] text-amber-600/80">Diga olá ao lobby…</span>
+              ) : (
+                messages.map((m) => (
+                  <span
+                    key={m.id}
+                    className="inline-flex shrink-0 max-w-[min(100%,280px)] items-baseline gap-1 rounded-sm bg-stone-800/60 px-1.5 py-0.5"
+                  >
+                    <span className="font-semibold text-amber-300">{m.author}</span>
+                    <span className="text-amber-100/95">· {m.text}</span>
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="flex w-full shrink-0 gap-1.5 sm:max-w-md sm:items-end">
+            <Input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  send()
+                }
+              }}
+              placeholder="Mensagem…"
+              maxLength={280}
+              className="h-9 touch-manipulation border-amber-800 bg-stone-900 text-sm text-amber-100 placeholder:text-amber-700"
+            />
+            <Button type="button" onClick={send} className="h-9 touch-manipulation shrink-0 bg-amber-800 px-3 text-sm hover:bg-amber-700">
+              Enviar
+            </Button>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
-    <Card className="mt-8 border-amber-900/50 bg-stone-950/80 text-amber-100">
+    <Card className={cn("mt-8 border-amber-900/50 bg-stone-950/80 text-amber-100", className)}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base text-amber-200">Bate-papo da Sala</CardTitle>
         <p className="text-[11px] font-normal text-amber-600/90">

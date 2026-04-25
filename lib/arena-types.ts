@@ -79,6 +79,8 @@ export interface Duelist {
   defense?: number
   /** Dano recebido neste turno (para Locomotor Mortis) */
   damageReceivedThisTurn?: number
+  /** Último valor de dano recebido num único “pacote” (Wiggenweld). Atualiza a cada golpe, DoT ou reflexo. */
+  lastSingleHitDamageReceived?: number
   /** Poções já usadas nesta batalha (uso único garantido pelo servidor) */
   usedPotions?: string[]
   /** Bônus permanente de acurácia (Poção Foco) */

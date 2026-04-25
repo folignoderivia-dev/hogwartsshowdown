@@ -403,15 +403,15 @@ export function calculateTurnOutcome(params: {
       logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} usou poção (${potKey})!`)
 
       if (potKey === "wiggenweld") {
-        const lastDmg = params.duelists.find((d) => d.id === attacker.id)?.damageReceivedThisTurn ?? 0
-        const healAmt = Math.max(0, lastDmg)
+        const self = state.find((d) => d.id === attacker.id)
+        const healAmt = Math.max(0, self?.lastSingleHitDamageReceived ?? 0)
         state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healAmt > 0 ? healFlatTotal(d.hp, healAmt) : d.hp } : d))
         const charmDebuff = attacker.debuffs.find((x) => x.type === "charm")
         if (charmDebuff?.meta && healAmt > 0) {
           state = state.map((d) => d.id === charmDebuff.meta ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d)
           logs.push(`→ CHARM: ${charmDebuff.meta} também recuperou ${healAmt} HP!`)
         }
-        logs.push(`→ ${attacker.name} usou Wiggenweld! Recuperou ${healAmt} HP (= dano anterior).`)
+        logs.push(`→ ${attacker.name} usou Wiggenweld! Recuperou ${healAmt} HP (= último golpe recebido).`)
 
       } else if (potKey === "edurus") {
         state = state.map((d) =>
@@ -604,7 +604,12 @@ export function calculateTurnOutcome(params: {
       }
       state = state.map((d) =>
         d.id === defId
-          ? { ...d, hp: applyDamage(d.hp, effectiveDmg, {}), damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + effectiveDmg }
+          ? {
+              ...d,
+              hp: applyDamage(d.hp, effectiveDmg, {}),
+              damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + effectiveDmg,
+              lastSingleHitDamageReceived: effectiveDmg,
+            }
           : d
       )
       // Lufa-Lufa espinhos: 10% do dano reflete no atacante (Testrálio do atingido limita o reflexo)
@@ -613,7 +618,16 @@ export function calculateTurnOutcome(params: {
         const thornRaw = Math.round(effectiveDmg * HOUSE_GDD.hufflepuff.thornsPercent)
         const thornDmg = dealer ? capThestralIncomingDamage(dealer.wand, thornRaw) : thornRaw
         if (thornDmg > 0) {
-          state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, thornDmg, { thestral: d.wand === "thestral" }) } : d))
+          state = state.map((d) =>
+            d.id === dealerId
+              ? {
+                  ...d,
+                  hp: applyDamage(d.hp, thornDmg, { thestral: d.wand === "thestral" }),
+                  damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + thornDmg,
+                  lastSingleHitDamageReceived: thornDmg,
+                }
+              : d
+          )
           logs.push(
             `→ 🦡 Espinhos (Lufa-Lufa): ${dealerName} recebeu ${thornDmg} de dano reflexo após ferir ${def.name} (${thornRaw} bruto, ${Math.round(HOUSE_GDD.hufflepuff.thornsPercent * 100)}% do golpe).`
           )
@@ -633,7 +647,16 @@ export function calculateTurnOutcome(params: {
         const refRaw = Math.round(effectiveDmg)
         const refDmg = dealer ? capThestralIncomingDamage(dealer.wand, refRaw) : refRaw
         if (refDmg > 0) {
-          state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, refDmg, { thestral: d.wand === "thestral" }) } : d))
+          state = state.map((d) =>
+            d.id === dealerId
+              ? {
+                  ...d,
+                  hp: applyDamage(d.hp, refDmg, { thestral: d.wand === "thestral" }),
+                  damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + refDmg,
+                  lastSingleHitDamageReceived: refDmg,
+                }
+              : d
+          )
           logs.push(
             `→ ✨ Salvio Hexia (reflect): ${dealerName} recebeu ${refDmg} de dano refletido de ${def.name} (${refRaw} bruto antes do cap).`
           )
@@ -898,7 +921,12 @@ export function calculateTurnOutcome(params: {
         if (retalDmg > 0 && !bloq) {
           state = state.map((d) =>
             d.id === target.id
-              ? { ...d, hp: applyDamage(d.hp, retalDmg, { thestral: d.wand === "thestral" }), damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + retalDmg }
+              ? {
+                  ...d,
+                  hp: applyDamage(d.hp, retalDmg, { thestral: d.wand === "thestral" }),
+                  damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + retalDmg,
+                  lastSingleHitDamageReceived: retalDmg,
+                }
               : d
           )
           logs.push(`→ 💀 Locomotor Mortis! ${attacker.name} devolveu ${retalDmg} dano (${pct}% de ${dmgReceived}) para ${target.name}!`)
@@ -1256,17 +1284,25 @@ export function calculateTurnOutcome(params: {
   const dotInfo: Array<{ id: string; name: string; burnDmg: number; poisonDmg: number }> = []
   state = state.map((d) => {
     let hp = d.hp
-    let burnDmg = 0, poisonDmg = 0
+    let burnDmg = 0,
+      poisonDmg = 0
+    let lastTick = d.lastSingleHitDamageReceived
     if (d.debuffs.some((x) => x.type === "burn")) {
       burnDmg = capThestralIncomingDamage(d.wand, 25)
       hp = applyDamage(hp, burnDmg, { thestral: d.wand === "thestral" })
+      lastTick = burnDmg
     }
     if (d.debuffs.some((x) => x.type === "poison")) {
       poisonDmg = capThestralIncomingDamage(d.wand, 50)
       hp = applyDamage(hp, poisonDmg, { thestral: d.wand === "thestral" })
+      lastTick = poisonDmg
     }
     if (burnDmg > 0 || poisonDmg > 0) dotInfo.push({ id: d.id, name: d.name, burnDmg, poisonDmg })
-    return { ...d, hp }
+    return {
+      ...d,
+      hp,
+      lastSingleHitDamageReceived: burnDmg > 0 || poisonDmg > 0 ? lastTick : d.lastSingleHitDamageReceived,
+    }
   })
   for (const dot of dotInfo) {
     if (dot.burnDmg > 0) {
@@ -1288,7 +1324,16 @@ export function calculateTurnOutcome(params: {
         logs.push(`→ 🪶 Pêlo de Testrálio: ${bd.name} limitou a BOMBA a ${bombDmg} (${bombRaw} → cap 300).`)
       }
       logs.push(`💣 BOMBA explodiu em ${bd.name}! ${bombDmg} de dano!`)
-      state = state.map((d) => (d.id === bd.id ? { ...d, hp: applyDamage(d.hp, bombDmg, { thestral: d.wand === "thestral" }) } : d))
+      state = state.map((d) =>
+        d.id === bd.id
+          ? {
+              ...d,
+              hp: applyDamage(d.hp, bombDmg, { thestral: d.wand === "thestral" }),
+              damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + bombDmg,
+              lastSingleHitDamageReceived: bombDmg,
+            }
+          : d
+      )
       animationsToPlay.push({ type: "cast", casterId: bd.id, spellName: "Subito", targetId: bd.id, isMiss: false, isCrit: false, delay: 200, damage: bombDmg, isBlock: false, fctOnly: true })
     }
   }

@@ -36,6 +36,7 @@ import {
 } from "@/lib/database"
 import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/supabase"
 import HomeLobbyChat from "@/components/home-lobby-chat"
+import { useLanguage } from "@/contexts/language-context"
 
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
@@ -638,6 +639,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const selectedAvatar = AVATARS.find((a) => a.value === avatar)
   const selectedWandCore = WAND_CORES.find((w) => w.value === wand)
   const effectiveName = currentUser?.username || name
+  const { locale, cycleLocale } = useLanguage()
 
   return (
     <div className="min-h-screen bg-cover bg-center bg-fixed p-2 sm:p-3 lg:p-4" style={{ backgroundImage: "url('https://i.postimg.cc/D0y9DbnS/clube.png')" }}>
@@ -646,6 +648,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />
         <span>⚠️ FASE BETA: Bugs podem ocorrer. O equilíbrio de jogo está em constante ajuste.</span>
       </div>
+
+      <HomeLobbyChat
+        authorName={currentUser?.username?.trim() || ""}
+        layout="topBanner"
+        className="relative z-30 -mx-2 mb-1 sm:mx-0"
+      />
 
       <div className="mx-auto max-w-[1400px]">
         {/* Header with Medieval Style */}
@@ -657,6 +665,16 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <p className="mt-1 text-amber-100/90">Monte sua Build e duele! Pvp Multiplayer</p>
           </div>
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={cycleLocale}
+              className="border-sky-800/80 bg-sky-950/40 text-sky-200 hover:bg-sky-900/50"
+              title="Estrutura de idioma (pt / en / es) — conteúdo ainda em PT"
+            >
+              🌍 Translate (EN/ES) <span className="ml-1 text-[10px] opacity-80">→ {locale.toUpperCase()}</span>
+            </Button>
             {/* Link de download do APK — gerado pelo GitHub Actions */}
             <a
               href="https://github.com/folignoderivia-dev/hogwartsshowdown/releases/latest/download/app-debug.apk"
@@ -1942,8 +1960,6 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         )}
         </div>
       </div>
-
-      <HomeLobbyChat authorName={currentUser?.username?.trim() || ""} />
 
       {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
       <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-[10px] text-amber-700/60">

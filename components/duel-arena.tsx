@@ -33,6 +33,8 @@ interface DuelArenaProps {
   onReturn: () => void
   /** Chamado ao encerrar duelo para atualizar ELO (modo online / conta). */
   onBattleEnd?: (outcome: "win" | "lose", userId?: string) => void
+  /** FFA: jogador com HP → 0; usar para +1 derrota no Supabase no momento da eliminação. */
+  onFfaPlayerEliminated?: (userId: string) => void
   matchId?: string
   isSpectator?: boolean
   participantIds?: string[]
@@ -339,7 +341,7 @@ function Heart({ fillPercent }: { fillPercent: number }) {
 }
 
 const DuelArena = (
-  { playerBuild, onReturn, onBattleEnd, matchId, isSpectator = false, participantIds = [], participantNames = [], matchStatus }: DuelArenaProps
+  { playerBuild, onReturn, onBattleEnd, onFfaPlayerEliminated, matchId, isSpectator = false, participantIds = [], participantNames = [], matchStatus }: DuelArenaProps
 ) => {
   if (typeof window === "undefined") return null
   const isOfflineMode = playerBuild.gameMode === "teste" || playerBuild.gameMode === "challenge"
@@ -621,6 +623,24 @@ const DuelArena = (
   const addLog = useCallback((line: string) => {
     setBattleLog((prev) => [...prev, line])
   }, [])
+
+  const notifyFfaEliminations = useCallback(
+    (prev: Duelist[], next: Duelist[]) => {
+      const mode = playerBuild.gameMode
+      if (mode !== "ffa" && mode !== "ffa3") return
+      if (!onFfaPlayerEliminated) return
+      const roster = new Set<string>([playerBuild.userId, ...participantIds].filter(Boolean) as string[])
+      for (const n of next) {
+        if (!roster.has(n.id)) continue
+        const o = prev.find((p) => p.id === n.id)
+        if (!o) continue
+        if (!isDefeated(o.hp) && isDefeated(n.hp)) {
+          onFfaPlayerEliminated(n.id)
+        }
+      }
+    },
+    [onFfaPlayerEliminated, participantIds, playerBuild.gameMode, playerBuild.userId]
+  )
 
   /** Deriva texto e tipo de FCT a partir de uma EngineAnimation.
    *  Inclui o nome do feitiço para que o FCT substitua o overlay central. */
@@ -975,6 +995,7 @@ const DuelArena = (
       await playAnimations(outcome.animationsToPlay, state)
 
       setDuelists(state)
+      notifyFfaEliminations(snapshot, state)
       setBattleLog((prev) => [...prev, ...outcome.logs])
 
       // Flash visual para debuffs recém-aplicados (comparação com snapshot pré-turno)
@@ -1066,6 +1087,7 @@ const DuelArena = (
 
       setDuelists(state)
       duelistsRef.current = state
+      notifyFfaEliminations(oldStateOnline, state)
       setBattleLog((prev) => [...prev, ...data.logs])
 
       // Flash visual para debuffs recém-aplicados (online)
