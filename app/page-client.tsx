@@ -219,6 +219,7 @@ export default function PageClient() {
           host: r.participantNames[0] || "Bruxo",
           playersJoined: r.playersJoined,
           playersExpected: r.playersExpected,
+          isVipRoom: (r as any).isVipRoom ?? false,
         }))
       )
     } catch {

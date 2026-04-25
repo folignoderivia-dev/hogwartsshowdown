@@ -56,6 +56,26 @@ export default function AdminPage() {
   const [resettingRanking, setResettingRanking] = useState(false)
   const [metaGlobal, setMetaGlobal] = useState(60)
 
+  const fetchMetaGlobal = useCallback(async () => {
+    try {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      
+      const res = await fetch("/api/admin/update-meta", {
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`
+        }
+      })
+      const data = await res.json()
+      if (res.ok && data.meta !== undefined) {
+        setMetaGlobal(data.meta)
+      }
+    } catch {
+      // Ignore error, keep default value
+    }
+  }, [])
+
   const handleUpdateMetaGlobal = async () => {
     try {
       const supabase = getSupabaseClient()
@@ -189,6 +209,7 @@ export default function AdminPage() {
           if (data?.is_admin === true) {
             // Admin logado: buscar requests
             await fetchRequests()
+            await fetchMetaGlobal()
           }
         }
       } catch {
@@ -198,7 +219,7 @@ export default function AdminPage() {
       }
     }
     checkAdminSession()
-  }, [fetchRequests])
+  }, [fetchRequests, fetchMetaGlobal])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
