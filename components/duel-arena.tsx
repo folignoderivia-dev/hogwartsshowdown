@@ -1144,8 +1144,9 @@ const DuelArena = (
   )
 
   // ─── Ciclo de vida do Socket.io ─────────────────────────────────────────────
+  // Espectadores precisam do mesmo socket (JOIN_MATCH com isSpectator) para receber GAME_START / TURN_RESOLVED.
   useEffect(() => {
-    if (!isOnlineMatch || !matchId || !selfDuelistId || isReadOnlySpectator) return
+    if (!isOnlineMatch || !matchId || !selfDuelistId) return
 
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL?.trim() || "http://localhost:3001"
     const socket = io(socketUrl, {
@@ -1941,7 +1942,11 @@ const DuelArena = (
           {!isOfflineMode && !gameStartAcknowledged && (
             <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-red-950/50">
               <div className="rounded-xl border border-red-600 bg-red-900/80 px-6 py-4 text-center shadow-[0_0_30px_rgba(239,68,68,0.45)]">
-                <p className="text-xl font-bold tracking-wide text-red-100">AGUARDANDO OPONENTE... ({roomPlayerCount}/{expectedOnlinePlayers})</p>
+                <p className="text-xl font-bold tracking-wide text-red-100">
+                  {isReadOnlySpectator
+                    ? "Conectando à partida em andamento…"
+                    : `AGUARDANDO OPONENTE... (${roomPlayerCount}/${expectedOnlinePlayers})`}
+                </p>
               </div>
             </div>
           )}
@@ -2009,7 +2014,9 @@ const DuelArena = (
           )}
           {!isOfflineMode && !gameStartAcknowledged && (
             <p className="mb-2 text-xs text-amber-300">
-              Aguardando jogadores na sala ({roomPlayerCount}/{expectedOnlinePlayers})...
+              {isReadOnlySpectator
+                ? "Espectador: aguardando estado do servidor (GAME_START / RECONNECT)…"
+                : `Aguardando jogadores na sala (${roomPlayerCount}/${expectedOnlinePlayers})...`}
             </p>
           )}
           {!isOfflineMode && !socketConnected && !gameStartAcknowledged && (
