@@ -781,6 +781,18 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   {currentUser.username} {currentUser.offlineWins && currentUser.offlineWins > 0 && <span className="ml-1">🥇 ({currentUser.offlineWins})</span>} · ELO {currentUser.elo}
                   {isVip && <span className="ml-1 text-[10px] text-yellow-400">VIP</span>}
                 </Badge>
+                {currentUser?.isAdmin && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-purple-700 bg-purple-950/30 text-purple-200 hover:bg-purple-950/50"
+                    onClick={() => window.location.href = "/admin"}
+                  >
+                    <Shield className="mr-1 h-3.5 w-3.5" />
+                    Painel Admin
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"
@@ -1104,7 +1116,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </DialogHeader>
             <form onSubmit={handleAuthSubmit} className="space-y-3">
               <div>
-                <Label className="text-amber-300">E-mail</Label>
+                <Label className="text-amber-300">E-mail ou Usuário</Label>
                 <Input
                   type="email"
                   value={authEmail}
@@ -1151,7 +1163,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           return
                         }
                         const supabase = getSupabaseClient()
-                        const redirect = typeof window !== "undefined" ? `${window.location.origin}/` : undefined
+                        const redirect = "https://hogwartsshowdown-lyart.vercel.app/"
                         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: redirect })
                         if (error) {
                           setAuthError(error.message)

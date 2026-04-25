@@ -155,28 +155,49 @@ export async function registerUser(
 }
 
 export async function loginUser(
-  email: string,
+  emailOrUsername: string,
   password: string
 ): Promise<{ ok: true; user: DbUser } | { ok: false; error: string }> {
-  const e = email.trim().toLowerCase()
+  const input = emailOrUsername.trim().toLowerCase()
   const supabase = getSupabaseClient()
-  const { data, error } = await supabase.auth.signInWithPassword({ email: e, password })
+  
+  // Check if input is an email (contains @) or username
+  let email = input
+  if (!input.includes("@")) {
+    // Input is username, fetch email from profiles
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", input)
+      .maybeSingle()
+    if (profileError || !profileData) {
+      return { ok: false, error: "Usuário não encontrado." }
+    }
+    // Get the actual email from auth users
+    const { data: { user } } = await supabase.auth.admin.getUserById(profileData.id)
+    if (!user?.email) {
+      return { ok: false, error: "Usuário não encontrado." }
+    }
+    email = user.email
+  }
+  
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error || !data.user) return { ok: false, error: "E-mail ou senha inválidos." }
 
   const profile = await getProfileById(data.user.id)
   if (!profile) {
-    const fallbackUsername = e.split("@")[0] || "Bruxo"
+    const fallbackUsername = email.split("@")[0] || "Bruxo"
     const { error: profileErr } = await supabase
       .from("profiles")
       .upsert({ id: data.user.id, username: fallbackUsername, elo: ELO_START, wins: 0, losses: 0, favorite_spell: null }, { onConflict: "id" })
     if (profileErr) return { ok: false, error: profileErr.message }
     return {
       ok: true,
-      user: { id: data.user.id, email: e, username: fallbackUsername, elo: ELO_START, createdAt: new Date().toISOString() },
+      user: { id: data.user.id, email, username: fallbackUsername, elo: ELO_START, createdAt: new Date().toISOString() },
     }
   }
 
-  return { ok: true, user: mapProfile(profile, e) }
+  return { ok: true, user: mapProfile(profile, email) }
 }
 
 export async function signOutUser(): Promise<void> {
