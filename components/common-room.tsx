@@ -423,10 +423,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   useEffect(() => {
     const fetchMeta = async () => {
       try {
-        const res = await fetch("/api/admin/get-meta")
-        const data = await res.json()
-        if (data.meta !== undefined) {
-          setMetaGoal(data.meta)
+        const supabase = getSupabaseClient()
+        const { data } = await supabase
+          .from("profiles")
+          .select("offline_wins")
+          .eq("username", "SISTEMA_META")
+          .maybeSingle()
+        if (data?.offline_wins) {
+          setMetaGoal(data.offline_wins)
         }
       } catch {
         // Keep default 60 on error

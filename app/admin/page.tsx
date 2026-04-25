@@ -5,258 +5,111 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getSupabaseClient } from "@/lib/supabase"
+import { createClient } from "@supabase/supabase-js"
 import { Shield, Users, AlertTriangle, RefreshCw } from "lucide-react"
-
-interface VipRequest {
-  id: string
-  user_id: string
-  email: string
-  proof_note: string
-  status: string
-  created_at: string
-}
-
-interface Report {
-  id: string
-  user_id: string
-  email: string
-  type: string
-  description: string
-  status: string
-  created_at: string
-}
 
 interface UserProfile {
   id: string
   username: string
-  email: string
   elo: number | null
-  wins: number | null
-  losses: number | null
   is_vip: boolean | null
-  vip_expires: string | null
   is_admin: boolean | null
+  offline_wins: number | null
 }
 
-type AdminTab = "vip" | "users" | "reports" | "ranking"
+type AdminTab = "users" | "ranking"
 
 export default function AdminPage() {
-  const [authenticated, setAuthenticated] = useState(false)
-  const [requests, setRequests] = useState<VipRequest[]>([])
-  const [reports, setReports] = useState<Report[]>([])
+  const supabase = getSupabaseClient()
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [approving, setApproving] = useState<string | null>(null)
-  const [feedback, setFeedback] = useState<Record<string, string>>({})
   const [checkingSession, setCheckingSession] = useState(true)
-  const [activeTab, setActiveTab] = useState<AdminTab>("vip")
+  const [activeTab, setActiveTab] = useState<AdminTab>("users")
   const [userSearch, setUserSearch] = useState("")
   const [resettingRanking, setResettingRanking] = useState(false)
   const [metaGlobal, setMetaGlobal] = useState(60)
 
-  const fetchMetaGlobal = useCallback(async () => {
+  const fetchUserProfile = useCallback(async () => {
     try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      
-      const res = await fetch("/api/admin/update-meta", {
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`
-        }
-      })
-      const data = await res.json()
-      if (res.ok && data.meta !== undefined) {
-        setMetaGlobal(data.meta)
-      }
-    } catch {
-      // Ignore error, keep default value
-    }
-  }, [])
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-  const handleUpdateMetaGlobal = async () => {
-    try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setError("Sessão não encontrada")
-        return
-      }
-      
-      const res = await fetch("/api/admin/update-meta", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ meta: metaGlobal }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        alert("Meta global atualizada com sucesso!")
-      } else {
-        setError(data.error ?? "Erro ao atualizar meta")
-      }
-    } catch {
-      setError("Falha de conexão")
-    }
-  }
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, username, elo, is_vip, is_admin, offline_wins")
+        .eq("id", user.id)
+        .maybeSingle()
 
-  const fetchRequests = useCallback(async () => {
-    setLoading(true)
-    setError("")
-    try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setError("Sessão não encontrada")
-        return
-      }
-      
-      const res = await fetch("/api/admin/vip-requests", {
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`
-        }
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error ?? "Erro ao buscar requests")
-        return
-      }
-      setRequests(data.requests ?? [])
-      setAuthenticated(true)
+      if (data) setUserProfile(data)
     } catch {
-      setError("Falha de conexão")
-    } finally {
-      setLoading(false)
+      setCheckingSession(false)
     }
-  }, [])
-
-  const fetchReports = useCallback(async () => {
-    setLoading(true)
-    setError("")
-    try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setError("Sessão não encontrada")
-        return
-      }
-      
-      const res = await fetch("/api/admin/reports", {
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`
-        }
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error ?? "Erro ao buscar denúncias")
-        return
-      }
-      setReports(data.reports ?? [])
-      setAuthenticated(true)
-    } catch {
-      setError("Falha de conexão")
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  }, [supabase])
 
   const fetchUsers = useCallback(async (search = "") => {
     setLoading(true)
     setError("")
     try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setError("Sessão não encontrada")
-        return
+      let query = supabase
+        .from("profiles")
+        .select("id, username, elo, is_vip, is_admin, offline_wins")
+        .order("created_at", { ascending: false })
+        .limit(100)
+
+      if (search) {
+        query = query.ilike("username", `%${search}%`)
       }
-      
-      const res = await fetch("/api/admin/users", {
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`
-        }
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error ?? "Erro ao buscar usuários")
-        return
-      }
-      setUsers(data.users ?? [])
-      setAuthenticated(true)
-    } catch {
-      setError("Falha de conexão")
+
+      const { data, error } = await query
+      if (error) throw error
+      setUsers(data ?? [])
+    } catch (err) {
+      setError("Erro ao buscar usuários")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [supabase])
 
-  // Verifica se o usuário atual tem is_admin=true na sessão Supabase
-  useEffect(() => {
-    const checkAdminSession = async () => {
-      try {
-        const supabase = getSupabaseClient()
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user?.id) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("is_admin")
-            .eq("id", session.user.id)
-            .maybeSingle()
-          if (data?.is_admin === true) {
-            // Admin logado: buscar requests
-            await fetchRequests()
-            await fetchMetaGlobal()
-          }
-        }
-      } catch {
-        // Silencioso — pode não ter sessão
-      } finally {
-        setCheckingSession(false)
-      }
-    }
-    checkAdminSession()
-  }, [fetchRequests, fetchMetaGlobal])
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    await fetchRequests()
-  }
-
-  const handleApprove = async (req: VipRequest, days = 30) => {
-    setApproving(req.user_id)
+  const fetchMetaGlobal = useCallback(async () => {
     try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setFeedback((prev) => ({ ...prev, [req.id]: "✗ Sessão não encontrada" }))
-        return
-      }
-      
-      const res = await fetch("/api/vip/grant", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ userId: req.user_id, days }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setFeedback((prev) => ({ ...prev, [req.id]: `✓ VIP ativado por ${days} dias` }))
-        setRequests((prev) =>
-          prev.map((r) => (r.id === req.id ? { ...r, status: "approved" } : r))
-        )
-      } else {
-        setFeedback((prev) => ({ ...prev, [req.id]: `✗ Erro: ${data.error}` }))
+      const { data } = await supabase
+        .from("profiles")
+        .select("offline_wins")
+        .eq("username", "SISTEMA_META")
+        .maybeSingle()
+
+      if (data?.offline_wins) {
+        setMetaGlobal(data.offline_wins)
       }
     } catch {
-      setFeedback((prev) => ({ ...prev, [req.id]: "✗ Falha de conexão" }))
-    } finally {
-      setApproving(null)
+      // Keep default 60
+    }
+  }, [supabase])
+
+  const handleUpdateMetaGlobal = async () => {
+    try {
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", "SISTEMA_META")
+        .maybeSingle()
+
+      if (existing) {
+        const { error } = await supabase
+          .from("profiles")
+          .update({ offline_wins: metaGlobal })
+          .eq("id", existing.id)
+        if (error) throw error
+      } else {
+        alert("Usuário SISTEMA_META não encontrado. Crie manualmente no Supabase.")
+        return
+      }
+
+      alert("Meta global atualizada com sucesso!")
+    } catch {
+      setError("Erro ao atualizar meta")
     }
   }
 
@@ -267,28 +120,16 @@ export default function AdminPage() {
     setResettingRanking(true)
     setError("")
     try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setError("Sessão não encontrada")
-        return
-      }
-      
-      const res = await fetch("/api/admin/reset-ranking", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-      })
-      const data = await res.json()
-      if (res.ok) {
-        alert("Ranking resetado com sucesso! Todos os jogadores agora têm 500 ELO.")
-      } else {
-        setError(data.error ?? "Erro ao resetar ranking")
-      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({ elo: 500 })
+        .neq("id", "00000000-0000-0000-0000-000000000000")
+
+      if (error) throw error
+      alert("Ranking resetado com sucesso! Todos os jogadores agora têm 500 ELO.")
+      await fetchUsers()
     } catch {
-      setError("Falha de conexão")
+      setError("Erro ao resetar ranking")
     } finally {
       setResettingRanking(false)
     }
@@ -296,132 +137,71 @@ export default function AdminPage() {
 
   const handleToggleVip = async (userId: string, currentVip: boolean | null) => {
     try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setError("Sessão não encontrada")
-        return
-      }
-      
-      const res = await fetch("/api/admin/toggle-vip", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ userId, setVip: !currentVip }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setUsers((prev) =>
-          prev.map((u) =>
-            u.id === userId ? { ...u, is_vip: !currentVip, vip_expires: !currentVip ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null } : u
-          )
+      const { error } = await supabase
+        .from("profiles")
+        .update({ 
+          is_vip: !currentVip,
+          vip_expires: !currentVip ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null
+        })
+        .eq("id", userId)
+
+      if (error) throw error
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId ? { ...u, is_vip: !currentVip } : u
         )
-      } else {
-        setError(data.error ?? "Erro ao alterar VIP")
-      }
+      )
     } catch {
-      setError("Falha de conexão")
+      setError("Erro ao alterar VIP")
     }
   }
 
   const handleToggleAdmin = async (userId: string, currentAdmin: boolean | null) => {
     try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setError("Sessão não encontrada")
-        return
-      }
-      
-      const res = await fetch("/api/admin/toggle-admin", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ userId, setAdmin: !currentAdmin }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === userId ? { ...u, is_admin: !currentAdmin } : u))
-        )
-      } else {
-        setError(data.error ?? "Erro ao alterar Admin")
-      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_admin: !currentAdmin })
+        .eq("id", userId)
+
+      if (error) throw error
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, is_admin: !currentAdmin } : u))
+      )
     } catch {
-      setError("Falha de conexão")
+      setError("Erro ao alterar Admin")
     }
   }
 
   const handleUpdateElo = async (userId: string, newElo: number) => {
     try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setError("Sessão não encontrada")
-        return
-      }
-      
-      const res = await fetch("/api/admin/update-elo", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ userId, elo: newElo }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === userId ? { ...u, elo: newElo } : u))
-        )
-      } else {
-        setError(data.error ?? "Erro ao atualizar ELO")
-      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({ elo: newElo })
+        .eq("id", userId)
+
+      if (error) throw error
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, elo: newElo } : u))
+      )
     } catch {
-      setError("Falha de conexão")
+      setError("Erro ao atualizar ELO")
     }
   }
 
-  const handleResolveReport = async (reportId: string, status: "resolved" | "dismissed") => {
-    try {
-      const supabase = getSupabaseClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setError("Sessão não encontrada")
-        return
-      }
-      
-      const res = await fetch("/api/admin/resolve-report", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ reportId, status }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setReports((prev) =>
-          prev.map((r) => (r.id === reportId ? { ...r, status } : r))
-        )
-      } else {
-        setError(data.error ?? "Erro ao resolver denúncia")
-      }
-    } catch {
-      setError("Falha de conexão")
+  useEffect(() => {
+    const init = async () => {
+      await fetchUserProfile()
+      setCheckingSession(false)
     }
-  }
+    init()
+  }, [fetchUserProfile])
 
-  const handleTabChange = (tab: AdminTab) => {
-    setActiveTab(tab)
-    if (tab === "vip" && authenticated) fetchRequests()
-    if (tab === "reports" && authenticated) fetchReports()
-    if (tab === "users" && authenticated) fetchUsers(userSearch)
-  }
+  useEffect(() => {
+    if (userProfile?.is_admin) {
+      fetchUsers()
+      fetchMetaGlobal()
+    }
+  }, [userProfile, fetchUsers, fetchMetaGlobal])
 
   if (checkingSession) {
     return (
@@ -431,16 +211,12 @@ export default function AdminPage() {
     )
   }
 
-  if (!authenticated) {
+  if (!userProfile?.is_admin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-stone-950 px-4">
         <div className="w-full max-w-sm rounded-xl border border-amber-800/40 bg-stone-900 p-8 shadow-2xl">
-          <h1 className="mb-2 text-center text-2xl font-bold text-amber-300">🔒 Painel Admin</h1>
-          <p className="mb-6 text-center text-xs text-stone-500">Hogwarts Showdown</p>
-          {error && <p className="mb-4 text-xs text-red-400">{error}</p>}
-          <p className="text-center text-xs text-stone-400">
-            Faça login no jogo com uma conta Admin para acessar este painel.
-          </p>
+          <h1 className="mb-2 text-center text-2xl font-bold text-amber-300">🔒 Acesso Negado</h1>
+          <p className="text-center text-xs text-stone-400">Você não tem permissão para acessar este painel.</p>
         </div>
       </div>
     )
@@ -472,16 +248,6 @@ export default function AdminPage() {
                 Salvar
               </Button>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-amber-700 text-amber-400"
-              onClick={() => {
-                setAuthenticated(false)
-              }}
-            >
-              Sair
-            </Button>
           </div>
         </div>
 
@@ -489,139 +255,25 @@ export default function AdminPage() {
         <div className="mb-6 flex gap-2 border-b border-amber-800/40 pb-2">
           <Button
             size="sm"
-            variant={activeTab === "vip" ? "default" : "ghost"}
-            className={activeTab === "vip" ? "bg-amber-700 text-white" : "text-amber-400 hover:bg-amber-900/30"}
-            onClick={() => handleTabChange("vip")}
-          >
-            <Shield className="mr-2 h-4 w-4" />
-            VIP Requests
-          </Button>
-          <Button
-            size="sm"
             variant={activeTab === "users" ? "default" : "ghost"}
             className={activeTab === "users" ? "bg-amber-700 text-white" : "text-amber-400 hover:bg-amber-900/30"}
-            onClick={() => handleTabChange("users")}
+            onClick={() => setActiveTab("users")}
           >
             <Users className="mr-2 h-4 w-4" />
             Usuários
           </Button>
           <Button
             size="sm"
-            variant={activeTab === "reports" ? "default" : "ghost"}
-            className={activeTab === "reports" ? "bg-amber-700 text-white" : "text-amber-400 hover:bg-amber-900/30"}
-            onClick={() => handleTabChange("reports")}
-          >
-            <AlertTriangle className="mr-2 h-4 w-4" />
-            Denúncias
-          </Button>
-          <Button
-            size="sm"
             variant={activeTab === "ranking" ? "default" : "ghost"}
             className={activeTab === "ranking" ? "bg-amber-700 text-white" : "text-amber-400 hover:bg-amber-900/30"}
-            onClick={() => handleTabChange("ranking")}
+            onClick={() => setActiveTab("ranking")}
           >
             <RefreshCw className="mr-2 h-4 w-4" />
-            Ranking
+            Resetar Ranking
           </Button>
         </div>
 
         {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
-
-        {/* VIP Requests Tab */}
-        {activeTab === "vip" && (
-          <>
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-xs text-stone-500">{requests.length} pedido(s) encontrado(s)</p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-amber-700 text-amber-400"
-                onClick={() => fetchRequests()}
-                disabled={loading}
-              >
-                {loading ? "Carregando..." : "↻ Atualizar"}
-              </Button>
-            </div>
-
-            {requests.length === 0 ? (
-              <div className="rounded-lg border border-amber-800/30 bg-stone-900 p-8 text-center text-amber-500">
-                Nenhum pedido de VIP encontrado.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {requests.map((req) => (
-                  <div
-                    key={req.id}
-                    className="rounded-lg border border-amber-800/40 bg-stone-900 p-4"
-                  >
-                    <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium text-amber-200">{req.email}</p>
-                        <p className="text-xs text-stone-400">User ID: {req.user_id}</p>
-                        <p className="text-xs text-stone-500">
-                          {new Date(req.created_at).toLocaleString("pt-BR")}
-                        </p>
-                      </div>
-                      <Badge
-                        className={
-                          req.status === "approved"
-                            ? "border-green-700 bg-green-900/40 text-green-300"
-                            : "border-amber-700 bg-amber-900/40 text-amber-300"
-                        }
-                      >
-                        {req.status === "approved" ? "✓ Aprovado" : "⏳ Pendente"}
-                      </Badge>
-                    </div>
-
-                    <div className="mb-3 rounded border border-stone-700 bg-stone-800 p-2 text-xs text-stone-300">
-                      <p className="mb-1 text-stone-500">Comprovante/Nota:</p>
-                      <p className="whitespace-pre-wrap">{req.proof_note || "(sem nota)"}</p>
-                    </div>
-
-                    {feedback[req.id] ? (
-                      <p
-                        className={`text-sm font-medium ${
-                          feedback[req.id].startsWith("✓") ? "text-green-400" : "text-red-400"
-                        }`}
-                      >
-                        {feedback[req.id]}
-                      </p>
-                    ) : req.status !== "approved" ? (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="bg-amber-700 text-white hover:bg-amber-600"
-                          disabled={approving === req.user_id}
-                          onClick={() => handleApprove(req, 30)}
-                        >
-                          {approving === req.user_id ? "Aprovando..." : "✓ Aprovar 30 dias"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-amber-700 text-amber-400"
-                          disabled={approving === req.user_id}
-                          onClick={() => handleApprove(req, 7)}
-                        >
-                          7 dias
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-green-800 text-green-400"
-                          disabled={approving === req.user_id}
-                          onClick={() => handleApprove(req, 365)}
-                        >
-                          1 ano
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
 
         {/* Users Tab */}
         {activeTab === "users" && (
@@ -632,7 +284,7 @@ export default function AdminPage() {
             <CardContent>
               <div className="mb-4 flex gap-2">
                 <Input
-                  placeholder="Buscar por nome ou email..."
+                  placeholder="Buscar por nome..."
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && fetchUsers(userSearch)}
@@ -658,10 +310,7 @@ export default function AdminPage() {
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="flex-1">
                           <p className="font-medium text-amber-200">{user.username || "Sem nome"}</p>
-                          <p className="text-xs text-stone-400">{user.email}</p>
-                          <p className="text-xs text-stone-500">
-                            ELO: {user.elo ?? 500} · V: {user.wins ?? 0} · D: {user.losses ?? 0}
-                          </p>
+                          <p className="text-xs text-stone-500">ELO: {user.elo ?? 500}</p>
                           <div className="mt-1 flex gap-2">
                             <Badge className={user.is_vip ? "border-yellow-600 bg-yellow-900/40 text-yellow-300" : "border-stone-600 bg-stone-700 text-stone-400"}>
                               {user.is_vip ? "👑 VIP" : "Normal"}
@@ -717,90 +366,6 @@ export default function AdminPage() {
               )}
             </CardContent>
           </Card>
-        )}
-
-        {/* Reports Tab */}
-        {activeTab === "reports" && (
-          <>
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-xs text-stone-500">{reports.length} denúncia(s) encontrada(s)</p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-amber-700 text-amber-400"
-                onClick={() => fetchReports()}
-                disabled={loading}
-              >
-                {loading ? "Carregando..." : "↻ Atualizar"}
-              </Button>
-            </div>
-
-            {reports.length === 0 ? (
-              <div className="rounded-lg border border-amber-800/30 bg-stone-900 p-8 text-center text-amber-500">
-                Nenhuma denúncia encontrada.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {reports.map((report) => (
-                  <div
-                    key={report.id}
-                    className="rounded-lg border border-amber-800/40 bg-stone-900 p-4"
-                  >
-                    <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium text-amber-200">{report.email}</p>
-                        <p className="text-xs text-stone-400">User ID: {report.user_id}</p>
-                        <p className="text-xs text-stone-500">
-                          {new Date(report.created_at).toLocaleString("pt-BR")}
-                        </p>
-                      </div>
-                      <Badge
-                        className={
-                          report.status === "resolved"
-                            ? "border-green-700 bg-green-900/40 text-green-300"
-                            : report.status === "dismissed"
-                              ? "border-stone-600 bg-stone-700 text-stone-400"
-                              : "border-amber-700 bg-amber-900/40 text-amber-300"
-                        }
-                      >
-                        {report.status === "resolved" ? "✓ Resolvida" : report.status === "dismissed" ? "✕ Ignorada" : "⏳ Pendente"}
-                      </Badge>
-                    </div>
-
-                    <div className="mb-2">
-                      <p className="text-xs text-stone-500">Tipo:</p>
-                      <p className="text-sm text-amber-200">{report.type}</p>
-                    </div>
-
-                    <div className="mb-3 rounded border border-stone-700 bg-stone-800 p-2 text-xs text-stone-300">
-                      <p className="mb-1 text-stone-500">Descrição:</p>
-                      <p className="whitespace-pre-wrap">{report.description}</p>
-                    </div>
-
-                    {report.status === "pending" && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="bg-green-700 text-white hover:bg-green-600"
-                          onClick={() => handleResolveReport(report.id, "resolved")}
-                        >
-                          ✓ Resolver
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-stone-600 text-stone-400"
-                          onClick={() => handleResolveReport(report.id, "dismissed")}
-                        >
-                          ✕ Ignorar
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
         )}
 
         {/* Ranking Tab */}
