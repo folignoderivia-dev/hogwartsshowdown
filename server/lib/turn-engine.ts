@@ -337,6 +337,10 @@ const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target
 const getSpellCastPriority = (_spellName: string, spell: SpellInfo | undefined, attacker: Duelist): number => {
   if (!spell) return 0
   let p = spell.priority ?? 0
+  // Tônico de Dragão: bônus de prioridade no próximo turno
+  if (attacker.nextTurnPriorityBonus) {
+    p += attacker.nextTurnPriorityBonus
+  }
   // Casa (Grifinória/Lufa-Lufa): peso forte na ordem para prevalecer na maioria dos cenários.
   const hg = HOUSE_GDD[attacker.house as keyof typeof HOUSE_GDD]
   if (hg && "attackPriorityBonus" in hg) p += (hg as { attackPriorityBonus: number }).attackPriorityBonus * 6
@@ -548,6 +552,30 @@ export function calculateTurnOutcome(params: {
           }
         } else {
           logs.push(`→ ${attacker.name} usou Poção de Merlin! O oponente ainda não usou nenhuma poção. Merlin falhou.`)
+        }
+      } else if (potKey === "dragon_tonic") {
+        state = state.map((d) => d.id === attacker.id ? { ...d, nextTurnPriorityBonus: (d.nextTurnPriorityBonus ?? 0) + 4 } : d)
+        logs.push(`→ ${attacker.name} usou Tônico de Dragão! +4 de prioridade no próximo turno.`)
+      } else if (potKey === "despair_potion") {
+        const opponent = state.find((d) => d.team !== attacker.team && !isDefeated(d.hp))
+        if (opponent?.lastSpellUsed && opponent.spellMana) {
+          const lastSpell = opponent.lastSpellUsed
+          state = state.map((d) => {
+            if (d.id === opponent.id && d.spellMana && lastSpell) {
+              const spellMana = { ...d.spellMana }
+              if (spellMana[lastSpell]) {
+                spellMana[lastSpell] = {
+                  current: Math.max(0, spellMana[lastSpell].current - 3),
+                  max: spellMana[lastSpell].max
+                }
+                return { ...d, spellMana }
+              }
+            }
+            return d
+          })
+          logs.push(`→ ${attacker.name} usou Poção do Desespero! Reduziu 3 de mana de ${opponent.lastSpellUsed} do oponente.`)
+        } else {
+          logs.push(`→ ${attacker.name} usou Poção do Desespero! O oponente ainda não usou nenhuma magia. Efeito falhou.`)
         }
 
       } else if (potKey === "felix") {

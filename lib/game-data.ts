@@ -79,6 +79,13 @@ export interface SpellInfo {
   isVipOnly?: boolean
 }
 
+export interface PotionInfo {
+  id: string
+  name: string
+  description: string
+  effect: string
+}
+
 export function rollSpellPower(spell: SpellInfo): number {
   if (spell.powerMin != null && spell.powerMax != null) {
     return Math.floor(Math.random() * (spell.powerMax - spell.powerMin + 1)) + spell.powerMin
@@ -145,4 +152,15 @@ export const SPELL_DATABASE: SpellInfo[] = [
   { name: "Revele seus Segredos", power: 0, accuracy: 100, pp: 5, cost: 2, isVipOnly: true, canCrit: false, special: "reveal_wand_core", effect: "👑 VIP: Revela o Núcleo da varinha do oponente" },
   { name: "Bombarda Maxima", powerMin: 100, powerMax: 200, accuracy: 65, pp: 8, cost: 3, isVipOnly: true, special: "bombarda_maxima_pierce", effect: "👑 VIP: Área; 25% chance de ignorar defesa" },
   { name: "Expecto Patronum", power: 0, accuracy: 100, pp: 5, cost: 2, isVipOnly: true, canCrit: false, priority: 4, debuff: { type: "unforgivable_block", chance: 100, duration: 1 }, effect: "👑 VIP: Prioridade +4; bloqueia Maldições do alvo (1t)" },
+]
+
+export const POTION_DATABASE: PotionInfo[] = [
+  { id: "wiggenweld", name: "Poção Wiggenweld", description: "Cura HP igual ao último dano recebido", effect: "heal_last_damage" },
+  { id: "edurus", name: "Poção Edurus", description: "Limpa debuffs + 1 turno de imunidade", effect: "immunity_1_turn" },
+  { id: "mortovivo", name: "Poção Morto-Vivo", description: "HP não cai abaixo de 1 por 1 turno", effect: "undead_1_turn" },
+  { id: "maxima", name: "Poção Maxima", description: "+50% dano no próximo turno", effect: "damage_boost_50" },
+  { id: "foco", name: "Poção Foco", description: "+10% Accuracy permanente", effect: "accuracy_plus_10" },
+  { id: "merlin", name: "Poção Merlin", description: "Copia última poção do oponente com +25% eficácia", effect: "copy_potion_boost" },
+  { id: "dragon_tonic", name: "Tônico de Dragão", description: "Aumenta sua prioridade em +4 no próximo turno", effect: "priority_plus_4" },
+  { id: "despair_potion", name: "Poção do Desespero", description: "Reduz 3 de mana do oponente baseado na última magia que ele usou", effect: "mana_drain_3" },
 ]

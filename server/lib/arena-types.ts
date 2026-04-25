@@ -87,6 +87,8 @@ export interface Duelist {
   cinzalWeakenStacks?: number
   occamyRepeatByTargetSpell?: Record<string, number>
   incendioCombo?: number
+  /** Tônico de Dragão: bônus de prioridade no próximo turno */
+  nextTurnPriorityBonus?: number
 }
 
 export type Point = { x: number; y: number }

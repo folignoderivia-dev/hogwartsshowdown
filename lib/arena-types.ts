@@ -92,6 +92,8 @@ export interface Duelist {
   permanentAccBonus?: number
   /** Presa de Cinzal: cada vez que o jogador causa 100+ de dano a um portador, +1 pilha (−15% dano multiplicativo por pilha). */
   cinzalWeakenStacks?: number
+  /** Tônico de Dragão: bônus de prioridade no próximo turno */
+  nextTurnPriorityBonus?: number
 }
 
 export type Point = { x: number; y: number }
