@@ -273,6 +273,8 @@ const calculateDamage = (
 }
 
 const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: string): number => {
+  // Scarlatum: NUNCA pode causar crítico (magia caótica)
+  if (spellNameNorm?.includes("scarlatum")) return 0
   if (defender?.debuffs.some((d) => d.type === "mark")) return 1.0
   if (spellNameNorm?.includes("glacius") && defender?.debuffs.some((d) => d.type === "freeze")) return 1.0
   // Veela: defensor nunca pode ser critado
@@ -291,6 +293,13 @@ const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target
   const n = normSpell(sn)
   if (n.includes("diffindo") && target?.debuffs.some((d) => d.type === "protego")) return 100
   let base = rollSpellPower(spell)
+  // Pele de Trasgo: força dano médio (ignora RNG)
+  if (WAND_PASSIVES[target?.wand ?? ""]?.effect === "troll_force_avg_damage" && spell.powerMin != null && spell.powerMax != null) {
+    base = Math.floor((spell.powerMin + spell.powerMax) / 2)
+    if (combatLogs) {
+      combatLogs.push(`→ 🧟 Pele de Trasgo: ${target?.name ?? "Alvo"} forçou dano médio de ${base} (em vez de aleatório).`)
+    }
+  }
   if (attacker.cruciusWeakness && !n.includes("crucius")) base *= 0.5
   if (attacker.maximosChargePct) base *= 1 + attacker.maximosChargePct / 100
   // Acromântula: +25 dano por turno completo (atualizado de +20)
@@ -711,7 +720,6 @@ export function calculateTurnOutcome(params: {
                   ...d,
                   hp: applyDamage(d.hp, thornDmg, { thestral: d.wand === "thestral" }),
                   damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + thornDmg,
-                  lastSingleHitDamageReceived: thornDmg,
                 }
               : d
           )
@@ -740,7 +748,6 @@ export function calculateTurnOutcome(params: {
                   ...d,
                   hp: applyDamage(d.hp, refDmg, { thestral: d.wand === "thestral" }),
                   damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + refDmg,
-                  lastSingleHitDamageReceived: refDmg,
                 }
               : d
           )

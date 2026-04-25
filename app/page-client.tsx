@@ -148,7 +148,9 @@ export default function PageClient() {
       if (mode !== "ffa" && mode !== "ffa3") return
       const selfId = playerBuild?.userId
       const activeParticipants = new Set((externalMatchState?.participantIds || []).filter(Boolean))
-      if (isSpectator || !selfId || userId !== selfId) return
+      // TRAVA RIGOROSA: Espectadores não podem receber ELO/Vitória/Derrota
+      if (isSpectator) return
+      if (!selfId || userId !== selfId) return
       if (activeParticipants.size > 0 && !activeParticipants.has(selfId)) return
       if (ffaStatsAppliedRef.current.has(userId)) return
       ffaStatsAppliedRef.current.add(userId)
@@ -170,7 +172,10 @@ export default function PageClient() {
     const mode = playerBuild?.gameMode
     const selfId = playerBuild?.userId
     const activeParticipants = new Set((externalMatchState?.participantIds || []).filter(Boolean))
-    if (isSpectator || !selfId || userId !== selfId) return
+    // TRAVA RIGOROSA: Espectadores não podem receber ELO/Vitória/Derrota
+    // Verifica se o userId está na lista de participantes originais da sala
+    if (isSpectator) return
+    if (!selfId || userId !== selfId) return
     if (activeParticipants.size > 0 && !activeParticipants.has(selfId)) return
     void (async () => {
       if ((mode === "ffa" || mode === "ffa3") && outcome === "lose" && ffaStatsAppliedRef.current.has(userId)) {

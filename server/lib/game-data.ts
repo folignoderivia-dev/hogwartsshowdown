@@ -34,6 +34,7 @@ export const WAND_PASSIVES: Record<string, { name: string; description: string; 
   cinzal:      { name: "Presa de Cinzal",           description: "Cada golpe de 100+ de dano recebido: atacante acumula −15% dano (multiplicativo)", effect: "cinzal_weaken" },
   centauro:    { name: "Pelo de Centauro",           description: "Com Centauro no campo: Ferula, Episkey e Vulnera Sanetur ficam com mana 0 para todos os duelistas", effect: "centauro_block_heals" },
   hippogriff:  { name: "Pena de Hipogrifo",          description: "Imunidade total a MARCA e BOMBA",                     effect: "hippogriff_immune_mark_bomb" },
+  troll:       { name: "Pele de Trasgo",            description: "Impede que as magias do oponente causem o dano máximo", effect: "troll_force_avg_damage" },
 }
 
 export type SpellDebuffType =
