@@ -179,7 +179,7 @@ export const calculateAccuracy = (
   if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "crit20_acc_minus15") accuracy -= 15
   // Veela (defensor): penalidade aleatória de 0-25% em quem ataca o Veela
   if (WAND_PASSIVES[defender.wand]?.effect === "veela_acc_penalty") accuracy -= Math.floor(Math.random() * 26)
-  // Occamy (atacante): espelho ativo → −10% acc por “camada” de repetição (−10, −20, −30…)
+  // Occamy (atacante): espelho ativo → −10% acc por "camada" de repetição (−10, −20, −30…)
   if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" && attackerRoundSpellName) {
     if (normSpell(defender.lastSpellUsed ?? "") === normSpell(attackerRoundSpellName)) {
       accuracy -= 10 * (1 + Math.max(0, occamyAccRepeatStacks))
@@ -200,6 +200,7 @@ export const calculateAccuracy = (
     return 0
   }
   accuracy -= (defender.arrestoStacks ?? 0) * 5
+  // Debuffs de redução de accuracy (aplicados corretamente)
   if (attacker.debuffs.some((d) => d.type === "lumus_acc_down")) accuracy -= 10
   // ARESTUM MOMENTUM: -5% acerto por stack
   const arestumOnAtk = attacker.debuffs.filter((d) => d.type === "arestum_penalty").length
@@ -275,10 +276,10 @@ const calculateDamage = (
 const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: string): number => {
   // Scarlatum: NUNCA pode causar crítico (magia caótica)
   if (spellNameNorm?.includes("scarlatum")) return 0
+  // Veela: defensor nunca pode ser critado (verificado antes de mark/glacius)
+  if (WAND_PASSIVES[defender?.wand ?? ""]?.effect === "veela_acc_penalty") return 0
   if (defender?.debuffs.some((d) => d.type === "mark")) return 1.0
   if (spellNameNorm?.includes("glacius") && defender?.debuffs.some((d) => d.type === "freeze")) return 1.0
-  // Veela: defensor nunca pode ser critado
-  if (WAND_PASSIVES[defender?.wand ?? ""]?.effect === "veela_acc_penalty") return 0
   let c = 0.25
   if (defender?.debuffs.some((d) => d.type === "crit_down")) c = Math.max(0, c - 0.1)
   // Dragão: +20% crit

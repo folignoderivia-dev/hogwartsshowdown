@@ -663,9 +663,13 @@ io.on("connection", (socket: Socket) => {
           const cs = io.sockets.sockets.get(slot.socketId)
           if (cs) cs.emit("MATCH_RESULT", { ...matchResultPayload, yourDelta: eloDeltas[uid] ?? 0 })
         }
-        for (const [, sid] of room.spectators) {
+        // Espectadores recebem MATCH_RESULT SEM yourDelta (hard check: não podem ter ELO/stats)
+        for (const [specUid, sid] of room.spectators) {
           const ss = io.sockets.sockets.get(sid)
-          if (ss) ss.emit("MATCH_RESULT", matchResultPayload)
+          if (ss) {
+            // Hard check: espectadores nunca recebem deltas de ELO
+            ss.emit("MATCH_RESULT", { ...matchResultPayload, yourDelta: 0 })
+          }
         }
 
         // Guarda no histórico em memória
@@ -687,11 +691,20 @@ io.on("connection", (socket: Socket) => {
     }
   )
 
-  // ── CHAT_MESSAGE ─────────────────────────────────────────────────────────────
+  // ── CHAT_MESSAGE (match-specific chat) ──────────────────────────────────────────
   socket.on(
     "CHAT_MESSAGE",
     ({ matchId, sender, text }: { matchId: string; sender: string; text: string }) => {
       socket.to(matchId).emit("CHAT_MESSAGE", { sender, text })
+    }
+  )
+
+  // ── GLOBAL_CHAT_MESSAGE (lobby-wide broadcast) ───────────────────────────────────
+  socket.on(
+    "global_chat_message",
+    ({ author, text, ts }: { author: string; text: string; ts: number }) => {
+      // Broadcast para todos os clientes conectados (exceto o emitente)
+      socket.broadcast.emit("global_chat_message", { author, text, ts })
     }
   )
 

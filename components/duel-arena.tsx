@@ -1549,6 +1549,20 @@ const DuelArena = (
       commitCast(target.id)
       return
     }
+    // FFA3, FFA4, 2v2: requer seleção explícita de alvo para spells de alvo único
+    if (playerBuild.gameMode === "ffa" || playerBuild.gameMode === "ffa3" || playerBuild.gameMode === "2v2") {
+      const provoke = player.debuffs.find((d) => d.type === "provoke")
+      if (provoke?.meta) {
+        const forcedTarget = duelists.find((d) => d.id === provoke.meta && !isDefeated(d.hp))
+        if (forcedTarget) {
+          commitCast(forcedTarget.id)
+          return
+        }
+      }
+      // Não auto-seleciona alvo em modos com >2 jogadores - exige clique do usuário
+      setPendingSpell(spellName)
+      return
+    }
     setPendingSpell(spellName)
   }
 

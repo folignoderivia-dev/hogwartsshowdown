@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { io, type Socket } from "socket.io-client"
 
 const STORAGE_KEY = "hs:lobbyChat:v1"
 const MAX_MESSAGES = 80
@@ -37,7 +38,7 @@ function saveMessages(list: LobbyChatMessage[]) {
 
 type LayoutMode = "default" | "topBanner"
 
-/** Bate-papo simples na Sala Comum (mensagens locais). */
+/** Bate-papo global da Sala Comum (mensagens broadcast via Socket.io). */
 export default function HomeLobbyChat({
   authorName,
   layout = "default",
@@ -52,9 +53,37 @@ export default function HomeLobbyChat({
   const [draft, setDraft] = useState("")
   const listRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
+  const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
     setMessages(loadMessages())
+  }, [])
+
+  useEffect(() => {
+    // Conecta ao Socket.io para chat global
+    const socket = io(process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3001", {
+      transports: ["polling", "websocket"],
+    })
+    socketRef.current = socket
+
+    // Recebe mensagens broadcast do servidor
+    socket.on("global_chat_message", (data: { author: string; text: string; ts: number }) => {
+      setMessages((prev) => {
+        const entry: LobbyChatMessage = {
+          id: `${data.ts}-${Math.random().toString(36).slice(2, 9)}`,
+          author: data.author,
+          text: data.text,
+          ts: data.ts,
+        }
+        const next = [...prev, entry].slice(-MAX_MESSAGES)
+        saveMessages(next)
+        return next
+      })
+    })
+
+    return () => {
+      socket.disconnect()
+    }
   }, [])
 
   useEffect(() => {
@@ -75,6 +104,8 @@ export default function HomeLobbyChat({
       text,
       ts: Date.now(),
     }
+    // Emite para o servidor broadcast
+    socketRef.current?.emit("global_chat_message", { author, text, ts: Date.now() })
     setMessages((prev) => {
       const next = [...prev, entry].slice(-MAX_MESSAGES)
       saveMessages(next)
@@ -95,7 +126,7 @@ export default function HomeLobbyChat({
         <div className="mx-auto flex max-w-[1400px] flex-col gap-1 px-2 py-1.5 sm:flex-row sm:items-stretch sm:gap-2 sm:px-3 sm:py-2">
           <div className="min-h-0 flex-1 sm:flex sm:min-w-0 sm:flex-1 sm:flex-col">
             <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-500/90 sm:shrink-0">
-              Bate-papo da Sala <span className="font-normal text-amber-700">(local)</span>
+              Bate-papo da Sala <span className="font-normal text-amber-700">(global)</span>
             </p>
             <div
               ref={trackRef}
@@ -144,7 +175,7 @@ export default function HomeLobbyChat({
       <CardHeader className="pb-2">
         <CardTitle className="text-base text-amber-200">Bate-papo da Sala</CardTitle>
         <p className="text-[11px] font-normal text-amber-600/90">
-          Mensagens ficam só neste aparelho (local). Use para combinar duelos ou deixar um recado rápido.
+          Mensagens são compartilhadas com todos os jogadores conectados. Use para combinar duelos ou deixar um recado rápido.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
