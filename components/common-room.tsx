@@ -422,9 +422,11 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [metaCurrent, setMetaCurrent] = useState(0)
 
   useEffect(() => {
+    const supabase = getSupabaseClient()
+    
+    // Initial fetch
     const fetchServerMeta = async () => {
       try {
-        const supabase = getSupabaseClient()
         const { data } = await supabase
           .from("server_meta")
           .select("arrecadado, meta_objetivo")
@@ -439,6 +441,29 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       }
     }
     fetchServerMeta()
+
+    // Realtime subscription
+    const channel = supabase
+      .channel("server_meta_changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "server_meta",
+          filter: "id=eq.1"
+        },
+        (payload) => {
+          const newRecord = payload.new as { arrecadado?: number; meta_objetivo?: number }
+          if (newRecord.arrecadado !== undefined) setArrecadado(newRecord.arrecadado)
+          if (newRecord.meta_objetivo !== undefined) setMetaObjetivo(newRecord.meta_objetivo)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const handlePixCopy = () => {
