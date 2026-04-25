@@ -30,7 +30,8 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>("users")
   const [userSearch, setUserSearch] = useState("")
   const [resettingRanking, setResettingRanking] = useState(false)
-  const [metaGlobal, setMetaGlobal] = useState(60)
+  const [arrecadado, setArrecadado] = useState(0)
+  const [metaObjetivo, setMetaObjetivo] = useState(60)
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -81,47 +82,36 @@ export default function AdminPage() {
     }
   }, [supabase])
 
-  const fetchMetaGlobal = useCallback(async () => {
+  const fetchServerMeta = useCallback(async () => {
     if (!supabase) return
     try {
       const { data } = await supabase
-        .from("profiles")
-        .select("offline_wins")
-        .eq("is_admin", true)
-        .limit(1)
+        .from("server_meta")
+        .select("arrecadado, meta_objetivo")
+        .eq("id", 1)
         .maybeSingle()
 
-      if (data?.offline_wins) {
-        setMetaGlobal(data.offline_wins)
+      if (data) {
+        setArrecadado(data.arrecadado ?? 0)
+        setMetaObjetivo(data.meta_objetivo ?? 60)
       }
     } catch {
-      // Keep default 60
+      // Keep defaults
     }
   }, [supabase])
 
-  const handleUpdateMetaGlobal = async () => {
+  const handleUpdateServerMeta = async () => {
+    if (!supabase) return
     try {
-      const { data: existing } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("is_admin", true)
-        .limit(1)
-        .maybeSingle()
+      const { error } = await supabase
+        .from("server_meta")
+        .upsert({ id: 1, arrecadado, meta_objetivo: metaObjetivo })
+        .eq("id", 1)
 
-      if (existing) {
-        const { error } = await supabase
-          .from("profiles")
-          .update({ offline_wins: metaGlobal })
-          .eq("id", existing.id)
-        if (error) throw error
-      } else {
-        alert("Nenhum usuário admin encontrado. Crie um usuário com is_admin=true.")
-        return
-      }
-
-      alert("Meta global atualizada com sucesso!")
+      if (error) throw error
+      alert("Meta de doações atualizada com sucesso!")
     } catch {
-      setError("Erro ao atualizar meta")
+      setError("Erro ao atualizar meta de doações")
     }
   }
 
@@ -207,18 +197,18 @@ export default function AdminPage() {
     if (supabase) {
       const init = async () => {
         await fetchUserProfile()
+        await fetchServerMeta()
         setCheckingSession(false)
       }
       init()
     }
-  }, [fetchUserProfile, supabase])
+  }, [fetchUserProfile, fetchServerMeta, supabase])
 
   useEffect(() => {
     if (userProfile?.is_admin && supabase) {
       fetchUsers()
-      fetchMetaGlobal()
     }
-  }, [userProfile, fetchUsers, fetchMetaGlobal, supabase])
+  }, [userProfile, fetchUsers, supabase])
 
   if (checkingSession) {
     return (
@@ -249,18 +239,25 @@ export default function AdminPage() {
           </div>
           <div className="flex gap-2">
             <div className="flex items-center gap-2 rounded border border-amber-700/50 bg-stone-800 px-3 py-2">
-              <span className="text-xs text-amber-400">Meta Global (R$):</span>
+              <span className="text-xs text-amber-400">Arrecadado (R$):</span>
               <input
                 type="number"
-                value={metaGlobal}
-                onChange={(e) => setMetaGlobal(Number(e.target.value))}
+                value={arrecadado}
+                onChange={(e) => setArrecadado(Number(e.target.value))}
+                className="w-16 rounded border border-amber-700 bg-stone-900 px-2 py-1 text-xs text-amber-200 text-right"
+              />
+              <span className="text-xs text-amber-400">Meta (R$):</span>
+              <input
+                type="number"
+                value={metaObjetivo}
+                onChange={(e) => setMetaObjetivo(Number(e.target.value))}
                 className="w-16 rounded border border-amber-700 bg-stone-900 px-2 py-1 text-xs text-amber-200 text-right"
               />
               <Button
                 size="sm"
                 variant="outline"
                 className="h-6 border-amber-600 text-xs text-amber-300"
-                onClick={handleUpdateMetaGlobal}
+                onClick={handleUpdateServerMeta}
               >
                 Salvar
               </Button>

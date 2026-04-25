@@ -417,27 +417,28 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const isVip = currentUser?.isVip ?? false
 
   const PIX_KEY = "guilhermefoligno@gmail.com"
-  const [metaGoal, setMetaGoal] = useState(60)
+  const [arrecadado, setArrecadado] = useState(0)
+  const [metaObjetivo, setMetaObjetivo] = useState(60)
   const [metaCurrent, setMetaCurrent] = useState(0)
 
   useEffect(() => {
-    const fetchMeta = async () => {
+    const fetchServerMeta = async () => {
       try {
         const supabase = getSupabaseClient()
         const { data } = await supabase
-          .from("profiles")
-          .select("offline_wins")
-          .eq("is_admin", true)
-          .limit(1)
+          .from("server_meta")
+          .select("arrecadado, meta_objetivo")
+          .eq("id", 1)
           .maybeSingle()
-        if (data?.offline_wins) {
-          setMetaGoal(data.offline_wins)
+        if (data) {
+          setArrecadado(data.arrecadado ?? 0)
+          setMetaObjetivo(data.meta_objetivo ?? 60)
         }
       } catch {
-        // Keep default 60 on error
+        // Keep defaults on error
       }
     }
-    fetchMeta()
+    fetchServerMeta()
   }, [])
 
   const handlePixCopy = () => {
@@ -898,11 +899,11 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             {/* Barra de meta */}
             <div className="mt-3 rounded border border-amber-700/50 bg-stone-800/80 p-2">
-              <p className="text-xs font-semibold text-amber-300">☕ Meta do Servidor: R$ {metaCurrent} / R$ {metaGoal}</p>
+              <p className="text-xs font-semibold text-amber-300">☕ Meta do Servidor: R$ {metaCurrent} / R$ {metaObjetivo}</p>
               <div className="mt-1 h-2 rounded-full bg-stone-700">
                 <div
                   className="h-2 rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
-                  style={{ width: `${Math.min(100, (metaCurrent / metaGoal) * 100)}%` }}
+                  style={{ width: `${Math.min(100, (metaCurrent / metaObjetivo) * 100)}%` }}
                 ></div>
               </div>
             </div>
