@@ -92,7 +92,7 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
   // ─── Socket ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL?.trim()
+    const url = "https://hogwartsshowdown-production.up.railway.app"
     const s = io(url, { transports: ["websocket", "polling"], autoConnect: true })
     socketRef.current = s
 

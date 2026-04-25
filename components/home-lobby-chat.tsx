@@ -61,7 +61,7 @@ export default function HomeLobbyChat({
 
   useEffect(() => {
     // Conecta ao Socket.io para chat global
-    const socket = io(process.env.NEXT_PUBLIC_SERVER_URL?.trim(), {
+    const socket = io("https://hogwartsshowdown-production.up.railway.app", {
       transports: ["polling", "websocket"],
     })
     socketRef.current = socket
