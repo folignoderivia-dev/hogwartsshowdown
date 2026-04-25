@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { createClient } from "@supabase/supabase-js"
 import { Shield, Users, AlertTriangle, RefreshCw } from "lucide-react"
+import { getSupabaseClient } from "@/lib/supabase"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 interface UserProfile {
   id: string
@@ -20,7 +21,7 @@ interface UserProfile {
 type AdminTab = "users" | "ranking"
 
 export default function AdminPage() {
-  const supabase = getSupabaseClient()
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(false)
@@ -31,7 +32,14 @@ export default function AdminPage() {
   const [resettingRanking, setResettingRanking] = useState(false)
   const [metaGlobal, setMetaGlobal] = useState(60)
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSupabase(getSupabaseClient())
+    }
+  }, [])
+
   const fetchUserProfile = useCallback(async () => {
+    if (!supabase) return
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -49,6 +57,7 @@ export default function AdminPage() {
   }, [supabase])
 
   const fetchUsers = useCallback(async (search = "") => {
+    if (!supabase) return
     setLoading(true)
     setError("")
     try {
@@ -73,11 +82,13 @@ export default function AdminPage() {
   }, [supabase])
 
   const fetchMetaGlobal = useCallback(async () => {
+    if (!supabase) return
     try {
       const { data } = await supabase
         .from("profiles")
         .select("offline_wins")
-        .eq("username", "SISTEMA_META")
+        .eq("is_admin", true)
+        .limit(1)
         .maybeSingle()
 
       if (data?.offline_wins) {
@@ -93,7 +104,8 @@ export default function AdminPage() {
       const { data: existing } = await supabase
         .from("profiles")
         .select("id")
-        .eq("username", "SISTEMA_META")
+        .eq("is_admin", true)
+        .limit(1)
         .maybeSingle()
 
       if (existing) {
@@ -103,7 +115,7 @@ export default function AdminPage() {
           .eq("id", existing.id)
         if (error) throw error
       } else {
-        alert("Usuário SISTEMA_META não encontrado. Crie manualmente no Supabase.")
+        alert("Nenhum usuário admin encontrado. Crie um usuário com is_admin=true.")
         return
       }
 
@@ -114,6 +126,7 @@ export default function AdminPage() {
   }
 
   const handleResetRanking = async () => {
+    if (!supabase) return
     if (!confirm("Tem certeza que deseja resetar o ranking de todos os jogadores para 500? Esta ação não pode ser desfeita.")) {
       return
     }
@@ -157,6 +170,7 @@ export default function AdminPage() {
   }
 
   const handleToggleAdmin = async (userId: string, currentAdmin: boolean | null) => {
+    if (!supabase) return
     try {
       const { error } = await supabase
         .from("profiles")
@@ -173,6 +187,7 @@ export default function AdminPage() {
   }
 
   const handleUpdateElo = async (userId: string, newElo: number) => {
+    if (!supabase) return
     try {
       const { error } = await supabase
         .from("profiles")
@@ -189,19 +204,21 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    const init = async () => {
-      await fetchUserProfile()
-      setCheckingSession(false)
+    if (supabase) {
+      const init = async () => {
+        await fetchUserProfile()
+        setCheckingSession(false)
+      }
+      init()
     }
-    init()
-  }, [fetchUserProfile])
+  }, [fetchUserProfile, supabase])
 
   useEffect(() => {
-    if (userProfile?.is_admin) {
+    if (userProfile?.is_admin && supabase) {
       fetchUsers()
       fetchMetaGlobal()
     }
-  }, [userProfile, fetchUsers, fetchMetaGlobal])
+  }, [userProfile, fetchUsers, fetchMetaGlobal, supabase])
 
   if (checkingSession) {
     return (

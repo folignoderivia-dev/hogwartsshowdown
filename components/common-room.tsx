@@ -427,7 +427,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         const { data } = await supabase
           .from("profiles")
           .select("offline_wins")
-          .eq("username", "SISTEMA_META")
+          .eq("is_admin", true)
+          .limit(1)
           .maybeSingle()
         if (data?.offline_wins) {
           setMetaGoal(data.offline_wins)
