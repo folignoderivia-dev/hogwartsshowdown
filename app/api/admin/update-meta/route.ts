@@ -33,14 +33,21 @@ export async function POST(req: NextRequest) {
     
     const meta = Number(body.meta ?? 60)
     
-    // Update meta in game_settings table
+    // Update meta in game_settings table using monthly_goal_value column
     const { error } = await supabase
       .from("game_settings")
-      .upsert({ key: "monthly_goal", value: meta }, { onConflict: "key" })
+      .update({ monthly_goal_value: meta })
+      .eq("key", "monthly_goal")
     
     if (error) {
       console.error("Error updating meta global:", error)
-      return NextResponse.json({ error: "Erro ao atualizar meta" }, { status: 500 })
+      // Try insert if update fails (key doesn't exist)
+      const { error: insertError } = await supabase
+        .from("game_settings")
+        .insert({ key: "monthly_goal", monthly_goal_value: meta })
+      if (insertError) {
+        return NextResponse.json({ error: "Erro ao atualizar meta" }, { status: 500 })
+      }
     }
     
     return NextResponse.json({ ok: true, meta })
@@ -80,7 +87,7 @@ export async function GET(req: NextRequest) {
     // Fetch current meta from game_settings
     const { data, error } = await supabase
       .from("game_settings")
-      .select("value")
+      .select("monthly_goal_value")
       .eq("key", "monthly_goal")
       .maybeSingle()
     
@@ -89,7 +96,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ meta: 60 }) // Return default on error
     }
     
-    return NextResponse.json({ meta: data?.value ?? 60 })
+    return NextResponse.json({ meta: data?.monthly_goal_value ?? 60 })
   } catch (error) {
     console.error("Unexpected error in update-meta GET:", error)
     return NextResponse.json({ meta: 60 }) // Return default on error

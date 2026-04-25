@@ -1955,8 +1955,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               onClick={() => {
                 const payload = buildPayload()
                 if (!payload || !onCreateRoom) return
-                // Mark as VIP room by adding a special property
-                onCreateRoom({ ...payload, isVipRoom: true })
+                // Mark as VIP room with custom settings
+                onCreateRoom({ 
+                  ...payload, 
+                  isVipRoom: true,
+                  customRoomSettings: customSettings 
+                })
               }}
               disabled={!isReady}
             >
