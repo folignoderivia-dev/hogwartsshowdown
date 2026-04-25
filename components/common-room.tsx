@@ -93,6 +93,8 @@ const POTIONS = [
   { value: "felix",       label: "Felix Felicis",     effect: "Recupera 100% mana da spell com menor mana atual" },
   { value: "aconito",     label: "Acônito",            effect: "Aplica POISON no oponente por 4 turnos" },
   { value: "amortentia",  label: "Amortentia",         effect: "Substitui aleatoriamente uma poção não usada do oponente" },
+  { value: "dragon_tonic", label: "Tônico de Dragão", effect: "Aumenta sua prioridade em +4 no próximo turno" },
+  { value: "despair_potion", label: "Poção do Desespero", effect: "Reduz 3 de mana do oponente baseado na última magia que ele usou" },
 ]
 
 
