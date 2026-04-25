@@ -84,14 +84,14 @@ const WAND_CORES = [
 
 const POTIONS = [
   { value: "wiggenweld",  label: "Wiggenweld",       effect: "Cura HP = último dano recebido" },
-  { value: "mortovivo",  label: "Morto Vivo",        effect: "HP não cai abaixo de 1 por 1 turno (Undead)" },
+  { value: "mortovivo",  label: "Morto Vivo",        effect: "Imortalidade: HP não cai abaixo de 1 no turno de ativação" },
   { value: "edurus",     label: "Edurus",             effect: "Limpa debuffs + Imunidade por 1 turno" },
   { value: "maxima",     label: "Maxima",             effect: "+50% dano final no próximo turno" },
   { value: "foco",       label: "Foco",               effect: "+10% Accuracy permanente" },
-  { value: "merlin",      label: "Poção de Merlin",   effect: "Troca mana da sua spell mais fraca pela da mais forte do oponente" },
+  { value: "merlin",      label: "Poção de Merlin",   effect: "Copia a última poção do oponente com +25% de efetividade" },
   { value: "felix",       label: "Felix Felicis",     effect: "Recupera 100% mana da spell com menor mana atual" },
   { value: "aconito",     label: "Acônito",            effect: "Aplica POISON no oponente por 4 turnos" },
-  { value: "amortentia",  label: "Amortentia",         effect: "CHARM no oponente (2t): se alvo curar, você também recebe a cura" },
+  { value: "amortentia",  label: "Amortentia",         effect: "Substitui aleatoriamente uma poção não usada do oponente" },
 ]
 
 
