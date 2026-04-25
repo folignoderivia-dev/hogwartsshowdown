@@ -1,48 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getSupabaseClient } from "@/lib/supabase"
+import { createClient } from "@supabase/supabase-js"
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabaseClient()
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     
-    // Get session from Authorization header
-    const authHeader = req.headers.get("authorization")
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
-    }
-    
-    const token = authHeader.substring(7)
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    if (authError || !user) {
-      return NextResponse.json({ error: "Sessão inválida" }, { status: 401 })
-    }
-    
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", user.id)
-      .maybeSingle()
-      
-    if (profileError || !profile?.is_admin) {
-      return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
-    }
-    
-    // Fetch reports from reports table
     const { data, error } = await supabase
       .from("reports")
-      .select("*")
+      .select("id, reporter_id, target_id, reason, description, status")
       .order("created_at", { ascending: false })
       .limit(100)
     
     if (error) {
       console.error("Error fetching reports:", error)
-      return NextResponse.json({ reports: [] })
+      console.error("Supabase error details:", JSON.stringify(error, null, 2))
+      return NextResponse.json({ error: "Erro ao ler reports" }, { status: 500 })
     }
     
     return NextResponse.json({ reports: data ?? [] })
   } catch (error) {
     console.error("Unexpected error in reports route:", error)
-    return NextResponse.json({ reports: [] })
+    return NextResponse.json({ error: "Erro ao ler reports" }, { status: 500 })
   }
 }

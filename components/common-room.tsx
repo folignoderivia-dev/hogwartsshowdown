@@ -423,14 +423,10 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   useEffect(() => {
     const fetchMeta = async () => {
       try {
-        const supabase = getSupabaseClient()
-        const { data, error } = await supabase
-          .from("game_settings")
-          .select("monthly_goal_value")
-          .eq("key", "monthly_goal")
-          .maybeSingle()
-        if (data?.monthly_goal_value) {
-          setMetaGoal(data.monthly_goal_value)
+        const res = await fetch("/api/admin/get-meta")
+        const data = await res.json()
+        if (data.meta !== undefined) {
+          setMetaGoal(data.meta)
         }
       } catch {
         // Keep default 60 on error
