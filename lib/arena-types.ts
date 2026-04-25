@@ -33,6 +33,8 @@ export type DebuffType =
   | "immunity"  // Imune a novos debuffs (1 turno)
   | "charm"     // Se receber buff/cura, o usuário da Amortentia recebe igual
   | "unforgivable_block" // Expecto Patronum: bloqueia Maldições do alvo (1t)
+  // Status de núcleos
+  | "invulnerable" // Oraqui Orala: dano recebido será 0 (1 turno)
 
 export type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 

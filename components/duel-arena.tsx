@@ -147,7 +147,8 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   undead: "💀 IMORTAL(1t)",
   immunity: "🛡️ IMUNIDADE",
   charm: "💖 ENCANTO",
-  unforgivable_block: "🕊️ PATRONUM(1t)",
+  unforgivable_block: "🜏 BLOQUEIO MALDIÇÕES",
+  invulnerable: "🪶 INVULNERÁVEL",
 }
 /** Mensagem flutuante curta ao aplicar debuff do grimório. */
 const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
@@ -502,6 +503,7 @@ const DuelArena = (
   const [timeLeft, setTimeLeft] = useState(120)
   const [pendingSpell, setPendingSpell] = useState<string | null>(null)
   const [pendingActions, setPendingActions] = useState<Record<string, RoundAction>>({})
+  const [lockedSpell, setLockedSpell] = useState<string | null>(null)
   const pendingActionsRef = useRef<Record<string, RoundAction>>({})
   const [battleLog, setBattleLog] = useState<string[]>(["[Turno 0]: O duelo começou!"])
   const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "Sistema", text: "Chat ativo." }])
@@ -2125,6 +2127,8 @@ const DuelArena = (
                 const info = getSpellInfo(spell, SPELL_DATABASE)
                 const tauntLock = player?.debuffs.some((d) => d.type === "taunt") && player?.lastSpellUsed
                 const disabledByDebuff = (player?.disabledSpells?.[spell] ?? 0) > 0
+                const hasSeminviso = playerBuild.wand === "seminviso"
+                const isLocked = lockedSpell === spell
                 const disabled =
                   !mana ||
                   mana.current <= 0 ||
@@ -2138,10 +2142,28 @@ const DuelArena = (
                   disabledByDebuff ||
                   (!!tauntLock && spell !== player.lastSpellUsed)
                 return (
-                  <Button key={spell} disabled={disabled} onClick={() => onSpellClick(spell)} className={`touch-manipulation select-none border border-amber-700 text-amber-100 ${pendingSpell === spell ? "bg-amber-600" : "bg-gradient-to-b from-amber-800 to-amber-900 hover:from-amber-700 hover:to-amber-800"}`}>
-                    <Wand2 className="mr-1 h-3.5 w-3.5" />
-                    {spell} ({mana?.current}/{mana?.max} MANA | {info?.accuracy || 0}%{disabledByDebuff ? ` | 🔒${player?.disabledSpells?.[spell]}t` : ""})
-                  </Button>
+                  <div key={spell} className="relative">
+                    {hasSeminviso && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isLocked) {
+                            setLockedSpell(null)
+                          } else {
+                            setLockedSpell(spell)
+                          }
+                        }}
+                        className={`absolute -top-2 right-0 z-10 p-0.5 rounded text-xs ${isLocked ? "text-amber-300" : "text-stone-500 hover:text-amber-300"} transition-colors`}
+                        title={isLocked ? "Desbloquear magia" : "Bloquear magia (imune a Expulso, Obliviate, Petrificus)"}
+                      >
+                        {isLocked ? "🔒" : "🔓"}
+                      </button>
+                    )}
+                    <Button disabled={disabled} onClick={() => onSpellClick(spell)} className={`touch-manipulation select-none border border-amber-700 text-amber-100 ${pendingSpell === spell ? "bg-amber-600" : "bg-gradient-to-b from-amber-800 to-amber-900 hover:from-amber-700 hover:to-amber-800"}`}>
+                      <Wand2 className="mr-1 h-3.5 w-3.5" />
+                      {spell} ({mana?.current}/{mana?.max} MANA | {info?.accuracy || 0}%{disabledByDebuff ? ` | 🔒${player?.disabledSpells?.[spell]}t` : ""})
+                    </Button>
+                  </div>
                 )
               })}
               <Button

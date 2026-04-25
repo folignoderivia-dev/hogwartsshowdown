@@ -31,6 +31,7 @@ export type DebuffType =
   | "immunity"
   | "charm"
   | "unforgivable_block"
+  | "invulnerable" // Oraqui Orala: dano recebido será 0 (1 turno)
 
 export type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 

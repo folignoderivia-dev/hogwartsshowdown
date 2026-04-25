@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload, X, Save, FolderOpen, Trash2 } from "lucide-react"
+import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload, X, Save, FolderOpen, Trash2, Lock } from "lucide-react"
 import { formatSpellPower, INITIAL_PLAYER_BUILD, SPELL_DATABASE, type SpellInfo } from "@/lib/data-store"
 import type { PlayerBuild, CustomRoomSettings, GameMode } from "@/lib/types"
 import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
@@ -81,6 +81,8 @@ const WAND_CORES = [
   { value: "centauro",    label: "Pelo de Centauro",         desc: "No campo: Ferula/Episkey/Vulnera com mana 0 para todos", icon: Wind },
   { value: "hippogriff",  label: "Pena de Hipogrifo",       desc: "Imunidade total a MARCA e BOMBA",               icon: Shield },
   { value: "troll",       label: "Pele de Trasgo",          desc: "Estabiliza o dano recebido no valor médio (não permite dano máximo)", icon: AlertTriangle },
+  { value: "oraq_orala",  label: "Pena de Oraqui Orala",    desc: "Ao receber Crítico: 30% chance de invulnerabilidade no próximo turno", icon: Shield },
+  { value: "seminviso",   label: "Pelo de Seminviso",       desc: "Permite trancar 1 magia: imune a Expulso, Obliviate e Petrificus", icon: Lock },
 ]
 
 const POTIONS = [

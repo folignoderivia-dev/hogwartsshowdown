@@ -35,6 +35,8 @@ export const WAND_PASSIVES: Record<string, { name: string; description: string; 
   centauro:    { name: "Pelo de Centauro",           description: "Com Centauro no campo: Ferula, Episkey e Vulnera Sanetur ficam com mana 0 para todos os duelistas", effect: "centauro_block_heals" },
   hippogriff:  { name: "Pena de Hipogrifo",          description: "Imunidade total a MARCA e BOMBA",                     effect: "hippogriff_immune_mark_bomb" },
   troll:       { name: "Pele de Trasgo",            description: "Impede que as magias do oponente causem o dano máximo", effect: "troll_force_avg_damage" },
+  oraq_orala:  { name: "Pena de Oraqui Orala",      description: "Ao receber Crítico: 30% chance de invulnerabilidade no próximo turno", effect: "oraq_orala_invuln_crit" },
+  seminviso:   { name: "Pelo de Seminviso",         description: "Permite trancar 1 magia: imune a Expulso, Obliviate e Petrificus", effect: "seminviso_spell_lock" },
 }
 
 export type SpellDebuffType =
@@ -70,6 +72,8 @@ export interface SpellInfo {
   special?: string
   /** true = feitiço exclusivo para jogadores VIP */
   isVipOnly?: boolean
+  /** Seminviso: magia trancada (imune a Expulso, Obliviate, Petrificus) */
+  isLocked?: boolean
 }
 
 export function rollSpellPower(spell: SpellInfo): number {

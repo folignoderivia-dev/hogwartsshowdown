@@ -795,12 +795,21 @@ export function calculateTurnOutcome(params: {
       }
       // UNDEAD: HP não pode cair abaixo de 1 neste turno (debuff ou flag de ativação)
       const isUndead = def.debuffs.some((x) => x.type === "undead") || def.isUndeadThisTurn
+      // INVULNERABLE: Oraqi Orala - dano recebido será 0
+      const isInvulnerable = def.debuffs.some((x) => x.type === "invulnerable")
       if (isUndead) {
         const totalHp = getTotalHP(def.hp)
         const beforeUndead = effectiveDmg
         effectiveDmg = Math.max(0, Math.min(effectiveDmg, totalHp - 1))
         if (beforeUndead > effectiveDmg) {
           logs.push(`→ 🧟 Morto-vivo: ${def.name} não cai abaixo de 1 HP neste turno (${beforeUndead} → ${effectiveDmg} recebido).`)
+        }
+      }
+      if (isInvulnerable) {
+        const beforeInvuln = effectiveDmg
+        effectiveDmg = 0
+        if (beforeInvuln > 0) {
+          logs.push(`→ 🪶 Pena de Oraqui Orala: ${def.name} é invulnerável! Dano recebido: 0.`)
         }
       }
       state = state.map((d) =>
@@ -1199,6 +1208,14 @@ export function calculateTurnOutcome(params: {
             }
           }
 
+          // ORAQI ORALA: ao receber crítico, 30% chance de invulnerabilidade no próximo turno
+          if (isCrit && damage > 0 && !bloqueado && WAND_PASSIVES[target.wand]?.effect === "oraq_orala_invuln_crit") {
+            if (Math.random() < 0.3) {
+              state = state.map((d) => (d.id === target.id ? { ...d, debuffs: [...d.debuffs, { type: "invulnerable" as DebuffType, duration: 1 }] } : d))
+              logs.push(`→ 🪶 Pena de Oraqui Orala ativada! Invulnerabilidade garantida para o próximo turno.`)
+            }
+          }
+
           animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000, damage, isBlock: bloqueado, fctOnly: true })
           applySpellDebuffTo(target.id)
 
@@ -1211,18 +1228,26 @@ export function calculateTurnOutcome(params: {
             logs.push(`→ Lumus! ${target.name} sofre −10% acerto (2t).`)
           }
 
+          // PETRIFICUS TOTALES: bloqueia 1 feitiço aleatório (2t)
+          // SEMINVISO: se a magia alvo estiver trancada, Petrificus falha
           if (spell.special === "petrificus_disable" && !bloqueado) {
             const ft = state.find((d) => d.id === target.id)
             const keys = ft?.spellMana ? Object.keys(ft.spellMana) : []
             if (keys.length > 0) {
               const rk = keys[Math.floor(Math.random() * keys.length)]
-              state = state.map((d) => {
-                if (d.id !== target.id) return d
-                const ds = { ...(d.disabledSpells || {}) }
-                ds[rk] = 2
-                return { ...d, disabledSpells: ds }
-              })
-              logs.push(`→ Petrificus Totales! "${rk}" de ${target.name} bloqueado (2t).`)
+              // Check if the spell is locked by Seminviso
+              const lockedSpellInfo = params.spellDatabase.find(s => s.name === rk)
+              if (lockedSpellInfo?.isLocked) {
+                logs.push(`→ Petrificus Totales! "${rk}" de ${target.name} está trancada pelo Seminviso! Petrificus falhou.`)
+              } else {
+                state = state.map((d) => {
+                  if (d.id !== target.id) return d
+                  const ds = { ...(d.disabledSpells || {}) }
+                  ds[rk] = 2
+                  return { ...d, disabledSpells: ds }
+                })
+                logs.push(`→ Petrificus Totales! "${rk}" de ${target.name} bloqueado (2t).`)
+              }
             }
           }
 
@@ -1327,6 +1352,7 @@ export function calculateTurnOutcome(params: {
           }
 
           // OBLIVIATE: reduz pela metade a mana de feitiço aleatório do alvo (permanente)
+          // SEMINVISO: se a magia alvo estiver trancada, Obliviate falha
           if (spell.special === "obliviate_mana" && !bloqueado) {
             const freshTarget = state.find((d) => d.id === target.id)
             const sm = freshTarget?.spellMana
@@ -1334,13 +1360,19 @@ export function calculateTurnOutcome(params: {
               const keys = Object.keys(sm)
               if (keys.length > 0) {
                 const rk = keys[Math.floor(Math.random() * keys.length)]
-                state = state.map((d) => {
-                  if (d.id !== target.id) return d
-                  const newSm = { ...(d.spellMana ?? {}) }
-                  newSm[rk] = { current: Math.floor(newSm[rk].current / 2), max: Math.floor(newSm[rk].max / 2) }
-                  return { ...d, spellMana: newSm }
-                })
-                logs.push(`→ Obliviate! Mana de "${rk}" de ${target.name} reduzida à metade permanentemente!`)
+                // Check if the spell is locked by Seminviso
+                const lockedSpellInfo = params.spellDatabase.find(s => s.name === rk)
+                if (lockedSpellInfo?.isLocked) {
+                  logs.push(`→ Obliviate! "${rk}" de ${target.name} está trancada pelo Seminviso! Obliviate falhou.`)
+                } else {
+                  state = state.map((d) => {
+                    if (d.id !== target.id) return d
+                    const newSm = { ...(d.spellMana ?? {}) }
+                    newSm[rk] = { current: Math.floor(newSm[rk].current / 2), max: Math.floor(newSm[rk].max / 2) }
+                    return { ...d, spellMana: newSm }
+                  })
+                  logs.push(`→ Obliviate! Mana de "${rk}" de ${target.name} reduzida à metade permanentemente!`)
+                }
               }
             }
           }
@@ -1381,24 +1413,31 @@ export function calculateTurnOutcome(params: {
             logs.push(`🔍 Revele seus Segredos! Núcleo de ${target.name}: ${passive?.name ?? "Desconhecido"} — ${passive?.description ?? ""}`)
           }
 
-          // EXPULSO: remove 1 spell e insere outra imediatamente (sem “buraco” em spellMana/spells)
+          // EXPULSO: remove 1 spell e insere outra imediatamente (sem "buraco" em spellMana/spells)
+          // SEMINVISO: se a magia alvo estiver trancada, Expulso falha
           if (spell.special === "expulso_swap" && !bloqueado) {
             const freshTarget = state.find((d) => d.id === target.id)
             if (freshTarget?.spellMana) {
               const targetSpells = Object.keys(freshTarget.spellMana)
               if (targetSpells.length > 0) {
                 const removedSpell = targetSpells[Math.floor(Math.random() * targetSpells.length)]
-                const remainingKeys = targetSpells.filter((k) => k !== removedSpell)
-                const newSpell = pickExpulsoReplacementSpell(remainingKeys, params.spellDatabase)
-                state = state.map((d) => {
-                  if (d.id !== target.id) return d
-                  const newSm = { ...(d.spellMana ?? {}) }
-                  delete newSm[removedSpell]
-                  newSm[newSpell.name] = { current: newSpell.pp, max: newSpell.pp }
-                  const keys = Object.keys(newSm).sort((a, b) => a.localeCompare(b))
-                  return { ...d, spellMana: newSm, spells: keys }
-                })
-                logs.push(`→ Expulso! ${attacker.name} substituiu "${removedSpell}" de ${target.name} por "${newSpell.name}"!`)
+                // Check if the spell is locked by Seminviso
+                const lockedSpellInfo = params.spellDatabase.find(s => s.name === removedSpell)
+                if (lockedSpellInfo?.isLocked) {
+                  logs.push(`→ Expulso! "${removedSpell}" de ${target.name} está trancada pelo Seminviso! Expulso falhou.`)
+                } else {
+                  const remainingKeys = targetSpells.filter((k) => k !== removedSpell)
+                  const newSpell = pickExpulsoReplacementSpell(remainingKeys, params.spellDatabase)
+                  state = state.map((d) => {
+                    if (d.id !== target.id) return d
+                    const newSm = { ...(d.spellMana ?? {}) }
+                    delete newSm[removedSpell]
+                    newSm[newSpell.name] = { current: newSpell.pp, max: newSpell.pp }
+                    const keys = Object.keys(newSm).sort((a, b) => a.localeCompare(b))
+                    return { ...d, spellMana: newSm, spells: keys }
+                  })
+                  logs.push(`→ Expulso! ${attacker.name} substituiu "${removedSpell}" de ${target.name} por "${newSpell.name}"!`)
+                }
               }
             }
           }
