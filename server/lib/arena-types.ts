@@ -64,6 +64,11 @@ export interface Duelist {
   turnsInBattle?: number
   /** Oculto do frontend: absorção de dano gerada no início da partida (10–50). */
   defense?: number
+  damageReceivedThisTurn?: number
+  usedPotions?: string[]
+  permanentAccBonus?: number
+  cinzalWeakenStacks?: number
+  occamyRepeatByTargetSpell?: Record<string, number>
 }
 
 export type Point = { x: number; y: number }

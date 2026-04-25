@@ -68,15 +68,15 @@ const WAND_CORES = [
   { value: "thestral",    label: "Pelo de Testrálio",       desc: "Dano único máximo 300",                          icon: Wind },
   { value: "basilisk",    label: "Presa de Basilisco",      desc: "+20% chance de aplicar debuffs",                 icon: AlertTriangle },
   { value: "thunderbird", label: "Pena de Pássaro Trovão", desc: "+1 prioridade global",                           icon: Zap },
-  { value: "occamy",      label: "Pena de Occamy",          desc: "Mesmo feitiço que alvo: -25% dano e -10% acc",   icon: Shield },
+  { value: "occamy",      label: "Pena de Occamy",          desc: "Espelho: mesmo feitiço do alvo — dano e acc penalizados por repetição", icon: Shield },
   { value: "kelpie",      label: "Crina de Kelpie",         desc: "Imune a Incêndio, Confringo e Bombarda",         icon: Wind },
   { value: "acromantula", label: "Pelo de Acromântula",     desc: "+25 dano por turno completo (empilhável)",       icon: Bug },
   { value: "rapinomonio", label: "Pele de Rapinomônio",     desc: "Início: 1 spell de cada duelista começa com 0 mana", icon: AlertTriangle },
   // Núcleos novos
   { value: "veela",       label: "Cabelo de Veela",         desc: "Acc do atacante reduzida 0-25% aleatório; imune a críticos", icon: Shield },
-  { value: "crupe",       label: "Pelo de Crupe",           desc: "Spells sem efeito: 25% chance de dano x3",      icon: Zap },
-  { value: "cinzal",      label: "Presa de Cinzal",         desc: "Se receber >100 dmg: atacante perde 15% dano",   icon: AlertTriangle },
-  { value: "centauro",    label: "Pelo de Centauro",         desc: "Oponente bloqueado de usar Ferula/Episkey/Vulnera", icon: Wind },
+  { value: "crupe",       label: "Pelo de Crupe",           desc: "Spells 100% acerto: 25% chance dano ×3",         icon: Zap },
+  { value: "cinzal",      label: "Presa de Cinzal",         desc: "Cada 100+ dmg recebido: atacante acumula −15% dano", icon: AlertTriangle },
+  { value: "centauro",    label: "Pelo de Centauro",         desc: "No campo: Ferula/Episkey/Vulnera com mana 0 para todos", icon: Wind },
   { value: "hippogriff",  label: "Pena de Hipogrifo",       desc: "Imunidade total a MARCA e BOMBA",               icon: Shield },
 ]
 

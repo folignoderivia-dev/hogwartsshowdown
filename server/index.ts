@@ -237,19 +237,17 @@ function applyRapinomonioBlock(duelists: Duelist[]): Duelist[] {
 // ─── Centauro: bloqueia spells de cura dos oponentes ao início ───────────────
 
 function applyCentauroBlock(duelists: Duelist[]): Duelist[] {
-  let next = [...duelists]
-  const centauros = next.filter((d) => WAND_PASSIVES[d.wand]?.effect === "centauro_block_heals")
-  for (const centauro of centauros) {
-    const foes = next.filter((d) => d.team !== centauro.team)
-    for (const foe of foes) {
-      const healSpells = ["Ferula", "Episkey", "Vulnera Sanetur"]
-      const nextDisabled = { ...(foe.disabledSpells || {}) }
-      healSpells.forEach((s) => { if (foe.spells.includes(s)) nextDisabled[s] = 999 })
-      next = next.map((d) => (d.id === foe.id ? { ...d, disabledSpells: nextDisabled } : d))
+  const hasCentauro = duelists.some((d) => WAND_PASSIVES[d.wand]?.effect === "centauro_block_heals")
+  if (!hasCentauro) return duelists
+  const healSpells = ["Ferula", "Episkey", "Vulnera Sanetur"] as const
+  return duelists.map((d) => {
+    if (!d.spellMana) return d
+    const sm = { ...d.spellMana }
+    for (const s of healSpells) {
+      if (sm[s]) sm[s] = { ...sm[s], current: 0 }
     }
-    console.log(`[Centauro] ${centauro.name}: oponentes bloqueados de usar spells de cura.`)
-  }
-  return next
+    return { ...d, spellMana: sm }
+  })
 }
 
 // ─── Debug log de passivas ao iniciar batalha ─────────────────────────────────

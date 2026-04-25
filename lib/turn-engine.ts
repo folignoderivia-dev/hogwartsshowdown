@@ -137,7 +137,27 @@ const reduceDebuffs = (duelist: Duelist): Duelist => ({
     .filter((d) => d.duration > 0),
 })
 
-export const calculateAccuracy = (attacker: Duelist, defender: Duelist, base: number, spell?: SpellInfo, attackerRoundSpellName?: string) => {
+const occamyRepeatKey = (targetId: string, spellNorm: string) => `${targetId}|${spellNorm}`
+
+/** Remove acúmulos Occamy do atacante para um alvo (troca de feitiço ou espelho inativo). */
+const stripOccamyRepeatsForTarget = (duelist: Duelist, targetId: string): Duelist => {
+  if (!duelist.occamyRepeatByTargetSpell) return duelist
+  const prefix = `${targetId}|`
+  const next = { ...duelist.occamyRepeatByTargetSpell }
+  for (const k of Object.keys(next)) {
+    if (k.startsWith(prefix)) delete next[k]
+  }
+  return Object.keys(next).length > 0 ? { ...duelist, occamyRepeatByTargetSpell: next } : { ...duelist, occamyRepeatByTargetSpell: undefined }
+}
+
+export const calculateAccuracy = (
+  attacker: Duelist,
+  defender: Duelist,
+  base: number,
+  spell?: SpellInfo,
+  attackerRoundSpellName?: string,
+  occamyAccRepeatStacks = 0
+) => {
   let accuracy = base
   const un = spell?.isUnforgivable
   const wandJammed = attacker.wandPassiveStripped || attacker.debuffs.some((d) => d.type === "disarm")
@@ -147,9 +167,11 @@ export const calculateAccuracy = (attacker: Duelist, defender: Duelist, base: nu
   if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "crit20_acc_minus15") accuracy -= 15
   // Veela (defensor): penalidade aleatória de 0-25% em quem ataca o Veela
   if (WAND_PASSIVES[defender.wand]?.effect === "veela_acc_penalty") accuracy -= Math.floor(Math.random() * 26)
-  // Occamy (atacante): se alvo usou o mesmo feitiço na rodada, -10% acc
+  // Occamy (atacante): espelho ativo → −10% acc por “camada” de repetição (−10, −20, −30…)
   if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" && attackerRoundSpellName) {
-    if (normSpell(defender.lastSpellUsed ?? "") === normSpell(attackerRoundSpellName)) accuracy -= 10
+    if (normSpell(defender.lastSpellUsed ?? "") === normSpell(attackerRoundSpellName)) {
+      accuracy -= 10 * (1 + Math.max(0, occamyAccRepeatStacks))
+    }
   }
   const spellNorm = normSpell(spell?.name || "")
   if (
@@ -175,10 +197,20 @@ export const calculateAccuracy = (attacker: Duelist, defender: Duelist, base: nu
   return Math.max(5, Math.min(100, accuracy))
 }
 
-const rollHit = (attacker: Duelist, defender: Duelist, spell: SpellInfo, missStreak = 0, spellName?: string) => {
+const rollHit = (
+  attacker: Duelist,
+  defender: Duelist,
+  spell: SpellInfo,
+  missStreak = 0,
+  spellName?: string,
+  occamyAccRepeatStacks = 0
+) => {
   if (spell.accuracy >= 100) return true
   const pityBonus = Math.min(20, missStreak * 7)
-  const finalAcc = Math.min(100, calculateAccuracy(attacker, defender, spell.accuracy, spell, spellName) + pityBonus)
+  const finalAcc = Math.min(
+    100,
+    calculateAccuracy(attacker, defender, spell.accuracy, spell, spellName, occamyAccRepeatStacks) + pityBonus
+  )
   return Math.random() * 100 <= finalAcc
 }
 
@@ -189,32 +221,37 @@ const calculateDamage = (
   spellNorm?: string,
   spell?: SpellInfo,
   occamyMirrorActive?: boolean,
-  combatLogs?: string[]
+  combatLogs?: string[],
+  occamyMirrorRepeat = 0
 ) => {
   let damage = base
-  // Kelpie: imune a Incêndio, Confringo e Bombarda
+  // Kelpie: imune a Incêndio, Confringo/Confringo e Bombarda
   if (spellNorm && WAND_PASSIVES[defender.wand]?.effect === "kelpie_fire_immune") {
     const n = spellNorm
-    if (n.includes("incendio") || n.includes("confrigo") || n.includes("bombarda")) {
+    if (n.includes("incendio") || n.includes("confrigo") || n.includes("confringo") || n.includes("bombarda")) {
       combatLogs?.push(`→ 🐴 Crina de Kelpie: ${defender.name} anulou o dano de fogo de ${attacker.name} (${spell?.name ?? "magia"}).`)
       return 0
     }
   }
   if (spellNorm?.includes("incendio") && defender.debuffs.some((d) => d.type === "burn")) damage *= 2
-  // Occamy: mesmo feitiço que o alvo → -25% dano
+  // Occamy: mesmo feitiço que o alvo → −25% dano por repetição acumulada (0.75^(1+n))
   if (occamyMirrorActive) {
-    damage *= 0.75
-    combatLogs?.push(`→ 🪶 Pena de Occamy: ${defender.name} espelhou o feitiço — ${attacker.name} causa −25% dano.`)
+    const layers = 1 + Math.max(0, occamyMirrorRepeat)
+    damage *= Math.pow(0.75, layers)
+    combatLogs?.push(
+      `→ 🪶 Pena de Occamy: ${defender.name} espelhou — ${attacker.name} ×${layers} penalidade de dano (${Math.round((1 - Math.pow(0.75, layers)) * 100)}% redução acumulada).`
+    )
   }
-  // Crupe: spell sem debuff → 25% de chance de x3 dano
-  if (WAND_PASSIVES[attacker.wand]?.effect === "crupe_triple" && !spell?.debuff) {
+  // Crupe: feitiços com 100% de acerto (base do grimório) → 25% chance de dano ×3
+  if (WAND_PASSIVES[attacker.wand]?.effect === "crupe_triple" && spell && spell.accuracy >= 100) {
     if (Math.random() < 0.25) {
       damage *= 3
-      combatLogs?.push(`→ 🐗 Pelo de Crupe: ${attacker.name} desferiu um golpe triplicado!`)
+      combatLogs?.push(`→ 🐗 Pelo de Crupe: ${attacker.name} desferiu um golpe triplicado (spell 100% acerto)!`)
     }
   }
-  // Cinzal: atacante foi debilitado por Cinzal do defensor → -15% dano
-  if (attacker.cinzalWeaken) damage *= 0.85
+  // Cinzal: pilhas de −15% dano (multiplicativo) no atacante
+  const cinzalStacks = attacker.cinzalWeakenStacks ?? 0
+  if (cinzalStacks > 0) damage *= Math.pow(0.85, cinzalStacks)
   if (attacker.debuffs.some((d) => d.type === "damage_amp")) damage *= 1.5
   if (attacker.debuffs.some((d) => d.type === "damage_reduce")) damage *= 0.75
   const arestumStacks = attacker.debuffs.filter((d) => d.type === "arestum_penalty").length
@@ -478,9 +515,9 @@ export function calculateTurnOutcome(params: {
       }
     }
 
-    // CENTAURO: oponente com Centauro bloqueia spells de cura
-    const centauroEnemyExists = state.some((d) => d.team !== attacker.team && !isDefeated(d.hp) && WAND_PASSIVES[d.wand]?.effect === "centauro_block_heals")
-    if (centauroEnemyExists && isSelfTargetSpell(sn)) {
+    // CENTAURO: com pelo de centauro no campo, Ferula/Episkey/Vulnera estão inutilizadas (mana 0 no início + bloqueio aqui)
+    const centauroFieldActive = state.some((d) => !isDefeated(d.hp) && WAND_PASSIVES[d.wand]?.effect === "centauro_block_heals")
+    if (centauroFieldActive && isSelfTargetSpell(sn)) {
       const nCur = normSpell(sn)
       if (nCur.includes("ferula") || nCur.includes("episkey") || (nCur.includes("vulnera") && nCur.includes("sanetur"))) {
         logs.push(`→ ${attacker.name} tentou usar ${sn}, mas está bloqueado pelo Centauro!`)
@@ -575,12 +612,21 @@ export function calculateTurnOutcome(params: {
         const dealer = state.find((d) => d.id === dealerId)
         const thornRaw = Math.round(effectiveDmg * HOUSE_GDD.hufflepuff.thornsPercent)
         const thornDmg = dealer ? capThestralIncomingDamage(dealer.wand, thornRaw) : thornRaw
-        if (thornDmg > 0) state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, thornDmg, { thestral: d.wand === "thestral" }) } : d))
+        if (thornDmg > 0) {
+          state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, thornDmg, { thestral: d.wand === "thestral" }) } : d))
+          logs.push(
+            `→ 🦡 Espinhos (Lufa-Lufa): ${dealerName} recebeu ${thornDmg} de dano reflexo após ferir ${def.name} (${thornRaw} bruto, ${Math.round(HOUSE_GDD.hufflepuff.thornsPercent * 100)}% do golpe).`
+          )
+        }
       }
-      // Cinzal: se recebeu >100 de dano, o atacante fica debilitado
+      // Cinzal: cada pacote de 100+ de dano recebido pelo portador → +1 pilha de −15% dano no atacante (acumula)
       if (WAND_PASSIVES[def.wand]?.effect === "cinzal_weaken" && dealerId !== defId && effectiveDmg > 100) {
-        state = state.map((d) => (d.id === dealerId ? { ...d, cinzalWeaken: true } : d))
-        logs.push(`→ 🪶 Pena de Cinzal: ${dealerName} foi debilitado(a) ao ferir ${def.name} — próximos ataques: −15% dano.`)
+        const prevStacks = state.find((d) => d.id === dealerId)?.cinzalWeakenStacks ?? 0
+        const nextStacks = prevStacks + 1
+        state = state.map((d) => (d.id === dealerId ? { ...d, cinzalWeakenStacks: nextStacks } : d))
+        logs.push(
+          `→ 🪶 Presa de Cinzal: ${dealerName} acumula penalidade de dano (pilha ${nextStacks}): −${Math.round((1 - Math.pow(0.85, nextStacks)) * 100)}% multiplicativo nos próximos golpes.`
+        )
       }
       if (def.debuffs.some((d) => d.type === "salvio_reflect") && dealerId !== defId && effectiveDmg > 0) {
         const dealer = state.find((d) => d.id === dealerId)
@@ -588,7 +634,9 @@ export function calculateTurnOutcome(params: {
         const refDmg = dealer ? capThestralIncomingDamage(dealer.wand, refRaw) : refRaw
         if (refDmg > 0) {
           state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, refDmg, { thestral: d.wand === "thestral" }) } : d))
-          logs.push(`→ ✨ Salvio Hexia: ${def.name} refletiu ${refDmg} de dano em ${dealerName}!`)
+          logs.push(
+            `→ ✨ Salvio Hexia (reflect): ${dealerName} recebeu ${refDmg} de dano refletido de ${def.name} (${refRaw} bruto antes do cap).`
+          )
           if (dealer && WAND_PASSIVES[dealer.wand ?? ""]?.effect === "thestral_cap300" && refRaw > refDmg) {
             logs.push(`→ 🪶 Pêlo de Testrálio: ${dealerName} limitou o reflexo a ${refDmg} (${refRaw} → cap 300).`)
           }
@@ -686,6 +734,8 @@ export function calculateTurnOutcome(params: {
         destinyBond: false,
         permanentAccBonus: undefined,
         usedPotions: [],
+        cinzalWeakenStacks: undefined,
+        occamyRepeatByTargetSpell: undefined,
       }))
     } else if (n.includes("circum")) {
       for (const t of targets) {
@@ -720,14 +770,29 @@ export function calculateTurnOutcome(params: {
       const ignoresDefense = spell.ignoresDefense === true
       for (const t of targets) {
         const streak = attacker.missStreakBySpell?.[sn] ?? 0
-        const occamyMirror = WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" &&
+        const atkLive = state.find((d) => d.id === attacker.id) ?? attacker
+        const occamyMirror = WAND_PASSIVES[atkLive.wand]?.effect === "occamy_mirror" &&
           normSpell(params.actions.find((a) => a.casterId === t.id)?.spellName ?? "") === n
-        const hit = rollHit(attacker, t, spell, streak, sn)
+        const occKey = occamyRepeatKey(t.id, n)
+        const occRepeat = occamyMirror ? (atkLive.occamyRepeatByTargetSpell?.[occKey] ?? 0) : 0
+        const hit = rollHit(atkLive, t, spell, streak, sn, occRepeat)
         if (!hit) {
+          if (WAND_PASSIVES[atkLive.wand]?.effect === "occamy_mirror") {
+            state = state.map((d) => (d.id === atkLive.id ? stripOccamyRepeatsForTarget(d, t.id) : d))
+          }
           animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: true, isCrit: false, delay: 900, damage: 0, isBlock: false, fctOnly: true })
           continue
         }
-        let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t, logs), n, spell, occamyMirror, logs)
+        let damage = calculateDamage(
+          atkLive,
+          t,
+          rollCombatPower(atkLive, spell, sn, t, logs),
+          n,
+          spell,
+          occamyMirror,
+          logs,
+          occRepeat
+        )
         // FOGO MALDITO: +50 de poder por 100 HP perdido pelo atacante
         if (n.includes("fogo") && n.includes("maldito")) {
           const lostHp = 500 - getTotalHP(attacker.hp)
@@ -748,6 +813,15 @@ export function calculateTurnOutcome(params: {
         applyDamageWithCircum(t.id, damage, attacker.id, n)
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900, damage, isBlock: bloqueadoArea, fctOnly: true })
         applySpellDebuffTo(t.id)
+        if (occamyMirror) {
+          state = state.map((d) => {
+            if (d.id !== atkLive.id) return d
+            const m = { ...(d.occamyRepeatByTargetSpell ?? {}), [occKey]: occRepeat + 1 }
+            return { ...d, occamyRepeatByTargetSpell: m }
+          })
+        } else {
+          state = state.map((d) => (d.id === atkLive.id ? stripOccamyRepeatsForTarget(d, t.id) : d))
+        }
       }
     } else {
       const ignoresDefense = spell.ignoresDefense === true
@@ -757,23 +831,30 @@ export function calculateTurnOutcome(params: {
       if (spell.special === "flagellum_multi") {
         const hitCount = Math.floor(Math.random() * 4) + 1
         let totalDmg = 0
+        const atk0 = state.find((d) => d.id === attacker.id) ?? attacker
+        const occamyMirrorFg =
+          WAND_PASSIVES[atk0.wand]?.effect === "occamy_mirror" &&
+          normSpell(params.actions.find((a) => a.casterId === target.id)?.spellName ?? "") === n
+        const occKeyFg = occamyRepeatKey(target.id, n)
+        const occRepFg = occamyMirrorFg ? (atk0.occamyRepeatByTargetSpell?.[occKeyFg] ?? 0) : 0
+        let anyLanded = false
         for (let h = 0; h < hitCount; h++) {
-          const hitRoll = rollHit(attacker, target, spell, 0)
+          const atkL = state.find((d) => d.id === attacker.id) ?? attacker
+          const hitRoll = rollHit(atkL, target, spell, 0, sn, occRepFg)
           if (!hitRoll) {
             animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 400, damage: 0, isBlock: false, fctOnly: true })
             continue
           }
-          const occamyMirrorFg =
-            WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" &&
-            normSpell(params.actions.find((a) => a.casterId === target.id)?.spellName ?? "") === n
+          anyLanded = true
           let dmg = calculateDamage(
-            attacker,
+            atkL,
             target,
-            rollCombatPower(attacker, spell, sn, target, logs),
+            rollCombatPower(atkL, spell, sn, target, logs),
             n,
             spell,
             occamyMirrorFg,
-            logs
+            logs,
+            occRepFg
           )
           const bloq = protegoBlocks(target)
           if (!bloq) dmg = ignoresDefense ? dmg : Math.max(0, dmg - (target.defense ?? 0))
@@ -784,6 +865,17 @@ export function calculateTurnOutcome(params: {
           applySpellDebuffTo(target.id)
         }
         logs.push(`→ Flagellum! ${hitCount} golpe(s) → ${totalDmg} dano total em ${target.name}!`)
+        if (occamyMirrorFg) {
+          if (anyLanded) {
+            state = state.map((d) => {
+              if (d.id !== atk0.id) return d
+              const m = { ...(d.occamyRepeatByTargetSpell ?? {}), [occKeyFg]: occRepFg + 1 }
+              return { ...d, occamyRepeatByTargetSpell: m }
+            })
+          } else {
+            state = state.map((d) => (d.id === atk0.id ? stripOccamyRepeatsForTarget(d, target.id) : d))
+          }
+        }
 
       // ── LOCOMOTOR MORTIS: devolve 25-150% do dano recebido no turno ─────────
       } else if (spell.special === "locomotor_retaliate") {
@@ -791,7 +883,9 @@ export function calculateTurnOutcome(params: {
         const dmgReceived = freshAtk?.damageReceivedThisTurn ?? 0
         const pct = Math.floor(Math.random() * 126) + 25
         let retalDmg = Math.round(dmgReceived * pct / 100)
-        if (attacker.cinzalWeaken) retalDmg = Math.round(retalDmg * 0.85)
+        const atkForCinzal = state.find((d) => d.id === attacker.id)
+        const cinzStacks = atkForCinzal?.cinzalWeakenStacks ?? 0
+        if (cinzStacks > 0) retalDmg = Math.round(retalDmg * Math.pow(0.85, cinzStacks))
         const targWand = state.find((d) => d.id === target.id)?.wand
         const retalBeforeCap = retalDmg
         retalDmg = capThestralIncomingDamage(targWand, retalDmg)
@@ -816,14 +910,29 @@ export function calculateTurnOutcome(params: {
       // ── FLUXO PADRÃO (single target) ────────────────────────────────────────
       } else {
         const streak = attacker.missStreakBySpell?.[sn] ?? 0
+        const atkLive = state.find((d) => d.id === attacker.id) ?? attacker
         // Occamy: verifica se o alvo usou o mesmo feitiço nesta rodada
-        const occamyMirror = WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" &&
+        const occamyMirror = WAND_PASSIVES[atkLive.wand]?.effect === "occamy_mirror" &&
           normSpell(params.actions.find((a) => a.casterId === target.id)?.spellName ?? "") === n
-        const hit = rollHit(attacker, target, spell, streak, sn)
+        const occKeySt = occamyRepeatKey(target.id, n)
+        const occRepeatSt = occamyMirror ? (atkLive.occamyRepeatByTargetSpell?.[occKeySt] ?? 0) : 0
+        const hit = rollHit(atkLive, target, spell, streak, sn, occRepeatSt)
+        if (!hit && WAND_PASSIVES[atkLive.wand]?.effect === "occamy_mirror") {
+          state = state.map((d) => (d.id === atkLive.id ? stripOccamyRepeatsForTarget(d, target.id) : d))
+        }
         if (hit) {
           let damage =
             getSpellMaxPower(spell) > 0
-              ? calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target, logs), n, spell, occamyMirror, logs)
+              ? calculateDamage(
+                  atkLive,
+                  target,
+                  rollCombatPower(atkLive, spell, sn, target, logs),
+                  n,
+                  spell,
+                  occamyMirror,
+                  logs,
+                  occRepeatSt
+                )
               : 0
           let isCrit = false
 
@@ -909,7 +1018,7 @@ export function calculateTurnOutcome(params: {
             for (let hi = 0; hi < extras; hi++) {
               const atkFresh = state.find((d) => d.id === attacker.id) ?? atkNow
               const tgtFresh = state.find((d) => d.id === target.id) ?? target
-              if (!rollHit(atkFresh, tgtFresh, spell, 0, sn)) {
+              if (!rollHit(atkFresh, tgtFresh, spell, 0, sn, occRepeatSt)) {
                 animationsToPlay.push({
                   type: "cast",
                   casterId: attacker.id,
@@ -931,7 +1040,8 @@ export function calculateTurnOutcome(params: {
                 n,
                 spell,
                 occamyMirror,
-                logs
+                logs,
+                occRepeatSt
               )
               const exBloq = protegoBlocks(tgtFresh)
               if (exBloq) exDmg = 0
@@ -957,7 +1067,9 @@ export function calculateTurnOutcome(params: {
           // AQUA ERUCTO: +25 dano por debuff no atacante; limpa BURN próprio
           if (n.includes("aqua") && n.includes("eructo")) {
             let debuffBonus = attacker.debuffs.length * 25
-            if (attacker.cinzalWeaken) debuffBonus = Math.round(debuffBonus * 0.85)
+            const atkAqua = state.find((d) => d.id === attacker.id)
+            const aqStacks = atkAqua?.cinzalWeakenStacks ?? 0
+            if (aqStacks > 0) debuffBonus = Math.round(debuffBonus * Math.pow(0.85, aqStacks))
             if (debuffBonus > 0 && !bloqueado) {
               applyDamageWithCircum(target.id, debuffBonus, attacker.id, n)
               logs.push(`→ Aqua Eructo: +${debuffBonus} dano (${attacker.debuffs.length} debuffs no usuário)!`)
@@ -1049,7 +1161,9 @@ export function calculateTurnOutcome(params: {
               if (targetSpells.length > 0) {
                 const removedSpell = targetSpells[Math.floor(Math.random() * targetSpells.length)]
                 const existingSet = new Set(targetSpells)
-                const available = params.spellDatabase.filter((s) => !existingSet.has(s.name) && !(s as any).isVipOnly && (s.power ?? s.powerMin ?? 0) >= 0)
+                let available = params.spellDatabase.filter((s) => !existingSet.has(s.name) && !(s as { isVipOnly?: boolean }).isVipOnly)
+                if (available.length === 0) available = params.spellDatabase.filter((s) => !existingSet.has(s.name))
+                if (available.length === 0) available = params.spellDatabase.filter((s) => s.name !== removedSpell)
                 if (available.length > 0) {
                   const newSpell = available[Math.floor(Math.random() * available.length)]
                   state = state.map((d) => {
@@ -1060,6 +1174,8 @@ export function calculateTurnOutcome(params: {
                     return { ...d, spellMana: newSm }
                   })
                   logs.push(`→ Expulso! ${attacker.name} substituiu "${removedSpell}" de ${target.name} por "${newSpell.name}"!`)
+                } else {
+                  logs.push(`→ Expulso: não foi possível escolher substituto para "${removedSpell}" (grimório cheio?).`)
                 }
               }
             }
@@ -1075,6 +1191,17 @@ export function calculateTurnOutcome(params: {
             } else {
               logs.push(`→ Flagrate: ${target.name} não possui passiva de núcleo ativa.`)
             }
+          }
+
+          // Occamy: uma “repetição” por lançamento acertado (Vermillious/Flagellum não somam várias no mesmo turno)
+          if (occamyMirror) {
+            state = state.map((d) => {
+              if (d.id !== atkLive.id) return d
+              const m = { ...(d.occamyRepeatByTargetSpell ?? {}), [occKeySt]: occRepeatSt + 1 }
+              return { ...d, occamyRepeatByTargetSpell: m }
+            })
+          } else {
+            state = state.map((d) => (d.id === atkLive.id ? stripOccamyRepeatsForTarget(d, target.id) : d))
           }
         } else if (spell.special === "avada_miss_hp" && n.includes("avada")) {
           state = state.map((d) => {

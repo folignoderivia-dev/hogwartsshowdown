@@ -83,8 +83,10 @@ export interface Duelist {
   usedPotions?: string[]
   /** Bônus permanente de acurácia (Poção Foco) */
   permanentAccBonus?: number
-  /** Aplicado pela Presa de Cinzal: próximos ataques causam 15% menos dano */
-  cinzalWeaken?: boolean
+  /** Presa de Cinzal: cada vez que o jogador causa 100+ de dano a um portador, +1 pilha (−15% dano multiplicativo por pilha). */
+  cinzalWeakenStacks?: number
+  /** Pena de Occamy (atacante): repetições do mesmo feitiço espelhado contra o mesmo alvo acumulam penalidade. Chave `alvoId|spellNorm`. */
+  occamyRepeatByTargetSpell?: Record<string, number>
 }
 
 export type Point = { x: number; y: number }

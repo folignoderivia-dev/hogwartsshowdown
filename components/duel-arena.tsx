@@ -847,19 +847,17 @@ const DuelArena = (
   }, [])
 
   const applyCentauroBlock = useCallback((state: Duelist[]) => {
-    let next = [...state]
-    // Centauro: bloqueia spells de cura dos oponentes no início da batalha
-    const centauros = next.filter((d) => WAND_PASSIVES[d.wand]?.effect === "centauro_block_heals")
-    for (const centauro of centauros) {
-      const foes = next.filter((d) => d.team !== centauro.team)
-      for (const foe of foes) {
-        const healSpells = ["Ferula", "Episkey", "Vulnera Sanetur"]
-        const nextDisabled = { ...(foe.disabledSpells || {}) }
-        healSpells.forEach((s) => { if (foe.spells.includes(s)) nextDisabled[s] = 999 })
-        next = next.map((d) => (d.id === foe.id ? { ...d, disabledSpells: nextDisabled } : d))
+    const hasCentauro = state.some((d) => WAND_PASSIVES[d.wand]?.effect === "centauro_block_heals")
+    if (!hasCentauro) return state
+    const healSpells = ["Ferula", "Episkey", "Vulnera Sanetur"] as const
+    return state.map((d) => {
+      if (!d.spellMana) return d
+      const sm = { ...d.spellMana }
+      for (const s of healSpells) {
+        if (sm[s]) sm[s] = { ...sm[s], current: 0 }
       }
-    }
-    return next
+      return { ...d, spellMana: sm }
+    })
   }, [])
 
   const beginRoundSelection = (state: Duelist[] = duelists) => {

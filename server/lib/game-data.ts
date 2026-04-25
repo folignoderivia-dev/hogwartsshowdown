@@ -24,15 +24,15 @@ export const WAND_PASSIVES: Record<string, { name: string; description: string; 
   thestral:    { name: "Pelo de Testrálio",         description: "Dano único máximo: 300",                                effect: "thestral_cap300" },
   basilisk:    { name: "Presa de Basilisco",        description: "+20% chance de aplicar debuffs",                        effect: "basilisk_debuff_chance" },
   thunderbird: { name: "Pena de Pássaro Trovão",   description: "+1 Prioridade global",                                  effect: "thunder_priority" },
-  occamy:      { name: "Pena de Occamy",            description: "Mesmo feitiço que o alvo: -25% Dano e -10% Acc no alvo", effect: "occamy_mirror" },
-  kelpie:      { name: "Crina de Kelpie",           description: "Imune a Incêndio, Confringo e Bombarda",               effect: "kelpie_fire_immune" },
+  occamy:      { name: "Pena de Occamy",            description: "Espelho ativo: mesmo feitiço que o alvo — −25% dano por repetição (acumula) e −10% acc por camada", effect: "occamy_mirror" },
+  kelpie:      { name: "Crina de Kelpie",           description: "Imune a dano de Incêndio, Confringo/Confrigo e Bombarda", effect: "kelpie_fire_immune" },
   acromantula: { name: "Pelo de Acromântula",       description: "+25 dano empilhável por turno completo",               effect: "acromantula_power_stack" },
   rapinomonio: { name: "Pele de Rapinomônio",       description: "Início: 1 spell aleatória de cada duelista com mana 0", effect: "rapinomonio_drain_start" },
   // ── Núcleos Novos ─────────────────────────────────────────────────────────
   veela:       { name: "Cabelo de Veela",           description: "Penalidade aleatória de Acc (0-25%) / Imune a críticos", effect: "veela_acc_penalty" },
-  crupe:       { name: "Pelo de Crupe",             description: "Spells sem efeito: chance de dano x3",                 effect: "crupe_triple" },
-  cinzal:      { name: "Presa de Cinzal",           description: "Se receber >100 dmg: -15% poder das spells inimigas",  effect: "cinzal_weaken" },
-  centauro:    { name: "Pelo de Centauro",           description: "Oponente não pode usar Ferula, Episkey ou Vulnera Sanetur", effect: "centauro_block_heals" },
+  crupe:       { name: "Pelo de Crupe",             description: "Feitiços com 100% de acerto no grimório: 25% chance de dano ×3", effect: "crupe_triple" },
+  cinzal:      { name: "Presa de Cinzal",           description: "Cada golpe de 100+ de dano recebido: atacante acumula −15% dano (multiplicativo)", effect: "cinzal_weaken" },
+  centauro:    { name: "Pelo de Centauro",           description: "Com Centauro no campo: Ferula, Episkey e Vulnera Sanetur ficam com mana 0 para todos os duelistas", effect: "centauro_block_heals" },
   hippogriff:  { name: "Pena de Hipogrifo",          description: "Imunidade total a MARCA e BOMBA",                     effect: "hippogriff_immune_mark_bomb" },
 }
 
