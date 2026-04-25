@@ -928,11 +928,11 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             {/* Barra de meta */}
             <div className="mt-3 rounded border border-amber-700/50 bg-stone-800/80 p-2">
-              <p className="text-xs font-semibold text-amber-300">☕ Meta do Servidor: R$ {metaCurrent} / R$ {metaObjetivo}</p>
+              <p className="text-xs font-semibold text-amber-300">☕ Meta do Servidor: R$ {arrecadado} / R$ {metaObjetivo}</p>
               <div className="mt-1 h-2 rounded-full bg-stone-700">
                 <div
                   className="h-2 rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
-                  style={{ width: `${Math.min(100, (metaCurrent / metaObjetivo) * 100)}%` }}
+                  style={{ width: `${Math.min(100, (arrecadado / metaObjetivo) * 100)}%` }}
                 ></div>
               </div>
             </div>
