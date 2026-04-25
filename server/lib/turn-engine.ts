@@ -33,6 +33,8 @@ export interface EngineAnimation {
   isBlock?: boolean
   /** Se true, o cliente deve pular o VFX e apenas exibir o FCT (floating combat text). */
   fctOnly?: boolean
+  /** Texto explícito no FCT (ex.: feitiço sem dano, buff). */
+  fctMessage?: string
   /** Chave da poção usada (ex: "wiggenweld", "foco"), para exibir nome correto no FCT. */
   potionType?: string
 }
@@ -48,6 +50,17 @@ export interface TurnOutcome {
 }
 
 export const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
+
+/** Garante substituto para Expulso: nome ainda livre após remoção, preferindo feitiços não-VIP. */
+function pickExpulsoReplacementSpell(remainingHandKeys: string[], database: SpellInfo[]): SpellInfo {
+  const used = new Set(remainingHandKeys)
+  const poolAll = database.filter((s) => !used.has(s.name))
+  const nonVip = poolAll.filter((s) => !s.isVipOnly)
+  const pool = nonVip.length > 0 ? nonVip : poolAll
+  if (pool.length > 0) return pool[Math.floor(Math.random() * pool.length)]!
+  return database[0]!
+}
+
 export const getTotalHP = (hp: HPState) => hp.bars.reduce((sum, value) => sum + value, 0)
 export const isDefeated = (hp: HPState) => getTotalHP(hp) <= 0
 export const getSpellInfo = (name: string, spellDatabase: SpellInfo[]) => spellDatabase.find((s) => s.name === name)
@@ -234,10 +247,10 @@ const calculateDamage = (
       `→ 🪶 Pena de Occamy: ${defender.name} espelhou — ${attacker.name} ×${layers} penalidade de dano (${Math.round((1 - Math.pow(0.75, layers)) * 100)}% redução acumulada).`
     )
   }
-  if (WAND_PASSIVES[attacker.wand]?.effect === "crupe_triple" && spell && spell.accuracy >= 100) {
+  if (WAND_PASSIVES[attacker.wand]?.effect === "crupe_triple" && spell && !spell.debuff) {
     if (Math.random() < 0.25) {
       damage *= 3
-      combatLogs?.push(`→ 🐗 Pelo de Crupe: ${attacker.name} desferiu um golpe triplicado (spell 100% acerto)!`)
+      combatLogs?.push(`→ 🐗 Pelo de Crupe: ${attacker.name} desferiu um golpe triplicado!`)
     }
   }
   const cinzalStacks = attacker.cinzalWeakenStacks ?? 0
@@ -392,6 +405,14 @@ export function calculateTurnOutcome(params: {
       // USO ÚNICO: rejeita se a poção já foi usada nesta batalha
       if (attacker.usedPotions?.includes(potKey)) {
         logs.push(`→ ${attacker.name} já usou a poção (${potKey}) nesta batalha!`)
+        animationsToPlay.push({
+          type: "cast",
+          casterId: attacker.id,
+          targetId: attacker.id,
+          fctOnly: true,
+          delay: 400,
+          fctMessage: "Poção já usada",
+        })
         continue
       }
       // Marca a poção como usada
@@ -517,12 +538,34 @@ export function calculateTurnOutcome(params: {
 
     const sn = action.spellName || ""
     const spell = getSpellInfo(sn, params.spellDatabase)
-    if (!spell) continue
+    if (!spell) {
+      animationsToPlay.push({
+        type: "cast",
+        casterId: attacker.id,
+        spellName: sn,
+        targetId: attacker.id,
+        isMiss: true,
+        fctOnly: true,
+        delay: 500,
+        fctMessage: "Feitiço desconhecido",
+      })
+      continue
+    }
     const n = normSpell(sn)
 
     const cannotAct = attacker.debuffs.some((d) => d.type === "stun" || d.type === "freeze")
     if (cannotAct) {
       logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} está impossibilitado de agir!`)
+      animationsToPlay.push({
+        type: "cast",
+        casterId: attacker.id,
+        spellName: sn,
+        targetId: attacker.id,
+        isMiss: true,
+        fctOnly: true,
+        delay: 500,
+        fctMessage: "Atordoado / Congelado",
+      })
       continue
     }
 
@@ -530,6 +573,16 @@ export function calculateTurnOutcome(params: {
     if (attacker.debuffs.some((d) => d.type === "taunt") && attacker.lastSpellUsed && action.type === "cast") {
       if (normSpell(sn) !== normSpell(attacker.lastSpellUsed)) {
         logs.push(`→ ${attacker.name} está sob Imperio! Somente "${attacker.lastSpellUsed}" pode ser lançado (tentou: ${sn}).`)
+        animationsToPlay.push({
+          type: "cast",
+          casterId: attacker.id,
+          spellName: sn,
+          targetId: attacker.id,
+          isMiss: true,
+          fctOnly: true,
+          delay: 500,
+          fctMessage: "Imperio!",
+        })
         continue
       }
     }
@@ -540,6 +593,16 @@ export function calculateTurnOutcome(params: {
       const nCur = normSpell(sn)
       if (nCur.includes("ferula") || nCur.includes("episkey") || (nCur.includes("vulnera") && nCur.includes("sanetur"))) {
         logs.push(`→ ${attacker.name} tentou usar ${sn}, mas está bloqueado pelo Centauro!`)
+        animationsToPlay.push({
+          type: "cast",
+          casterId: attacker.id,
+          spellName: sn,
+          targetId: attacker.id,
+          isMiss: true,
+          fctOnly: true,
+          delay: 500,
+          fctMessage: "Bloqueado (Centauro)",
+        })
         continue
       }
     }
@@ -558,9 +621,33 @@ export function calculateTurnOutcome(params: {
       const t = state.find((d) => d.id === action.targetId)
       if (t && !isDefeated(t.hp)) targets = [t]
     }
-    if (targets.length === 0) continue
+    if (targets.length === 0) {
+      animationsToPlay.push({
+        type: "cast",
+        casterId: attacker.id,
+        spellName: sn,
+        isMiss: true,
+        fctOnly: true,
+        delay: 500,
+        fctMessage: "Sem alvo válido",
+      })
+      continue
+    }
 
     animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetIds: targets.map((t) => t.id), targetId: targets[0]?.id, delay: 1200 })
+    if (isSelfTargetSpell(sn)) {
+      animationsToPlay.push({
+        type: "cast",
+        casterId: attacker.id,
+        spellName: sn,
+        targetId: attacker.id,
+        targetIds: [attacker.id],
+        fctOnly: true,
+        delay: 400,
+        damage: 0,
+        fctMessage: `✨ ${sn}`,
+      })
+    }
     logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} lançou ${sn}${isAreaSpell(sn) ? " em área" : ` em ${targets[0].name}`}!`)
 
     const protegoBlocks = (def: Duelist) => {
@@ -1195,30 +1282,24 @@ export function calculateTurnOutcome(params: {
             logs.push(`🔍 Revele seus Segredos! Núcleo de ${target.name}: ${passive?.name ?? "Desconhecido"} — ${passive?.description ?? ""}`)
           }
 
-          // EXPULSO: substitui 1 spell aleatória do alvo por outra do grimório
+          // EXPULSO: remove 1 spell e insere outra imediatamente (sem “buraco” em spellMana/spells)
           if (spell.special === "expulso_swap" && !bloqueado) {
             const freshTarget = state.find((d) => d.id === target.id)
             if (freshTarget?.spellMana) {
               const targetSpells = Object.keys(freshTarget.spellMana)
               if (targetSpells.length > 0) {
                 const removedSpell = targetSpells[Math.floor(Math.random() * targetSpells.length)]
-                const existingSet = new Set(targetSpells)
-                let available = params.spellDatabase.filter((s) => !existingSet.has(s.name) && !(s as { isVipOnly?: boolean }).isVipOnly)
-                if (available.length === 0) available = params.spellDatabase.filter((s) => !existingSet.has(s.name))
-                if (available.length === 0) available = params.spellDatabase.filter((s) => s.name !== removedSpell)
-                if (available.length > 0) {
-                  const newSpell = available[Math.floor(Math.random() * available.length)]
-                  state = state.map((d) => {
-                    if (d.id !== target.id) return d
-                    const newSm = { ...(d.spellMana ?? {}) }
-                    delete newSm[removedSpell]
-                    newSm[newSpell.name] = { current: newSpell.pp, max: newSpell.pp }
-                    return { ...d, spellMana: newSm }
-                  })
-                  logs.push(`→ Expulso! ${attacker.name} substituiu "${removedSpell}" de ${target.name} por "${newSpell.name}"!`)
-                } else {
-                  logs.push(`→ Expulso: não foi possível escolher substituto para "${removedSpell}" (grimório cheio?).`)
-                }
+                const remainingKeys = targetSpells.filter((k) => k !== removedSpell)
+                const newSpell = pickExpulsoReplacementSpell(remainingKeys, params.spellDatabase)
+                state = state.map((d) => {
+                  if (d.id !== target.id) return d
+                  const newSm = { ...(d.spellMana ?? {}) }
+                  delete newSm[removedSpell]
+                  newSm[newSpell.name] = { current: newSpell.pp, max: newSpell.pp }
+                  const keys = Object.keys(newSm).sort((a, b) => a.localeCompare(b))
+                  return { ...d, spellMana: newSm, spells: keys }
+                })
+                logs.push(`→ Expulso! ${attacker.name} substituiu "${removedSpell}" de ${target.name} por "${newSpell.name}"!`)
               }
             }
           }

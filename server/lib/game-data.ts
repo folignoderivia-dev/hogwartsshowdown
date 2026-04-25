@@ -30,7 +30,7 @@ export const WAND_PASSIVES: Record<string, { name: string; description: string; 
   rapinomonio: { name: "Pele de Rapinomônio",       description: "Início: 1 spell aleatória de cada duelista com mana 0", effect: "rapinomonio_drain_start" },
   // ── Núcleos Novos ─────────────────────────────────────────────────────────
   veela:       { name: "Cabelo de Veela",           description: "Penalidade aleatória de Acc (0-25%) / Imune a críticos", effect: "veela_acc_penalty" },
-  crupe:       { name: "Pelo de Crupe",             description: "Feitiços com 100% de acerto no grimório: 25% chance de dano ×3", effect: "crupe_triple" },
+  crupe:       { name: "Pelo de Crupe",             description: "Feitiços sem debuff/efeito de status: 25% chance de dano ×3", effect: "crupe_triple" },
   cinzal:      { name: "Presa de Cinzal",           description: "Cada golpe de 100+ de dano recebido: atacante acumula −15% dano (multiplicativo)", effect: "cinzal_weaken" },
   centauro:    { name: "Pelo de Centauro",           description: "Com Centauro no campo: Ferula, Episkey e Vulnera Sanetur ficam com mana 0 para todos os duelistas", effect: "centauro_block_heals" },
   hippogriff:  { name: "Pena de Hipogrifo",          description: "Imunidade total a MARCA e BOMBA",                     effect: "hippogriff_immune_mark_bomb" },

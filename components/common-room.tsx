@@ -75,7 +75,7 @@ const WAND_CORES = [
   { value: "rapinomonio", label: "Pele de Rapinomônio",     desc: "Início: 1 spell de cada duelista começa com 0 mana", icon: AlertTriangle },
   // Núcleos novos
   { value: "veela",       label: "Cabelo de Veela",         desc: "Acc do atacante reduzida 0-25% aleatório; imune a críticos", icon: Shield },
-  { value: "crupe",       label: "Pelo de Crupe",           desc: "Spells 100% acerto: 25% chance dano ×3",         icon: Zap },
+  { value: "crupe",       label: "Pelo de Crupe",           desc: "Feitiços sem debuff: 25% chance dano ×3",         icon: Zap },
   { value: "cinzal",      label: "Presa de Cinzal",         desc: "Cada 100+ dmg recebido: atacante acumula −15% dano", icon: AlertTriangle },
   { value: "centauro",    label: "Pelo de Centauro",         desc: "No campo: Ferula/Episkey/Vulnera com mana 0 para todos", icon: Wind },
   { value: "hippogriff",  label: "Pena de Hipogrifo",       desc: "Imunidade total a MARCA e BOMBA",               icon: Shield },
@@ -331,7 +331,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const isVip = currentUser?.isVip ?? false
 
   const PIX_KEY = "guilhermefoligno@gmail.com"
-  const META_GOAL = 10
+  const META_GOAL = 60
   const META_CURRENT = 0
 
   const handlePixCopy = () => {
@@ -758,9 +758,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             {/* Barra de meta */}
             <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-amber-300">☕ Meta para Servidor Próprio — R$ {META_GOAL}</p>
-                <span className="text-[10px] text-amber-500">R$ {META_CURRENT}/{META_GOAL}</span>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-amber-300">☕ Meta do Servidor: R$ {META_CURRENT} / R$ {META_GOAL}</p>
               </div>
               <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-stone-700">
                 <div

@@ -647,9 +647,14 @@ const DuelArena = (
   const getFCTFromAnim = useCallback(
     (anim: EngineAnimation): { text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" } | null => {
       const spell = anim.spellName ? `${anim.spellName} ` : ""
+      if (anim.fctMessage) return { text: anim.fctMessage, type: anim.isMiss ? "miss" : "heal" }
       if (anim.isMiss) return { text: `${spell}ERROU!`, type: "miss" }
       if (anim.isBlock) return { text: `${spell}🛡 BLOQUEADO!`, type: "block" }
-      if (!anim.damage || anim.damage <= 0) return null
+      const dmg = anim.damage ?? 0
+      if (dmg <= 0) {
+        if (anim.fctOnly) return { text: `${spell}✨`, type: "heal" }
+        return null
+      }
       if (anim.isCrit) return { text: `${spell}${anim.damage} 💥 CRÍTICO!`, type: "crit" }
       return { text: `${spell}-${anim.damage}`, type: "damage" }
     },
@@ -716,6 +721,10 @@ const DuelArena = (
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const player = duelists.find((d) => d.id === selfDuelistId)
+  const handSpellList =
+    player?.spellMana && Object.keys(player.spellMana).length > 0
+      ? Object.keys(player.spellMana).sort((a, b) => a.localeCompare(b))
+      : playerBuild.spells
   const playerDefeated = !player || isDefeated(player.hp)
   const playerCannotAct = !!player?.debuffs.some((d) => d.type === "stun" || d.type === "freeze")
   const expectedOnlinePlayers =
@@ -1137,8 +1146,13 @@ const DuelArena = (
             await playSpellVfx(anim.spellName, caster, targets)
           }
 
-          // FCT: aparece para cada alvo com info de dano real (pushes fctOnly)
-          const fctTargets = targets.length > 0 ? targets : []
+          // FCT: cada alvo; fallback para targetId / caster se o snapshot ainda não tiver a lista
+          let fctTargets = targets.length > 0 ? targets : []
+          if (fctTargets.length === 0 && anim.targetId) {
+            const t = stateSnapshot.find((d) => d.id === anim.targetId)
+            if (t) fctTargets = [t]
+          }
+          if (fctTargets.length === 0 && anim.fctMessage && caster) fctTargets = [caster]
           for (const t of fctTargets) {
             const fctData = getFCTFromAnim(anim)
             if (!fctData) continue
@@ -2079,7 +2093,7 @@ const DuelArena = (
 
           {!isReadOnlySpectator && !playerDefeated && (isOnlineMatch ? !awaitingServerAck : !selfDuelistId || !pendingActions[selfDuelistId]) && (
             <div className="mb-2 flex flex-wrap gap-2">
-              {playerBuild.spells.map((spell) => {
+              {handSpellList.map((spell) => {
                 const mana = player?.spellMana?.[spell]
                 const info = getSpellInfo(spell, SPELL_DATABASE)
                 const tauntLock = player?.debuffs.some((d) => d.type === "taunt") && player?.lastSpellUsed
