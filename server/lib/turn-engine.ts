@@ -167,19 +167,36 @@ const rollHit = (attacker: Duelist, defender: Duelist, spell: SpellInfo, missStr
   return Math.random() * 100 <= finalAcc
 }
 
-const calculateDamage = (attacker: Duelist, defender: Duelist, base: number, spellNorm?: string, spell?: SpellInfo, occamyMirrorActive?: boolean) => {
+const calculateDamage = (
+  attacker: Duelist,
+  defender: Duelist,
+  base: number,
+  spellNorm?: string,
+  spell?: SpellInfo,
+  occamyMirrorActive?: boolean,
+  combatLogs?: string[]
+) => {
   let damage = base
   // Kelpie: imune a Incêndio, Confringo e Bombarda
   if (spellNorm && WAND_PASSIVES[defender.wand]?.effect === "kelpie_fire_immune") {
     const n = spellNorm
-    if (n.includes("incendio") || n.includes("confrigo") || n.includes("bombarda")) return 0
+    if (n.includes("incendio") || n.includes("confrigo") || n.includes("bombarda")) {
+      combatLogs?.push(`→ 🐴 Crina de Kelpie: ${defender.name} anulou o dano de fogo de ${attacker.name} (${spell?.name ?? "magia"}).`)
+      return 0
+    }
   }
   if (spellNorm?.includes("incendio") && defender.debuffs.some((d) => d.type === "burn")) damage *= 2
   // Occamy: mesmo feitiço que o alvo → -25% dano
-  if (occamyMirrorActive) damage *= 0.75
+  if (occamyMirrorActive) {
+    damage *= 0.75
+    combatLogs?.push(`→ 🪶 Pena de Occamy: ${defender.name} espelhou o feitiço — ${attacker.name} causa −25% dano.`)
+  }
   // Crupe: spell sem debuff → 25% de chance de x3 dano
   if (WAND_PASSIVES[attacker.wand]?.effect === "crupe_triple" && !spell?.debuff) {
-    if (Math.random() < 0.25) damage *= 3
+    if (Math.random() < 0.25) {
+      damage *= 3
+      combatLogs?.push(`→ 🐗 Pelo de Crupe: ${attacker.name} desferiu um golpe triplicado!`)
+    }
   }
   // Cinzal: atacante foi debilitado por Cinzal do defensor → -15% dano
   if (attacker.cinzalWeaken) damage *= 0.85
@@ -210,7 +227,7 @@ const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: st
   return Math.min(0.95, c)
 }
 
-const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target: Duelist | null): number => {
+const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target: Duelist | null, combatLogs?: string[]): number => {
   const n = normSpell(sn)
   // Diffindo: 100 de dano se alvo tiver Protego ativo (o spell ainda ignora o Protego)
   if (n.includes("diffindo") && target?.debuffs.some((d) => d.type === "protego")) return 100
@@ -219,7 +236,12 @@ const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target
   if (attacker.maximosChargePct) base *= 1 + attacker.maximosChargePct / 100
   // Acromântula: +25 dano por turno completo (atualizado de +20)
   if (WAND_PASSIVES[attacker.wand]?.effect === "acromantula_power_stack") {
-    base += (attacker.turnsInBattle ?? 0) * 25
+    const add = (attacker.turnsInBattle ?? 0) * 25
+    base += add
+    if (add > 0 && combatLogs) {
+      const msg = `→ 🕷 Pelo de Acromântula: ${attacker.name} soma +${add} de poder (${attacker.turnsInBattle} turno(s) em campo).`
+      if (combatLogs[combatLogs.length - 1] !== msg) combatLogs.push(msg)
+    }
   }
   return Math.round(base)
 }
@@ -522,7 +544,12 @@ export function calculateTurnOutcome(params: {
       if (before?.debuffs.some((d) => d.type === "immunity")) return
       // Hipogrifo: imune total a MARCA e BOMBA
       if (WAND_PASSIVES[before?.wand ?? ""]?.effect === "hippogriff_immune_mark_bomb") {
-        if (spell.debuff.type === "mark" || spell.debuff.type === "bomba") return
+        if (spell.debuff.type === "mark" || spell.debuff.type === "bomba") {
+          logs.push(
+            `→ 🪶 Pena de Hipogrifo: ${before.name} bloqueou ${spell.debuff.type === "mark" ? "Marca" : "Bomba"} de ${attacker.name}.`
+          )
+          return
+        }
       }
       // Basilisco: +20% chance de aplicar debuffs (multiplicador)
       const chanceMultiplier = WAND_PASSIVES[attacker.wand]?.effect === "basilisk_debuff_chance" ? 1.2 : 1
@@ -536,6 +563,9 @@ export function calculateTurnOutcome(params: {
             ? { ...d, debuffs: [...d.debuffs, { type: spell.debuff!.type as DebuffType, duration: dur, meta, irremovable }] }
             : d
         )
+        if (chanceMultiplier > 1) {
+          logs.push(`→ 🐍 Presa de Basilisco: ${attacker.name} aplicou o debuff com bônus de chance!`)
+        }
       }
     }
 
@@ -551,11 +581,19 @@ export function calculateTurnOutcome(params: {
     const applyDamageWithCircum = (defId: string, dmg: number, dealerId: string, sourceSpellNorm?: string) => {
       const def = state.find((d) => d.id === defId)
       if (!def) return
+      const dealerName = state.find((d) => d.id === dealerId)?.name ?? dealerId
       let effectiveDmg = capThestralIncomingDamage(def.wand, dmg)
+      if (WAND_PASSIVES[def.wand ?? ""]?.effect === "thestral_cap300" && dmg > effectiveDmg) {
+        logs.push(`→ 🪶 Pêlo de Testrálio: ${def.name} limitou o golpe de ${dealerName} a ${effectiveDmg} (${dmg} → cap 300).`)
+      }
       // UNDEAD: HP não pode cair abaixo de 1 neste turno
       if (def.debuffs.some((x) => x.type === "undead")) {
         const totalHp = getTotalHP(def.hp)
+        const beforeUndead = effectiveDmg
         effectiveDmg = Math.max(0, Math.min(effectiveDmg, totalHp - 1))
+        if (beforeUndead > effectiveDmg) {
+          logs.push(`→ 🧟 Morto-vivo: ${def.name} não cai abaixo de 1 HP neste turno (${beforeUndead} → ${effectiveDmg} recebido).`)
+        }
       }
       state = state.map((d) =>
         d.id === defId
@@ -572,13 +610,19 @@ export function calculateTurnOutcome(params: {
       // Cinzal: se recebeu > 100 de dano, o atacante fica debilitado (-15% dano futuros)
       if (WAND_PASSIVES[def.wand]?.effect === "cinzal_weaken" && dealerId !== defId && effectiveDmg > 100) {
         state = state.map((d) => (d.id === dealerId ? { ...d, cinzalWeaken: true } : d))
-        logs.push(`→ Cinzal: ${dealerId} foi debilitado! Próximos ataques causam 15% menos dano.`)
+        logs.push(`→ 🪶 Pena de Cinzal: ${dealerName} foi debilitado(a) ao ferir ${def.name} — próximos ataques: −15% dano.`)
       }
       if (def.debuffs.some((d) => d.type === "salvio_reflect") && dealerId !== defId && effectiveDmg > 0) {
         const dealer = state.find((d) => d.id === dealerId)
         const refRaw = Math.round(effectiveDmg)
         const refDmg = dealer ? capThestralIncomingDamage(dealer.wand, refRaw) : refRaw
-        if (refDmg > 0) state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, refDmg, { thestral: d.wand === "thestral" }) } : d))
+        if (refDmg > 0) {
+          state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, refDmg, { thestral: d.wand === "thestral" }) } : d))
+          logs.push(`→ ✨ Salvio Hexia: ${def.name} refletiu ${refDmg} de dano em ${dealerName}!`)
+          if (dealer && WAND_PASSIVES[dealer.wand ?? ""]?.effect === "thestral_cap300" && refRaw > refDmg) {
+            logs.push(`→ 🪶 Pêlo de Testrálio: ${dealerName} limitou o reflexo a ${refDmg} (${refRaw} → cap 300).`)
+          }
+        }
       }
       const circumOn = (def.circumAura ?? 0) > 0 || (params.circumFlames[defId] ?? 0) > 0
       if (circumOn && dealerId !== defId) {
@@ -716,7 +760,7 @@ export function calculateTurnOutcome(params: {
           logs.push(`→ ${attacker.name} errou ${sn} em ${t.name}!`)
           continue
         }
-        let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t), n, spell, occamyMirror)
+        let damage = calculateDamage(attacker, t, rollCombatPower(attacker, spell, sn, t, logs), n, spell, occamyMirror, logs)
         // FOGO MALDITO: +50 de poder por 100 HP perdido pelo atacante
         if (n.includes("fogo") && n.includes("maldito")) {
           const lostHp = 500 - getTotalHP(attacker.hp)
@@ -735,9 +779,9 @@ export function calculateTurnOutcome(params: {
           logs.push(`→ ${sn} foi bloqueado pelo Protego de ${t.name}!`)
         } else {
           if (!piercesDefense) damage = Math.max(0, damage - (t.defense ?? 0))
-          // Dano mínimo garantido de 25 para spells de área não bloqueadas
-          if (getSpellMaxPower(spell) > 0 && damage < 25) damage = 25
-          if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${t.name}!${occamyMirror ? " (Occamy mirror!)" : ""}`)
+          // Dano mínimo garantido de 25 para spells de área não bloqueadas (não aplica a imunidade 0, ex. Kelpie)
+          if (damage > 0 && getSpellMaxPower(spell) > 0 && damage < 25) damage = 25
+          if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${t.name}!`)
         }
         applyDamageWithCircum(t.id, damage, attacker.id, n)
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: t.id, isMiss: false, isCrit, delay: 900, damage, isBlock: bloqueadoArea, fctOnly: true })
@@ -757,7 +801,18 @@ export function calculateTurnOutcome(params: {
             animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: true, isCrit: false, delay: 400, damage: 0, isBlock: false, fctOnly: true })
             continue
           }
-          let dmg = calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n)
+          const occamyMirrorFg =
+            WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" &&
+            normSpell(params.actions.find((a) => a.casterId === target.id)?.spellName ?? "") === n
+          let dmg = calculateDamage(
+            attacker,
+            target,
+            rollCombatPower(attacker, spell, sn, target, logs),
+            n,
+            spell,
+            occamyMirrorFg,
+            logs
+          )
           const bloq = protegoBlocks(target)
           if (!bloq) dmg = ignoresDefense ? dmg : Math.max(0, dmg - (target.defense ?? 0))
           else dmg = 0
@@ -776,7 +831,13 @@ export function calculateTurnOutcome(params: {
         let retalDmg = Math.round(dmgReceived * pct / 100)
         if (attacker.cinzalWeaken) retalDmg = Math.round(retalDmg * 0.85)
         const targWand = state.find((d) => d.id === target.id)?.wand
+        const retalBeforeCap = retalDmg
         retalDmg = capThestralIncomingDamage(targWand, retalDmg)
+        if (WAND_PASSIVES[targWand ?? ""]?.effect === "thestral_cap300" && retalBeforeCap > retalDmg) {
+          logs.push(
+            `→ 🪶 Pêlo de Testrálio: ${target.name} limitou o Locomotor Mortis a ${retalDmg} (${retalBeforeCap} → cap 300).`
+          )
+        }
         const bloq = protegoBlocks(target)
         if (retalDmg > 0 && !bloq) {
           // ignoreBuffs: aplica dano direto sem defesa nem modifiers
@@ -799,7 +860,10 @@ export function calculateTurnOutcome(params: {
           normSpell(params.actions.find(a => a.casterId === target.id)?.spellName ?? "") === n
         const hit = rollHit(attacker, target, spell, streak, sn)
         if (hit) {
-          let damage = getSpellMaxPower(spell) > 0 ? calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target), n, spell, occamyMirror) : 0
+          let damage =
+            getSpellMaxPower(spell) > 0
+              ? calculateDamage(attacker, target, rollCombatPower(attacker, spell, sn, target, logs), n, spell, occamyMirror, logs)
+              : 0
           let isCrit = false
 
           // CRUCIUS: +30% dano por debuff no alvo
@@ -1038,8 +1102,12 @@ export function calculateTurnOutcome(params: {
   // BOMBA: explode quando o contador expira (duration === 1, prestes a ser removido)
   const bombaTargets = state.filter((d) => d.debuffs.some((x) => x.type === "bomba" && x.duration === 1))
   for (const bd of bombaTargets) {
-    const bombDmg = capThestralIncomingDamage(bd.wand, Math.round(((500 - getTotalHP(bd.hp)) / 100) * 25))
+    const bombRaw = Math.round(((500 - getTotalHP(bd.hp)) / 100) * 25)
+    const bombDmg = capThestralIncomingDamage(bd.wand, bombRaw)
     if (bombDmg > 0) {
+      if (WAND_PASSIVES[bd.wand ?? ""]?.effect === "thestral_cap300" && bombRaw > bombDmg) {
+        logs.push(`→ 🪶 Pêlo de Testrálio: ${bd.name} limitou a BOMBA a ${bombDmg} (${bombRaw} → cap 300).`)
+      }
       logs.push(`💣 BOMBA explodiu em ${bd.name}! ${bombDmg} de dano!`)
       state = state.map((d) => (d.id === bd.id ? { ...d, hp: applyDamage(d.hp, bombDmg, { thestral: d.wand === "thestral" }) } : d))
       animationsToPlay.push({ type: "cast", casterId: bd.id, spellName: "Subito", targetId: bd.id, isMiss: false, isCrit: false, delay: 200, damage: bombDmg, isBlock: false, fctOnly: true })
