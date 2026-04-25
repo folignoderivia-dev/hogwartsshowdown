@@ -146,6 +146,10 @@ export default function PageClient() {
     (userId: string) => {
       const mode = playerBuild?.gameMode
       if (mode !== "ffa" && mode !== "ffa3") return
+      const selfId = playerBuild?.userId
+      const activeParticipants = new Set((externalMatchState?.participantIds || []).filter(Boolean))
+      if (isSpectator || !selfId || userId !== selfId) return
+      if (activeParticipants.size > 0 && !activeParticipants.has(selfId)) return
       if (ffaStatsAppliedRef.current.has(userId)) return
       ffaStatsAppliedRef.current.add(userId)
       void (async () => {
@@ -157,13 +161,17 @@ export default function PageClient() {
         }
       })()
     },
-    [playerBuild?.gameMode]
+    [externalMatchState?.participantIds, isSpectator, playerBuild?.gameMode, playerBuild?.userId]
   )
 
   const handleBattleEnd = (outcome: "win" | "lose", userId?: string) => {
     if (!userId) return
     if (playerBuild?.gameMode === "teste") return
     const mode = playerBuild?.gameMode
+    const selfId = playerBuild?.userId
+    const activeParticipants = new Set((externalMatchState?.participantIds || []).filter(Boolean))
+    if (isSpectator || !selfId || userId !== selfId) return
+    if (activeParticipants.size > 0 && !activeParticipants.has(selfId)) return
     void (async () => {
       if ((mode === "ffa" || mode === "ffa3") && outcome === "lose" && ffaStatsAppliedRef.current.has(userId)) {
         return

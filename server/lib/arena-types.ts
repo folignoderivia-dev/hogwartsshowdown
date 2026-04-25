@@ -22,6 +22,15 @@ export type DebuffType =
   | "crit_boost"
   | "unforgivable_acc_down"
   | "protego_maximo"
+  | "bomba"
+  | "bloqueio_cura"
+  | "damage_reduce"
+  | "protego_diabol"
+  | "crit_down"
+  | "undead"
+  | "immunity"
+  | "charm"
+  | "unforgivable_block"
 
 export type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 
@@ -71,6 +80,7 @@ export interface Duelist {
   permanentAccBonus?: number
   cinzalWeakenStacks?: number
   occamyRepeatByTargetSpell?: Record<string, number>
+  incendioCombo?: number
 }
 
 export type Point = { x: number; y: number }

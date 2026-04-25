@@ -302,9 +302,9 @@ const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target
 const getSpellCastPriority = (_spellName: string, spell: SpellInfo | undefined, attacker: Duelist): number => {
   if (!spell) return 0
   let p = spell.priority ?? 0
-  // Grifinória +2 / Lufa-Lufa -3 em todas as magias (inclui self, cura e power 0 — ex.: Protego age mais cedo)
+  // Casa (Grifinória/Lufa-Lufa): peso forte na ordem para prevalecer na maioria dos cenários.
   const hg = HOUSE_GDD[attacker.house as keyof typeof HOUSE_GDD]
-  if (hg && "attackPriorityBonus" in hg) p += (hg as { attackPriorityBonus: number }).attackPriorityBonus
+  if (hg && "attackPriorityBonus" in hg) p += (hg as { attackPriorityBonus: number }).attackPriorityBonus * 6
   // Thunderbird: +1 prioridade global
   if (WAND_PASSIVES[attacker.wand]?.effect === "thunder_priority") p += 1
   // PARALISIA: força prioridade máxima 0
@@ -680,7 +680,8 @@ export function calculateTurnOutcome(params: {
       // Basilisco: +20% chance de aplicar debuffs (multiplicador)
       const chanceMultiplier = WAND_PASSIVES[attacker.wand]?.effect === "basilisk_debuff_chance" ? 1.2 : 1
       if (Math.random() * 100 <= spell.debuff.chance * chanceMultiplier) {
-        const dur = spell.debuff.duration || 1
+        const baseDur = spell.debuff.duration || 1
+        const dur = n.includes("imperio") ? Math.max(3, baseDur) : baseDur
         const meta = spell.debuff.type === "provoke" ? attacker.id : undefined
         // Imperio é IRREMOVÍVEL
         const irremovable = n.includes("imperio") ? true : undefined
@@ -1069,6 +1070,15 @@ export function calculateTurnOutcome(params: {
               : 0
           let isCrit = false
 
+          if (n.includes("incendio") && damage > 0) {
+            const comboStacks = atkLive.incendioCombo ?? 0
+            if (comboStacks > 0) {
+              const mult = 1 + comboStacks * 0.2
+              damage = Math.round(damage * mult)
+              logs.push(`→ 🔥 Combo Incêndio: ${attacker.name} está em sequência (${comboStacks}) e amplificou o dano (${Math.round(mult * 100)}%).`)
+            }
+          }
+
           // CRUCIUS: +30% dano por debuff no alvo
           if (n.includes("crucius") && damage > 0 && target.debuffs.length > 0) {
             damage = Math.round(damage * (1 + 0.3 * target.debuffs.length))
@@ -1350,6 +1360,7 @@ export function calculateTurnOutcome(params: {
         ...d,
         spellMana: sm,
         lastSpellUsed: sn,
+        incendioCombo: n.includes("incendio") ? (d.incendioCombo ?? 0) + 1 : 0,
         lastRoundSpellWasProtego: n.includes("protego") ? d.lastRoundSpellWasProtego : false,
         lastRoundSpellWasLumus: n.includes("lumus") ? d.lastRoundSpellWasLumus : false,
         nextAccBonusPct: undefined,

@@ -51,6 +51,7 @@ export type SpellDebuffType =
   | "silence_defense"
   | "damage_amp"
   | "arestum_penalty"
+  | "bomba"
   | "unforgivable_block"
 
 export interface SpellInfo {
@@ -86,14 +87,14 @@ export function formatSpellPower(spell: SpellInfo): string {
 export const SPELL_DATABASE: SpellInfo[] = [
   { name: "Estupefaca", powerMin: 15, powerMax: 60, accuracy: 50, pp: 7, cost: 1, debuff: { type: "stun", chance: 100, duration: 1 }, effect: "100% STUN (proximo turno)" },
   { name: "Bombarda", powerMin: 50, powerMax: 140, accuracy: 70, pp: 8, cost: 1, debuff: { type: "burn", chance: 50, duration: 2 }, effect: "Area: todos inimigos" },
-  { name: "Incendio", powerMin: 25, powerMax: 60, accuracy: 90, pp: 15, cost: 1, debuff: { type: "burn", chance: 50, duration: 2 }, effect: "50% BURN (-15% HP/turno)" },
+  { name: "Incendio", powerMin: 25, powerMax: 60, accuracy: 90, pp: 15, cost: 1, debuff: { type: "burn", chance: 50, duration: 2 }, effect: "50% BURN; combo: +20% dano por uso consecutivo" },
   { name: "Glacius", powerMin: 30, powerMax: 70, accuracy: 70, pp: 15, cost: 1, debuff: { type: "freeze", chance: 20, duration: 2 }, effect: "20% [FREEZE] - pula o próximo turno" },
   { name: "Diffindo", power: 50, accuracy: 100, pp: 15, cost: 1, special: "shield_break", effect: "Ignora Protego" },
   { name: "Expelliarmus", powerMin: 10, powerMax: 50, accuracy: 80, pp: 10, cost: 1, priority: 1, debuff: { type: "disarm", chance: 100, duration: 3 }, effect: "DISARM nucleo 3 turnos" },
   { name: "Depulso", power: 40, accuracy: 100, pp: 15, cost: 1 },
   { name: "Confrigo", powerMin: 70, powerMax: 150, accuracy: 70, pp: 10, cost: 1, debuff: { type: "mark", chance: 15, duration: 2 }, effect: "MARCA +20% dano recebido" },
-  { name: "Scarlatum", powerMin: 1, powerMax: 300, accuracy: 100, pp: 15, cost: 1, priority: 1, effect: "RNG puro de dano" },
-  { name: "Subito", powerMin: 30, powerMax: 90, accuracy: 100, pp: 10, cost: 1, special: "subito_bonus", effect: "x1.5 se alvo a 500% HP" },
+  { name: "Scarlatum", powerMin: 1, powerMax: 300, accuracy: 65, pp: 2, cost: 1, priority: 1, effect: "Dano aleatório; precisão 65% e mana 2" },
+  { name: "Subito", powerMin: 30, powerMax: 90, accuracy: 100, pp: 10, cost: 1, debuff: { type: "bomba", chance: 100, duration: 2 }, effect: "BOMBA (2t): explosão escala com HP perdido do alvo" },
   { name: "Reducto", power: 100, accuracy: 50, pp: 5, cost: 1, debuff: { type: "silence_defense", chance: 100, duration: 2 }, effect: "Desativa defesas 2 turnos" },
   { name: "Desumo Tempestas", powerMin: 50, powerMax: 200, accuracy: 100, pp: 5, cost: 2, effect: "Todos em campo incl. atacante" },
   { name: "Protego", power: 0, accuracy: 100, pp: 10, cost: 1, priority: 4, special: "protego_fail_chain", effect: "Self, falha se consecutivo" },

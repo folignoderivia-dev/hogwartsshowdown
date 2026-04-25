@@ -37,6 +37,7 @@ import {
 import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/supabase"
 import HomeLobbyChat from "@/components/home-lobby-chat"
 import { useLanguage } from "@/contexts/language-context"
+import type { AppLocale } from "@/contexts/language-context"
 
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
@@ -121,14 +122,98 @@ const AVATARS = [
 const AVATARS_PER_PAGE = 6
 
 const GAME_MODES = [
-  { value: "teste", label: "TESTE (BOT)" },
-  { value: "challenge", label: "CHALLENGE (OFFLINE)" },
-  { value: "1v1", label: "1 VS 1" },
-  { value: "2v2", label: "2 VS 2" },
-  { value: "ffa3", label: "ALL IN ONE (3 FFA)" },
-  { value: "ffa", label: "ALL IN ONE (4 FFA)" },
-  { value: "quidditch", label: "🏆 QUADRIBOL 1v1" },
-]
+  { value: "teste" },
+  { value: "challenge" },
+  { value: "1v1" },
+  { value: "2v2" },
+  { value: "ffa3" },
+  { value: "ffa" },
+  { value: "quidditch" },
+] as const
+
+const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"], string>> = {
+  pt: {
+    teste: "TESTE (BOT)",
+    challenge: "CHALLENGE (OFFLINE)",
+    "1v1": "1 VS 1",
+    "2v2": "2 VS 2",
+    ffa3: "ALL IN ONE (3 FFA)",
+    ffa: "ALL IN ONE (4 FFA)",
+    quidditch: "🏆 QUADRIBOL 1v1",
+  },
+  en: {
+    teste: "TEST (BOT)",
+    challenge: "CHALLENGE (OFFLINE)",
+    "1v1": "1 VS 1",
+    "2v2": "2 VS 2",
+    ffa3: "ALL IN ONE (3 FFA)",
+    ffa: "ALL IN ONE (4 FFA)",
+    quidditch: "🏆 QUIDDITCH 1v1",
+  },
+  es: {
+    teste: "PRUEBA (BOT)",
+    challenge: "DESAFIO (OFFLINE)",
+    "1v1": "1 VS 1",
+    "2v2": "2 VS 2",
+    ffa3: "ALL IN ONE (3 FFA)",
+    ffa: "ALL IN ONE (4 FFA)",
+    quidditch: "🏆 QUIDDITCH 1v1",
+  },
+}
+
+const UI_LABELS: Record<AppLocale, Record<string, string>> = {
+  pt: {
+    translate: "🌍 Translate (EN/ES)",
+    downloadApk: "📲 Baixar APK",
+    openRooms: "Salas em Aberto",
+    duel1v1: "Duelo 1v1",
+    battle2v2: "Batalha 2v2",
+    ffa4: "Todos contra Todos (4)",
+    ffa3: "Todos contra Todos (3)",
+    updateRooms: "↻ Atualizar",
+    hide: "Ocultar",
+    show: "Mostrar",
+    join: "Entrar",
+    startOffline: "Iniciar Offline",
+    createRoom: "Criar Sala",
+    joinRoom: "Entrar em Sala",
+    gameMode: "Modo de Jogo:",
+  },
+  en: {
+    translate: "🌍 Translate (EN/ES)",
+    downloadApk: "📲 Download APK",
+    openRooms: "Open Rooms",
+    duel1v1: "1v1 Duel",
+    battle2v2: "2v2 Battle",
+    ffa4: "Free For All (4)",
+    ffa3: "Free For All (3)",
+    updateRooms: "↻ Refresh",
+    hide: "Hide",
+    show: "Show",
+    join: "Join",
+    startOffline: "Start Offline",
+    createRoom: "Create Room",
+    joinRoom: "Join Room",
+    gameMode: "Game Mode:",
+  },
+  es: {
+    translate: "🌍 Traducir (EN/ES)",
+    downloadApk: "📲 Descargar APK",
+    openRooms: "Salas Abiertas",
+    duel1v1: "Duelo 1v1",
+    battle2v2: "Batalla 2v2",
+    ffa4: "Todos contra Todos (4)",
+    ffa3: "Todos contra Todos (3)",
+    updateRooms: "↻ Actualizar",
+    hide: "Ocultar",
+    show: "Mostrar",
+    join: "Entrar",
+    startOffline: "Iniciar Offline",
+    createRoom: "Crear Sala",
+    joinRoom: "Entrar a Sala",
+    gameMode: "Modo de Juego:",
+  },
+}
 
 const MAX_SPELL_POINTS = 6
 const MAX_UNFORGIVABLE = 1
@@ -640,6 +725,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const selectedWandCore = WAND_CORES.find((w) => w.value === wand)
   const effectiveName = currentUser?.username || name
   const { locale, cycleLocale } = useLanguage()
+  const ui = UI_LABELS[locale]
 
   return (
     <div className="min-h-screen bg-cover bg-center bg-fixed p-2 sm:p-3 lg:p-4" style={{ backgroundImage: "url('https://i.postimg.cc/D0y9DbnS/clube.png')" }}>
@@ -673,7 +759,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               className="border-sky-800/80 bg-sky-950/40 text-sky-200 hover:bg-sky-900/50"
               title="Estrutura de idioma (pt / en / es) — conteúdo ainda em PT"
             >
-              🌍 Translate (EN/ES) <span className="ml-1 text-[10px] opacity-80">→ {locale.toUpperCase()}</span>
+              {ui.translate} <span className="ml-1 text-[10px] opacity-80">→ {locale.toUpperCase()}</span>
             </Button>
             {/* Link de download do APK — gerado pelo GitHub Actions */}
             <a
@@ -682,7 +768,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-full border border-emerald-700 bg-emerald-950/50 px-3 py-1 text-xs font-medium text-emerald-300 transition-colors hover:bg-emerald-900/60 hover:text-emerald-200"
             >
-              📲 Baixar APK
+              {ui.downloadApk}
             </a>
             <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
               🟢 {onlineWizards} Bruxos Online
@@ -967,15 +1053,15 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <Card className="order-5 w-full min-w-0 medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:order-none lg:col-start-2 lg:row-start-5">
           <CardHeader className="border-b border-amber-900/50 py-2">
             <CardTitle className="flex items-center justify-between text-sm text-amber-200">
-              <span>Salas em Aberto</span>
+              <span>{ui.openRooms}</span>
               <div className="flex gap-1">
                 {onRefreshRooms && (
                   <Button size="sm" variant="outline" className="h-7 border-amber-700 text-amber-300" onClick={onRefreshRooms} title="Atualizar lista de salas">
-                    ↻ Atualizar
+                    {ui.updateRooms}
                   </Button>
                 )}
                 <Button size="sm" variant="outline" className="h-7 border-amber-700 text-amber-300" onClick={() => setShowOpenRoomsPanel((v) => !v)}>
-                  {showOpenRoomsPanel ? "Ocultar" : "Mostrar"}
+                  {showOpenRoomsPanel ? ui.hide : ui.show}
                 </Button>
               </div>
             </CardTitle>
@@ -987,7 +1073,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               ) : (
                 <div className="space-y-2">
                   {openRooms.map((r) => {
-                    const modeLabel = r.mode === "1v1" ? "Duelo 1v1" : r.mode === "2v2" ? "Batalha 2v2" : r.mode === "ffa" ? "All In One (4)" : r.mode === "ffa3" ? "All In One (3)" : r.mode === "quidditch" ? "🏆 Quadribol" : r.mode.toUpperCase()
+                    const modeLabel = r.mode === "1v1" ? ui.duel1v1 : r.mode === "2v2" ? ui.battle2v2 : r.mode === "ffa" ? ui.ffa4 : r.mode === "ffa3" ? ui.ffa3 : r.mode === "quidditch" ? MODE_LABELS[locale].quidditch : r.mode.toUpperCase()
                     return (
                     <div key={r.matchId} className="flex flex-col gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-amber-100">
@@ -999,7 +1085,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                         onClick={() => handleJoinRoomClick(r.matchId)}
                         disabled={!currentUser}
                       >
-                        Entrar
+                        {ui.join}
                       </Button>
                     </div>
                     )
@@ -1774,7 +1860,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           {/* Game Mode Selector */}
           <div className="medieval-frame flex w-full max-w-full flex-col items-stretch gap-2 rounded-lg bg-stone-800/90 px-3 py-2.5 sm:px-4 lg:px-5">
             <Swords className="h-5 w-5 text-amber-400" />
-            <span className="text-center text-sm text-amber-200">Modo de Jogo:</span>
+            <span className="text-center text-sm text-amber-200">{ui.gameMode}</span>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {GAME_MODES.map((mode) => (
                 <Button
@@ -1788,7 +1874,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                       : "border-amber-800 bg-stone-800 text-amber-300 hover:border-amber-600 hover:bg-amber-900/30"
                   }`}
                 >
-                  {mode.label}
+                  {MODE_LABELS[locale][mode.value]}
                 </Button>
               ))}
             </div>
@@ -1806,7 +1892,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               }`}
             >
               <Wand2 className="mr-2 h-5 w-5" />
-              {gameMode === "teste" || gameMode === "challenge" ? "Iniciar Offline" : "Criar Sala"}
+              {gameMode === "teste" || gameMode === "challenge" ? ui.startOffline : ui.createRoom}
             </Button>
             {gameMode !== "teste" && gameMode !== "challenge" && (
               <Button
@@ -1818,7 +1904,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 }}
                 className="medieval-frame w-full border border-amber-700 bg-amber-900/50 px-4 py-3 text-sm sm:px-6 sm:py-4 sm:text-base font-bold text-amber-100 hover:bg-amber-800/60"
               >
-                Entrar em Sala
+                {ui.joinRoom}
               </Button>
             )}
           </div>

@@ -89,6 +89,8 @@ export interface Duelist {
   cinzalWeakenStacks?: number
   /** Pena de Occamy (atacante): repetições do mesmo feitiço espelhado contra o mesmo alvo acumulam penalidade. Chave `alvoId|spellNorm`. */
   occamyRepeatByTargetSpell?: Record<string, number>
+  /** Combo de Incêndio: cresce com usos consecutivos e reseta ao usar outra spell. */
+  incendioCombo?: number
 }
 
 export type Point = { x: number; y: number }

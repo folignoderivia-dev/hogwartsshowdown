@@ -107,10 +107,10 @@ export default function HomeLobbyChat({
                 messages.map((m) => (
                   <span
                     key={m.id}
-                    className="inline-flex shrink-0 max-w-[min(100%,280px)] items-baseline gap-1 rounded-sm bg-stone-800/60 px-1.5 py-0.5"
+                    className="inline-flex min-w-0 max-w-[min(100%,280px)] items-baseline gap-1 overflow-hidden rounded-sm bg-stone-800/60 px-1.5 py-0.5"
                   >
                     <span className="font-semibold text-amber-300">{m.author}</span>
-                    <span className="text-amber-100/95">· {m.text}</span>
+                    <span className="whitespace-normal break-words text-amber-100/95">· {m.text}</span>
                   </span>
                 ))
               )}
