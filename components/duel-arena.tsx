@@ -506,6 +506,7 @@ const DuelArena = (
   const [pendingSpell, setPendingSpell] = useState<string | null>(null)
   const [pendingActions, setPendingActions] = useState<Record<string, RoundAction>>({})
   const [lockedSpell, setLockedSpell] = useState<string | null>(null)
+  const [isParryingActive, setIsParryingActive] = useState(false)
   const pendingActionsRef = useRef<Record<string, RoundAction>>({})
   const [battleLog, setBattleLog] = useState<string[]>(["[Turno 0]: O duelo começou!"])
   const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "Sistema", text: "Chat ativo." }])
@@ -1535,7 +1536,7 @@ const DuelArena = (
     const sid = selfDuelistId
     const commitCast = (targetId: string, areaAll?: boolean) => {
       const spell = getSpellInfo(spellName, SPELL_DATABASE)
-      const localAction: RoundAction = { casterId: sid, type: "cast", spellName, baseDamage: spell ? getSpellMaxPower(spell) : 0, targetId, areaAll, turnId: turnNumber }
+      const localAction: RoundAction = { casterId: sid, type: "cast", spellName, baseDamage: spell ? getSpellMaxPower(spell) : 0, targetId, areaAll, turnId: turnNumber, isParrying: isParryingActive }
       if (isOnlineMatch) {
         void submitTurnAction(localAction)
       } else {
@@ -1595,7 +1596,7 @@ const DuelArena = (
     const prov = player.debuffs.find((d) => d.type === "provoke")
     if (prov?.meta && targetId !== prov.meta) return
     const spell = getSpellInfo(pendingSpell, SPELL_DATABASE)
-    const localAction: RoundAction = { casterId: selfDuelistId, type: "cast", spellName: pendingSpell, baseDamage: spell ? getSpellMaxPower(spell) : 0, targetId, turnId: turnNumber }
+    const localAction: RoundAction = { casterId: selfDuelistId, type: "cast", spellName: pendingSpell, baseDamage: spell ? getSpellMaxPower(spell) : 0, targetId, turnId: turnNumber, isParrying: isParryingActive }
     if (isOnlineMatch) {
       void submitTurnAction(localAction)
     } else {
@@ -2186,6 +2187,22 @@ const DuelArena = (
                 <FlaskConical className="mr-1 h-3.5 w-3.5" />
                 {POTION_NAMES[playerBuild.potion] || "Poção"}
                 {potionUsed && " (usada)"}
+              </Button>
+              <Button
+                disabled={
+                  !!gameOver ||
+                  battleStatus !== "selecting" ||
+                  playerDefeated ||
+                  !isBattleReady ||
+                  (isOnlineMatch && !gameStartAcknowledged) ||
+                  awaitingServerAck ||
+                  playerCannotAct
+                }
+                onClick={() => setIsParryingActive(!isParryingActive)}
+                title="PARRY: Se o oponente usar o mesmo feitiço, você reflete o dobro de dano (custo: 3 mana)"
+                className={`touch-manipulation select-none border border-green-700 text-green-100 ${isParryingActive ? "bg-green-600 animate-pulse shadow-[0_0_20px_rgba(34,197,94,0.8)]" : "bg-gradient-to-b from-green-800 to-green-900 hover:from-green-700 hover:to-green-800"}`}
+              >
+                ⚔️ PARRY
               </Button>
             </div>
           )}

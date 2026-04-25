@@ -11,6 +11,7 @@ export interface RoundAction {
   targetId?: string
   areaAll?: boolean
   potionType?: string
+  isParrying?: boolean
 }
 
 /** Monta ação de lançamento (ex.: fila WebSocket → cliente aplica na arena). */

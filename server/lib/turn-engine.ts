@@ -1596,6 +1596,124 @@ export function calculateTurnOutcome(params: {
     if (outcomeMid) return { newDuelists: state, logs, animationsToPlay, outcome: outcomeMid, orderedActions, ffaWinnerId }
   }
 
+  // ── PARRY SYSTEM ─────────────────────────────────────────────────────────────
+  // Check for Parry: if both players used the same spell and one is parrying
+  const castActions = orderedActions.filter((a) => a.type === "cast")
+  if (castActions.length === 2) {
+    const actionA = castActions[0]
+    const actionB = castActions[1]
+    const spellA = actionA.spellName
+    const spellB = actionB.spellName
+    const isParryingA = actionA.isParrying
+    const isParryingB = actionB.isParrying
+
+    // Track damage dealt by each player in this turn
+    const damageDealt = new Map<string, number>()
+    state.forEach((d) => {
+      const prev = params.duelists.find((p) => p.id === d.id)
+      if (prev) {
+        const prevHp = getTotalHP(prev.hp)
+        const currHp = getTotalHP(d.hp)
+        const damageTaken = prevHp - currHp
+        if (damageTaken > 0) {
+          damageDealt.set(d.id, damageTaken)
+        }
+      }
+    })
+
+    // Check if PlayerA is parrying and used the same spell as PlayerB
+    if (isParryingA && spellA === spellB) {
+      const damageA = damageDealt.get(actionB.casterId) || 0
+      const damageB = damageDealt.get(actionA.casterId) || 0
+      const totalDamage = damageA + damageB
+
+      // Set PlayerA damage to ZERO
+      state = state.map((d) => {
+        if (d.id === actionA.casterId) {
+          // Restore HP to pre-turn state
+          const prev = params.duelists.find((p) => p.id === d.id)
+          return prev ? { ...d, hp: prev.hp } : d
+        }
+        return d
+      })
+
+      // Set PlayerB damage to (DamageA + DamageB)
+      state = state.map((d) => {
+        if (d.id === actionB.casterId) {
+          const prev = params.duelists.find((p) => p.id === d.id)
+          if (prev) {
+            const hp = applyDamage(prev.hp, totalDamage, { thestral: d.wand === "thestral" })
+            return { ...d, hp }
+          }
+        }
+        return d
+      })
+
+      logs.push(`⚔️ PARRY PERFEITO! ${state.find((d) => d.id === actionA.casterId)?.name} refletiu o ${spellA} de ${state.find((d) => d.id === actionB.casterId)?.name} com o dobro de força!`)
+    } else if (isParryingA) {
+      // Parry failed: subtract 3 mana from PlayerA
+      state = state.map((d) => {
+        if (d.id === actionA.casterId && d.spellMana && spellA) {
+          const sm = { ...d.spellMana }
+          if (sm[spellA]) {
+            sm[spellA] = { ...sm[spellA], current: Math.max(0, sm[spellA].current - 3) }
+          }
+          return { ...d, spellMana: sm }
+        }
+        return d
+      })
+      logs.push(`⚔️ PARRY falhou! ${state.find((d) => d.id === actionA.casterId)?.name} perdeu 3 de mana (feitiços diferentes).`)
+    }
+
+    // Same logic for PlayerB parrying
+    if (isParryingB && spellB === spellA && !isParryingA) {
+      const damageB = damageDealt.get(actionA.casterId) || 0
+      const damageA = damageDealt.get(actionB.casterId) || 0
+      const totalDamage = damageB + damageA
+
+      // Set PlayerB damage to ZERO
+      state = state.map((d) => {
+        if (d.id === actionB.casterId) {
+          const prev = params.duelists.find((p) => p.id === d.id)
+          return prev ? { ...d, hp: prev.hp } : d
+        }
+        return d
+      })
+
+      // Set PlayerA damage to (DamageB + DamageA)
+      state = state.map((d) => {
+        if (d.id === actionA.casterId) {
+          const prev = params.duelists.find((p) => p.id === d.id)
+          if (prev) {
+            const hp = applyDamage(prev.hp, totalDamage, { thestral: d.wand === "thestral" })
+            return { ...d, hp }
+          }
+        }
+        return d
+      })
+
+      logs.push(`⚔️ PARRY PERFEITO! ${state.find((d) => d.id === actionB.casterId)?.name} refletiu o ${spellB} de ${state.find((d) => d.id === actionA.casterId)?.name} com o dobro de força!`)
+    } else if (isParryingB && !isParryingA) {
+      // Parry failed: subtract 3 mana from PlayerB
+      state = state.map((d) => {
+        if (d.id === actionB.casterId && d.spellMana && spellB) {
+          const sm = { ...d.spellMana }
+          if (sm[spellB]) {
+            sm[spellB] = { ...sm[spellB], current: Math.max(0, sm[spellB].current - 3) }
+          }
+          return { ...d, spellMana: sm }
+        }
+        return d
+      })
+      logs.push(`⚔️ PARRY falhou! ${state.find((d) => d.id === actionB.casterId)?.name} perdeu 3 de mana (feitiços diferentes).`)
+    }
+
+    // Both parrying with same spell: both take 0 damage
+    if (isParryingA && isParryingB && spellA === spellB) {
+      logs.push(`⚔️ EMPATE TÉCNICO DE PARRY! Ambos refletiram o ${spellA} simultaneamente!`)
+    }
+  }
+
   // ── Dano periódico (DoT) com FCT visível ───────────────────────────────────
   const dotInfo: Array<{ id: string; name: string; burnDmg: number; poisonDmg: number }> = []
   state = state.map((d) => {
