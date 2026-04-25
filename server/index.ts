@@ -36,8 +36,9 @@ const io = new Server(httpServer, {
     credentials: true,
   },
   allowEIO3: true,
-  pingTimeout: 60000,
-  pingInterval: 25000,
+  // Redes móveis / FFA: tolerar pausas maiores antes de derrubar o socket
+  pingTimeout: 120_000,
+  pingInterval: 25_000,
   transports: ["polling", "websocket"],
 })
 
@@ -279,7 +280,8 @@ function logPassivesDebug(duelists: Duelist[]): void {
 }
 
 // ─── Idle timeout (W.O. por inatividade) ──────────────────────────────────────
-const IDLE_TIMEOUT_MS = 120_000 // 2 minutos
+const IDLE_TIMEOUT_MS_DEFAULT = 120_000 // 2 minutos (1v1 / 2v2)
+const IDLE_TIMEOUT_MS_FFA = 240_000 // 4 jogadores: mais tempo para todos agirem
 
 function clearIdleTimer(room: MatchRoom) {
   if (room.idleTimer) {
@@ -290,6 +292,7 @@ function clearIdleTimer(room: MatchRoom) {
 
 function startIdleTimer(room: MatchRoom, matchId: string) {
   clearIdleTimer(room)
+  const idleMs = room.gameMode === "ffa" || room.gameMode === "ffa3" ? IDLE_TIMEOUT_MS_FFA : IDLE_TIMEOUT_MS_DEFAULT
   room.idleTimer = setTimeout(() => {
     if (!activeMatches.has(matchId)) return
     const aliveIds = room.duelists.filter((d) => !isDefeated(d.hp)).map((d) => d.id)
@@ -309,7 +312,7 @@ function startIdleTimer(room: MatchRoom, matchId: string) {
         animationsToPlay: [],
         newDuelists: personalizeDuelists(room.duelists, uid),
         outcome: isInactive ? "lose" : "win",
-        logs: [`[W.O.]: ${missingNames} perdeu por inatividade (2 min sem agir)!`],
+        logs: [`[W.O.]: ${missingNames} perdeu por inatividade (${Math.round(idleMs / 60000)} min sem agir)!`],
         nextTurn: room.turnNumber,
         circumFlames: room.circumFlames,
       })
@@ -317,7 +320,7 @@ function startIdleTimer(room: MatchRoom, matchId: string) {
 
     clearIdleTimer(room)
     setTimeout(() => activeMatches.delete(matchId), 10_000)
-  }, IDLE_TIMEOUT_MS)
+  }, idleMs)
 }
 
 // ─── Lógica do Socket ──────────────────────────────────────────────────────────
@@ -371,15 +374,41 @@ io.on("connection", (socket: Socket) => {
         return
       }
 
-      // ── Reconexão mid-game ─────────────────────────────────────────────────
+      // ── Reconexão mid-game (atualiza socketId — antes o return impedia e o cliente ficava “morto” na sala) ──
       if (room.gameStarted) {
-        const pd = personalizeDuelists(room.duelists, userId)
-        socket.emit("RECONNECT_STATE", {
-          duelists: pd,
-          turnNumber: room.turnNumber,
-          circumFlames: room.circumFlames,
-        })
-        console.log(`[Server] Reconexão mid-game: ${userId.slice(0, 8)}… → ${matchId}`)
+        const existing = room.players.get(userId)
+        if (existing) {
+          existing.socketId = socket.id
+          socket.emit("RECONNECT_STATE", {
+            duelists: personalizeDuelists(room.duelists, userId),
+            turnNumber: room.turnNumber,
+            circumFlames: room.circumFlames,
+          })
+          console.log(`[Server] Reconexão mid-game (socket atualizado): ${userId.slice(0, 8)}… → ${matchId}`)
+          broadcastActiveMatches()
+          return
+        }
+        const duelistState = room.duelists.find((d) => d.id === userId)
+        if (duelistState) {
+          const seatIndex = room.duelists.findIndex((d) => d.id === userId)
+          room.players.set(userId, {
+            socketId: socket.id,
+            userId,
+            build,
+            duelist: duelistState,
+            team: duelistState.team,
+            index: Math.max(0, seatIndex),
+          })
+          socket.emit("RECONNECT_STATE", {
+            duelists: personalizeDuelists(room.duelists, userId),
+            turnNumber: room.turnNumber,
+            circumFlames: room.circumFlames,
+          })
+          console.log(`[Server] Reconexão mid-game (slot restaurado): ${userId.slice(0, 8)}… → ${matchId}`)
+          broadcastActiveMatches()
+          return
+        }
+        socket.emit("ERROR", { message: "Partida em curso: este usuário não está nesta sala." })
         return
       }
 
@@ -756,11 +785,11 @@ io.on("connection", (socket: Socket) => {
     if (matchId && userId) {
       const room = activeMatches.get(matchId)
       if (room) {
-        if (room.gameStarted) {
-          socket.to(matchId).emit("OPPONENT_DISCONNECTED", { userId })
+        socket.to(matchId).emit("OPPONENT_DISCONNECTED", { userId })
+        // Com partida a iniciar (lobby): remove o slot. Em jogo: mantém o jogador na sala para reconectar sem perder a partida (FFA / rede móvel).
+        if (!room.gameStarted) {
+          room.players.delete(userId)
         }
-        // Remove da sala; se vazia, limpa
-        room.players.delete(userId)
         if (room.players.size === 0) {
           clearIdleTimer(room)
           activeMatches.delete(matchId)

@@ -174,6 +174,10 @@ const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
   immunity: "IMUNE!",
   charm: "ENCANTOU!",
   unforgivable_block: "PATRONUM! SEM MALDIÇÕES!",
+  damage_reduce: "DANO −25%!",
+  crit_down: "CRÍTICO −!",
+  bomba: "BOMBA!",
+  bloqueio_cura: "SEM CURA!",
 }
 const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
 
@@ -202,6 +206,10 @@ function getSpellVfx(spellName: string): Omit<NonNullable<ArenaVfxState>, "key" 
   if (n.includes("impedimenta")) return { mode: "marker-bang", color: "#facc15", color2: "#eab308" }
   if (n.includes("obliviate")) return { mode: "marker-question", color: "#818cf8", color2: "#6366f1" }
   if (n.includes("flagellum")) return { mode: "beam-pulse", color: "#b45309", color2: "#f59e0b" }
+  if (n.includes("lumus")) return { mode: "beam-thin", color: "#fef9c3", color2: "#fde047" }
+  if (n.includes("trevus")) return { mode: "mist", color: "#7c3aed", color2: "#a78bfa" }
+  if (n.includes("petrificus")) return { mode: "shield", color: "#78716c", color2: "#a8a29e" }
+  if (n.includes("vermillious")) return { mode: "fireball", color: "#dc2626", color2: "#f97316" }
   return { mode: "beam", color: "#fbbf24", color2: "#fcd34d" }
 }
 
@@ -1152,7 +1160,12 @@ const DuelArena = (
     const socket = io(socketUrl, {
       transports: ["polling", "websocket"],
       upgrade: true,
-      reconnectionAttempts: 5,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 20_000,
+      timeout: 90_000,
+      randomizationFactor: 0.5,
     })
     socketRef.current = socket
 
@@ -1622,7 +1635,7 @@ const DuelArena = (
         type="button"
         onClick={() => onTargetClick(duelist.id)}
         disabled={!targetable}
-        className={`relative w-full rounded-lg border-2 bg-stone-900/85 p-2 text-left transition-transform duration-150 ${dead ? "opacity-50 border-stone-600" : targetable ? "border-amber-400 animate-pulse" : "border-amber-900/80"} ${impactTargetId === duelist.id ? "scale-[1.03] ring-2 ring-amber-300" : ""}`}
+        className={`relative w-full touch-manipulation select-none rounded-lg border-2 bg-stone-900/85 p-2 text-left transition-transform duration-150 ${dead ? "opacity-50 border-stone-600" : targetable ? "border-amber-400 animate-pulse" : "border-amber-900/80"} ${impactTargetId === duelist.id ? "scale-[1.03] ring-2 ring-amber-300" : ""}`}
       >
         {currentTargetId === duelist.id && <div className="absolute -top-2 left-1/2 z-50 -translate-x-1/2 text-xl text-amber-300">⬇</div>}
         <div className="mb-1 flex items-start gap-2">
@@ -2064,7 +2077,7 @@ const DuelArena = (
                   disabledByDebuff ||
                   (!!tauntLock && spell !== player.lastSpellUsed)
                 return (
-                  <Button key={spell} disabled={disabled} onClick={() => onSpellClick(spell)} className={`border border-amber-700 text-amber-100 ${pendingSpell === spell ? "bg-amber-600" : "bg-gradient-to-b from-amber-800 to-amber-900 hover:from-amber-700 hover:to-amber-800"}`}>
+                  <Button key={spell} disabled={disabled} onClick={() => onSpellClick(spell)} className={`touch-manipulation select-none border border-amber-700 text-amber-100 ${pendingSpell === spell ? "bg-amber-600" : "bg-gradient-to-b from-amber-800 to-amber-900 hover:from-amber-700 hover:to-amber-800"}`}>
                     <Wand2 className="mr-1 h-3.5 w-3.5" />
                     {spell} ({mana?.current}/{mana?.max} MANA | {info?.accuracy || 0}%{disabledByDebuff ? ` | 🔒${player?.disabledSpells?.[spell]}t` : ""})
                   </Button>
@@ -2083,7 +2096,7 @@ const DuelArena = (
                 }
                 onClick={usePotion}
                 title={potionUsed ? "Poção já usada nesta batalha" : undefined}
-                className={`border border-purple-700 text-purple-100 ${potionUsed ? "bg-stone-800 opacity-50 cursor-not-allowed" : "bg-purple-900 hover:bg-purple-800"}`}
+                className={`touch-manipulation select-none border border-purple-700 text-purple-100 ${potionUsed ? "bg-stone-800 opacity-50 cursor-not-allowed" : "bg-purple-900 hover:bg-purple-800"}`}
               >
                 <FlaskConical className="mr-1 h-3.5 w-3.5" />
                 {POTION_NAMES[playerBuild.potion] || "Poção"}

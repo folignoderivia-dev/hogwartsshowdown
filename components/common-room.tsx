@@ -35,6 +35,7 @@ import {
   signOutUser,
 } from "@/lib/database"
 import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/supabase"
+import HomeLobbyChat from "@/components/home-lobby-chat"
 
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
@@ -1941,6 +1942,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         )}
         </div>
       </div>
+
+      <HomeLobbyChat authorName={currentUser?.username?.trim() || ""} />
 
       {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
       <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-[10px] text-amber-700/60">

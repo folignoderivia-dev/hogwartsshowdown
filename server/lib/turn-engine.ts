@@ -2,6 +2,22 @@ import { HOUSE_GDD, WAND_PASSIVES, rollSpellPower, type SpellInfo } from "./data
 import type { DebuffType, Duelist, HPState } from "./arena-types"
 import type { RoundAction } from "./duelActions"
 
+const TREVUS_RANDOM_DEBUFFS: DebuffType[] = [
+  "burn",
+  "freeze",
+  "stun",
+  "confusion",
+  "poison",
+  "paralysis",
+  "damage_reduce",
+  "crit_down",
+  "silence_defense",
+  "no_potion",
+  "arestum_penalty",
+  "lumus_acc_down",
+  "mark",
+]
+
 /** Motor puro: recebe `RoundAction` em memória. Persistência Supabase usa `match_turns.action_payload` apenas na Arena. */
 
 export interface EngineAnimation {
@@ -546,7 +562,7 @@ export function calculateTurnOutcome(params: {
       if (WAND_PASSIVES[before?.wand ?? ""]?.effect === "hippogriff_immune_mark_bomb") {
         if (spell.debuff.type === "mark" || spell.debuff.type === "bomba") {
           logs.push(
-            `→ 🪶 Pena de Hipogrifo: ${before.name} bloqueou ${spell.debuff.type === "mark" ? "Marca" : "Bomba"} de ${attacker.name}.`
+            `→ 🪶 Pena de Hipogrifo: ${before?.name ?? "Alvo"} bloqueou ${spell.debuff.type === "mark" ? "Marca" : "Bomba"} de ${attacker.name}.`
           )
           return
         }
@@ -900,6 +916,95 @@ export function calculateTurnOutcome(params: {
 
           animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000, damage, isBlock: bloqueado, fctOnly: true })
           applySpellDebuffTo(target.id)
+
+          if (n.includes("lumus") && !bloqueado) {
+            state = state.map((d) =>
+              d.id === target.id
+                ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "lumus_acc_down"), { type: "lumus_acc_down", duration: 2 }] }
+                : d
+            )
+            logs.push(`→ Lumus! ${target.name} sofre −10% acerto (2t).`)
+          }
+
+          if (spell.special === "petrificus_disable" && !bloqueado) {
+            const ft = state.find((d) => d.id === target.id)
+            const keys = ft?.spellMana ? Object.keys(ft.spellMana) : []
+            if (keys.length > 0) {
+              const rk = keys[Math.floor(Math.random() * keys.length)]
+              state = state.map((d) => {
+                if (d.id !== target.id) return d
+                const ds = { ...(d.disabledSpells || {}) }
+                ds[rk] = 2
+                return { ...d, disabledSpells: ds }
+              })
+              logs.push(`→ Petrificus Totales! "${rk}" de ${target.name} bloqueado (2t).`)
+            }
+          }
+
+          if (spell.special === "trevus_random" && !bloqueado) {
+            const pool = [...TREVUS_RANDOM_DEBUFFS].sort(() => Math.random() - 0.5)
+            const a = pool[0]
+            const b = pool.find((t) => t !== a) ?? pool[1]
+            const tname = state.find((d) => d.id === target.id)?.name ?? target.name
+            for (const dt of [a, b]) {
+              state = state.map((d) =>
+                d.id === target.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== dt), { type: dt, duration: 1 }] } : d
+              )
+            }
+            logs.push(`→ Trevus! ${tname} recebeu dois efeitos aleatórios (1t cada).`)
+          }
+
+          if (spell.special === "vermillious_dynamic_hits" && !bloqueado) {
+            const atkNow = state.find((d) => d.id === attacker.id) ?? attacker
+            const lostHp = 500 - getTotalHP(atkNow.hp)
+            const extras = Math.min(8, Math.floor(lostHp / 100))
+            for (let hi = 0; hi < extras; hi++) {
+              const atkFresh = state.find((d) => d.id === attacker.id) ?? atkNow
+              const tgtFresh = state.find((d) => d.id === target.id) ?? target
+              if (!rollHit(atkFresh, tgtFresh, spell, 0, sn)) {
+                animationsToPlay.push({
+                  type: "cast",
+                  casterId: attacker.id,
+                  spellName: sn,
+                  targetId: target.id,
+                  isMiss: true,
+                  isCrit: false,
+                  delay: 320,
+                  damage: 0,
+                  isBlock: false,
+                  fctOnly: true,
+                })
+                continue
+              }
+              let exDmg = calculateDamage(
+                atkFresh,
+                tgtFresh,
+                rollCombatPower(atkFresh, spell, sn, tgtFresh, logs),
+                n,
+                spell,
+                occamyMirror,
+                logs
+              )
+              const exBloq = protegoBlocks(tgtFresh)
+              if (exBloq) exDmg = 0
+              else if (!ignoresDefense) exDmg = Math.max(0, exDmg - (tgtFresh.defense ?? 0))
+              if (exDmg > 0 && getSpellMaxPower(spell) > 0 && exDmg < 25) exDmg = 25
+              if (exDmg > 0) applyDamageWithCircum(target.id, exDmg, attacker.id, n)
+              animationsToPlay.push({
+                type: "cast",
+                casterId: attacker.id,
+                spellName: sn,
+                targetId: target.id,
+                isMiss: false,
+                isCrit: false,
+                delay: 350,
+                damage: exDmg,
+                isBlock: exBloq,
+                fctOnly: true,
+              })
+            }
+            if (extras > 0) logs.push(`→ Vermillious! +${extras} golpe(s) extra(s) (${lostHp} HP abaixo do máximo).`)
+          }
 
           // AQUA ERUCTO: +25 dano por debuff no atacante; limpa BURN próprio
           if (n.includes("aqua") && n.includes("eructo")) {
