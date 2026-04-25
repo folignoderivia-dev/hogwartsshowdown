@@ -2078,7 +2078,6 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 <p className="text-[10px] text-amber-600">As regras serão compartilhadas com o oponente ao entrar na sala.</p>
               </div>
             )}
-        )}
         {!isVip && isReady && gameMode && gameMode !== "teste" && gameMode !== "torneio-offline" && (
           <p className="mt-1 text-center text-[10px] text-amber-600/70">
             👑 <button type="button" className="underline hover:text-amber-400" onClick={() => setPixModal(true)}>Torne-se VIP</button> para criar salas personalizadas
