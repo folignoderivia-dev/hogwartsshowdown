@@ -61,36 +61,37 @@ export interface Duelist {
   isPlayer?: boolean
   team: "player" | "enemy"
   spellMana?: Record<string, { current: number; max: number }>
+  turnsInBattle?: number
+  disabledSpells?: Record<string, number>
+  missStreakBySpell?: Record<string, number>
+  lastSingleHitDamageReceived?: number
   lastSpellUsed?: string
+  incendioCombo?: number
   lastRoundSpellWasProtego?: boolean
   lastRoundSpellWasLumus?: boolean
+  nextAccBonusPct?: number
+  nextDamagePotionMult?: number
+  damageReceivedThisTurn?: number
+  /** Núcleo Occamy: contagem de repetições por alvo+feitiço */
+  occamyRepeatByTargetSpell?: Record<string, number>
+  /** Poções usadas nesta batalha */
+  usedPotions?: string[]
+  /** Poção substituída por Amortentia */
+  replacedPotion?: string
+  /** Morto Vivo: imortalidade no turno de ativação */
+  isUndeadThisTurn?: boolean
+  /** Redução fixa de dano (bônus de defesa) */
+  defense?: number
   arrestoStacks?: number
   cruciusWeakness?: boolean
   wandPassiveStripped?: boolean
   circumAura?: number
   maximosChargePct?: number
-  nextAccBonusPct?: number
-  nextDamagePotionMult?: number
   destinyBond?: boolean
-  disabledSpells?: Record<string, number>
-  missStreakBySpell?: Record<string, number>
-  turnsInBattle?: number
-  /** Redução fixa de dano (bônus de defesa) */
-  defense?: number
-  /** Dano recebido neste turno (para Locomotor Mortis) */
-  damageReceivedThisTurn?: number
-  /** Último valor de dano recebido num único “pacote” (Wiggenweld). Atualiza a cada golpe, DoT ou reflexo. */
-  lastSingleHitDamageReceived?: number
-  /** Poções já usadas nesta batalha (uso único garantido pelo servidor) */
-  usedPotions?: string[]
   /** Bônus permanente de acurácia (Poção Foco) */
   permanentAccBonus?: number
   /** Presa de Cinzal: cada vez que o jogador causa 100+ de dano a um portador, +1 pilha (−15% dano multiplicativo por pilha). */
   cinzalWeakenStacks?: number
-  /** Pena de Occamy (atacante): repetições do mesmo feitiço espelhado contra o mesmo alvo acumulam penalidade. Chave `alvoId|spellNorm`. */
-  occamyRepeatByTargetSpell?: Record<string, number>
-  /** Combo de Incêndio: cresce com usos consecutivos e reseta ao usar outra spell. */
-  incendioCombo?: number
 }
 
 export type Point = { x: number; y: number }

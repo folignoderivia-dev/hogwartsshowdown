@@ -16,7 +16,7 @@ export function useArenaMatchSync({
   participantIds,
   expectedOnlinePlayers,
 }: UseArenaMatchSyncParams) {
-  const isOfflineMode = gameMode === "teste" || gameMode === "challenge"
+  const isOfflineMode = gameMode === "teste" || gameMode === "torneio-offline"
   const [readyByPlayerId, setReadyByPlayerId] = useState<Record<string, boolean>>({})
 
   const isOnlineMatch = !isOfflineMode && !!matchId

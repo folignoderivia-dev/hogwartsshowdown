@@ -13,6 +13,7 @@ export interface DbUser {
   elo: number
   wins?: number
   losses?: number
+  offlineWins?: number
   favoriteSpell?: string | null
   createdAt?: string
   isVip?: boolean
@@ -27,6 +28,7 @@ interface ProfileRow {
   elo: number | null
   wins?: number | null
   losses?: number | null
+  offline_wins?: number | null
   favorite_spell?: string | null
   created_at?: string | null
   is_vip?: boolean | null
@@ -35,7 +37,7 @@ interface ProfileRow {
   is_admin?: boolean | null
 }
 
-const PROFILE_SELECT = "id,username,elo,wins,losses,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin"
+const PROFILE_SELECT = "id,username,elo,wins,losses,offline_wins,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin"
 
 function isVipActive(row: ProfileRow): boolean {
   if (!row.is_vip) return false
@@ -50,6 +52,7 @@ function mapProfile(profile: ProfileRow, email: string): DbUser {
     username: profile.username,
     elo: profile.elo ?? ELO_START,
     wins: profile.wins ?? 0,
+    offlineWins: profile.offline_wins ?? 0,
     isAdmin: profile.is_admin ?? false,
     losses: profile.losses ?? 0,
     favoriteSpell: profile.favorite_spell ?? null,
@@ -239,6 +242,7 @@ export async function applyMatchElo(userId: string, outcome: "win" | "lose", mod
   const nextElo = Math.max(ELO_START, (profile.elo ?? ELO_START) + delta)
   const nextWins = (profile.wins ?? 0) + (outcome === "win" ? 1 : 0)
   const nextLosses = (profile.losses ?? 0) + (outcome === "lose" ? 1 : 0)
+  const nextOfflineWins = (profile.offline_wins ?? 0) + (mode === "torneio-offline" && outcome === "win" ? 1 : 0)
 
   // Feitiço mais usado: contar a partir do JSON payload (action_id na tabela é eventId único, não é o feitiço).
   const { data: spellRows } = await supabase
@@ -257,7 +261,7 @@ export async function applyMatchElo(userId: string, outcome: "win" | "lose", mod
 
   const { error } = await supabase
     .from("profiles")
-    .update({ elo: nextElo, wins: nextWins, losses: nextLosses, favorite_spell: favoriteSpell })
+    .update({ elo: nextElo, wins: nextWins, losses: nextLosses, offline_wins: nextOfflineWins, favorite_spell: favoriteSpell })
     .eq("id", userId)
   if (error) return null
 
@@ -269,6 +273,7 @@ export async function applyMatchElo(userId: string, outcome: "win" | "lose", mod
     username: profile.username,
     elo: nextElo,
     wins: nextWins,
+    offlineWins: nextOfflineWins,
     losses: nextLosses,
     favoriteSpell,
     createdAt: profile.created_at ?? undefined,

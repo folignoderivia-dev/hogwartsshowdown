@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge"
 import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload, X, Save, FolderOpen, Trash2 } from "lucide-react"
 import { formatSpellPower, INITIAL_PLAYER_BUILD, SPELL_DATABASE, type SpellInfo } from "@/lib/data-store"
-import type { PlayerBuild, CustomRoomSettings } from "@/lib/types"
+import type { PlayerBuild, CustomRoomSettings, GameMode } from "@/lib/types"
 import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
 import { getRecentMatchHistory } from "@/lib/database"
 import {
@@ -123,7 +123,7 @@ const AVATARS_PER_PAGE = 6
 
 const GAME_MODES = [
   { value: "teste" },
-  { value: "challenge" },
+  { value: "torneio-offline" },
   { value: "1v1" },
   { value: "2v2" },
   { value: "ffa3" },
@@ -134,7 +134,7 @@ const GAME_MODES = [
 const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"], string>> = {
   pt: {
     teste: "TESTE (BOT)",
-    challenge: "CHALLENGE (OFFLINE)",
+    "torneio-offline": "TORNEIO-OFFLINE",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
@@ -143,7 +143,7 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
   },
   en: {
     teste: "TEST (BOT)",
-    challenge: "CHALLENGE (OFFLINE)",
+    "torneio-offline": "TOURNAMENT-OFFLINE",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
@@ -152,7 +152,7 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
   },
   es: {
     teste: "PRUEBA (BOT)",
-    challenge: "DESAFIO (OFFLINE)",
+    "torneio-offline": "TORNEO-OFFLINE",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
@@ -254,7 +254,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
   const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
-  const [gameMode, setGameMode] = useState<"teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "">("")
+  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "">("")
 
   // ── Builds Salvas ────────────────────────────────────────────────────────
   interface SavedBuild {
@@ -328,8 +328,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       if (saved.avatar) setAvatar(saved.avatar)
       else if (INITIAL_PLAYER_BUILD.avatar) setAvatar(INITIAL_PLAYER_BUILD.avatar)
       if (Array.isArray(saved.spells)) setSelectedSpells(saved.spells.filter((s) => SPELL_DATABASE.some((sp) => sp.name === s)))
-      if (saved.gameMode && ["teste", "challenge", "1v1", "2v2", "ffa", "ffa3"].includes(saved.gameMode)) {
-        setGameMode(saved.gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3")
+      if (saved.gameMode && ["teste", "torneio-offline", "1v1", "2v2", "ffa", "ffa3"].includes(saved.gameMode)) {
+        setGameMode(saved.gameMode as "teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3")
       }
     } catch {
       // ignora build inválida no storage
@@ -346,7 +346,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       potion,
       spells: selectedSpells,
       avatar,
-      gameMode: gameMode || undefined,
+      gameMode: gameMode as GameMode | undefined,
       userId: currentUser.id,
       username: currentUser.username,
       elo: currentUser.elo,
@@ -611,7 +611,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         potion,
         spells: selectedSpells,
         avatar,
-        gameMode: gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch",
+        gameMode: gameMode as "teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch",
         userId: currentUser.id,
         username: currentUser.username,
         elo: currentUser.elo,
@@ -628,7 +628,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       potion,
       spells: selectedSpells,
       avatar,
-      gameMode: gameMode as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch",
+      gameMode: gameMode as "teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch",
       userId: currentUser.id,
       username: currentUser.username,
       elo: currentUser.elo,
@@ -777,7 +777,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               <>
                 <Badge className={`border-amber-600 bg-stone-900 px-3 py-1 ${isVip ? "text-yellow-300" : "text-amber-200"}`}>
                   {isVip && <Crown className="mr-1 inline h-3.5 w-3.5 text-yellow-400" />}
-                  {currentUser.username} · ELO {currentUser.elo}
+                  {currentUser.username} {currentUser.offlineWins && currentUser.offlineWins > 0 && <span className="ml-1">🥇 ({currentUser.offlineWins})</span>} · ELO {currentUser.elo}
                   {isVip && <span className="ml-1 text-[10px] text-yellow-400">VIP</span>}
                 </Badge>
                 <Button
@@ -1867,7 +1867,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   key={mode.value}
                   variant="outline"
                   size="sm"
-                  onClick={() => setGameMode(mode.value as "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch")}
+                  onClick={() => setGameMode(mode.value as GameMode)}
                   className={`h-9 w-full justify-center px-2 text-xs sm:text-sm transition-all ${
                     gameMode === mode.value
                       ? "border-amber-500 bg-amber-700/50 text-amber-200"
@@ -1884,7 +1884,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <Button
               size="lg"
               disabled={!isReady}
-              onClick={gameMode === "teste" || gameMode === "challenge" ? handleStartDuel : handleCreateRoomClick}
+              onClick={gameMode === "teste" || gameMode === "torneio-offline" ? handleStartDuel : handleCreateRoomClick}
               className={`medieval-frame w-full border-0 px-4 py-3 text-sm sm:px-6 sm:py-4 sm:text-base font-bold transition-all ${
                 isReady
                   ? "bg-gradient-to-b from-red-800 to-red-900 text-amber-100 shadow-lg shadow-red-900/50 hover:from-red-700 hover:to-red-800"
@@ -1892,9 +1892,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               }`}
             >
               <Wand2 className="mr-2 h-5 w-5" />
-              {gameMode === "teste" || gameMode === "challenge" ? ui.startOffline : ui.createRoom}
+              {gameMode === "teste" || gameMode === "torneio-offline" ? ui.startOffline : ui.createRoom}
             </Button>
-            {gameMode !== "teste" && gameMode !== "challenge" && (
+            {gameMode !== "teste" && gameMode !== "torneio-offline" && (
               <Button
                 size="lg"
                 disabled={!isReady || !openRooms.some((r) => !gameMode || r.mode === gameMode)}
@@ -1911,7 +1911,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         </div>
 
         {/* ── Botão Sala Personalizada (VIP) ─────────────────────────────── */}
-        {isVip && gameMode !== "teste" && gameMode !== "challenge" && (
+        {isVip && gameMode !== "teste" && gameMode !== "torneio-offline" && (
           <div className="mt-2">
             <Button
               variant="outline"
@@ -2027,7 +2027,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             )}
           </div>
         )}
-        {!isVip && isReady && gameMode && gameMode !== "teste" && gameMode !== "challenge" && (
+        {!isVip && isReady && gameMode && gameMode !== "teste" && gameMode !== "torneio-offline" && (
           <p className="mt-1 text-center text-[10px] text-amber-600/70">
             👑 <button type="button" className="underline hover:text-amber-400" onClick={() => setPixModal(true)}>Torne-se VIP</button> para criar salas personalizadas
           </p>

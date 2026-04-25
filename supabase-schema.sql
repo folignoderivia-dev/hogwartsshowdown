@@ -7,6 +7,7 @@ create table if not exists public.profiles (
   elo int not null default 500,
   wins int not null default 0,
   losses int not null default 0,
+  offline_wins int not null default 0,
   favorite_spell text null,
   created_at timestamptz not null default now()
 );
@@ -14,6 +15,7 @@ create table if not exists public.profiles (
 alter table public.profiles enable row level security;
 alter table public.profiles add column if not exists wins int not null default 0;
 alter table public.profiles add column if not exists losses int not null default 0;
+alter table public.profiles add column if not exists offline_wins int not null default 0;
 alter table public.profiles add column if not exists favorite_spell text null;
 
 drop policy if exists "profiles_select_all" on public.profiles;

@@ -91,8 +91,8 @@ const AVATAR_IMAGES: Record<string, string> = {
   avatar22: "https://i.postimg.cc/gJTb1FHD/pngwing-com-(9).png",
 }
 const DEFAULT_AVATARS = ["avatar1","avatar2","avatar3","avatar4","avatar5","avatar6","avatar7","avatar8"]
-const CHALLENGE_LABELS = ["Oitavas", "Quartas", "Semifinal", "Final"]
-const CHALLENGE_BOTS = [
+const TORNEIO_LABELS = ["Oitavas", "Quartas", "Semifinal", "Final"]
+const TORNEIO_BOTS = [
   { name: "Sentinela de Azkaban", house: "slytherin", wand: "dragon", spells: ["Bombarda", "Confrigo", "Crucius", "Imperio", "Protego", "Expelliarmus"] },
   { name: "Auror Renegado", house: "gryffindor", wand: "thunderbird", spells: ["Scarlatum", "Depulso", "Glacius", "Arestum Momentum", "Protego", "Ferula"] },
   { name: "Alquimista Sombrio", house: "ravenclaw", wand: "acromantula", spells: ["Confundos", "Flagellum", "Lumus", "Finite Incantatem", "Fumus", "Episkey"] },
@@ -344,7 +344,7 @@ const DuelArena = (
   { playerBuild, onReturn, onBattleEnd, onFfaPlayerEliminated, matchId, isSpectator = false, participantIds = [], participantNames = [], matchStatus }: DuelArenaProps
 ) => {
   if (typeof window === "undefined") return null
-  const isOfflineMode = playerBuild.gameMode === "teste" || playerBuild.gameMode === "challenge"
+  const isOfflineMode = playerBuild.gameMode === "teste" || playerBuild.gameMode === "torneio-offline"
   const selfDuelistId = playerBuild.userId ?? null
   const isIdentityReady = isOfflineMode || !!selfDuelistId
   if (!isOfflineMode && !selfDuelistId) {
@@ -476,10 +476,10 @@ const DuelArena = (
       disabledSpells: {},
       missStreakBySpell: {},
     }
-    const botBase = CHALLENGE_BOTS[Math.floor(Math.random() * CHALLENGE_BOTS.length)]
+    const botBase = TORNEIO_BOTS[Math.floor(Math.random() * TORNEIO_BOTS.length)]
     const bot: Duelist = {
-      id: `challenge-bot-${stage + 1}`,
-      name: `${botBase.name} (${CHALLENGE_LABELS[Math.min(stage, CHALLENGE_LABELS.length - 1)]})`,
+      id: `torneio-bot-${stage + 1}`,
+      name: `${botBase.name} (${TORNEIO_LABELS[Math.min(stage, TORNEIO_LABELS.length - 1)]})`,
       house: botBase.house,
       wand: botBase.wand,
       avatar: DEFAULT_AVATARS[(stage + 1) % DEFAULT_AVATARS.length],
@@ -1034,10 +1034,10 @@ const DuelArena = (
       setTurnNumber(nextTurn)
 
       if (outcome.outcome) {
-        if (playerBuild.gameMode === "challenge" && outcome.outcome === "win" && challengeStage < CHALLENGE_LABELS.length - 1) {
+        if (playerBuild.gameMode === "torneio-offline" && outcome.outcome === "win" && challengeStage < TORNEIO_LABELS.length - 1) {
           const nextStage = challengeStage + 1
           setChallengeStage(nextStage)
-          addLog(`[Challenge]: ${playerBuild.name} avançou para ${CHALLENGE_LABELS[nextStage]}!`)
+          addLog(`[Torneio]: ${playerBuild.name} avançou para ${TORNEIO_LABELS[nextStage]}!`)
           const nextRound = applyRapinomonioBlock(buildChallengeRound(nextStage))
           setDuelists(nextRound)
           setPendingActions({})
@@ -1050,11 +1050,13 @@ const DuelArena = (
           beginRoundSelection(nextRound)
           return
         }
-        if (playerBuild.gameMode === "challenge" && outcome.outcome === "lose") {
+        if (playerBuild.gameMode === "torneio-offline" && outcome.outcome === "lose") {
           setChallengeStage(0)
         }
         setGameOver(outcome.outcome)
-        if ((outcome.outcome === "win" || outcome.outcome === "lose") && playerBuild.gameMode !== "challenge") {
+        if ((outcome.outcome === "win" || outcome.outcome === "lose") && playerBuild.gameMode !== "torneio-offline") {
+          onBattleEnd?.(outcome.outcome, playerBuild.userId)
+        } else if (playerBuild.gameMode === "torneio-offline" && outcome.outcome === "win") {
           onBattleEnd?.(outcome.outcome, playerBuild.userId)
         }
         setBattleStatus("finished")
@@ -1116,7 +1118,10 @@ const DuelArena = (
 
       if (data.outcome) {
         setGameOver(data.outcome)
-        if (data.outcome === "win" || data.outcome === "lose") {
+        // Em FFA, não chamamos onBattleEnd aqui para evitar múltiplas contagens de derrota
+        // Apenas MATCH_RESULT deve processar o resultado final
+        const isFfaMode = playerBuild.gameMode === "ffa" || playerBuild.gameMode === "ffa3"
+        if (!isFfaMode && (data.outcome === "win" || data.outcome === "lose")) {
           onBattleEnd?.(data.outcome, playerBuild.userId)
         }
         setBattleStatus("finished")
@@ -1349,16 +1354,24 @@ const DuelArena = (
         winnerNames,
         loserNames,
         yourDelta,
+        eloDeltas,
       }: {
         matchId: string
         gameMode: string
         winnerNames: string[]
         loserNames: string[]
         yourDelta?: number
+        eloDeltas?: Record<string, number>
       }) => {
         if (yourDelta !== undefined) {
           const sign = yourDelta >= 0 ? "+" : ""
           addLog(`[Ranking] Variação de ELO: ${sign}${yourDelta} pts`)
+        }
+        // Em FFA, processamos o resultado final aqui para garantir apenas uma derrota por partida
+        const isFfaMode = gameMode === "ffa" || gameMode === "ffa3"
+        if (isFfaMode && yourDelta !== undefined) {
+          const outcome = yourDelta > 0 ? "win" : "lose"
+          onBattleEnd?.(outcome, playerBuild.userId)
         }
         saveMatchHistory({ matchId: mId, gameMode, winnerNames, loserNames }).catch(() => null)
       }
@@ -1411,7 +1424,7 @@ const DuelArena = (
 
   useEffect(() => {
     setBackgroundImage(SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)])
-    if (playerBuild.gameMode === "challenge") {
+    if (playerBuild.gameMode === "torneio-offline") {
       setChallengeStage(0)
       setPotionUsed(false)
       setPendingSpell(null)
@@ -1772,7 +1785,7 @@ const DuelArena = (
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">
               {{ selecting: "⚔️ Escolhendo", resolving: "✨ Conjurando...", animating: "✨ Conjurando...", finished: "🏁 Finalizado", waiting: "⏳ Aguardando", idle: "⏸ Parado" }[battleStatus] ?? battleStatus}
             </Badge>
-            {playerBuild.gameMode === "challenge" && <Badge className="border-purple-700 bg-purple-950/40 text-purple-200">{CHALLENGE_LABELS[Math.min(challengeStage, CHALLENGE_LABELS.length - 1)]}</Badge>}
+            {playerBuild.gameMode === "torneio-offline" && <Badge className="border-purple-700 bg-purple-950/40 text-purple-200">{TORNEIO_LABELS[Math.min(challengeStage, TORNEIO_LABELS.length - 1)]}</Badge>}
             {isReadOnlySpectator && <Badge className="border-blue-700 bg-blue-950/40 text-blue-200">ESPECTADOR</Badge>}
             {isReadOnlySpectator ? (
               <Button onClick={handleLeaveRoom} className="h-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 px-2 text-xs text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Voltar para o Lobby">

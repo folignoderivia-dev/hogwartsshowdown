@@ -38,6 +38,8 @@ export interface Debuff {
   type: DebuffType
   duration: number
   meta?: string
+  /** Não pode ser removido por Finite Incantatem nem transferido */
+  irremovable?: boolean
 }
 
 export interface HPState {
@@ -77,6 +79,10 @@ export interface Duelist {
   /** Último dano em um único evento (Wiggenweld). */
   lastSingleHitDamageReceived?: number
   usedPotions?: string[]
+  /** Poção substituída por Amortentia */
+  replacedPotion?: string
+  /** Morto Vivo: imortalidade no turno de ativação */
+  isUndeadThisTurn?: boolean
   permanentAccBonus?: number
   cinzalWeakenStacks?: number
   occamyRepeatByTargetSpell?: Record<string, number>

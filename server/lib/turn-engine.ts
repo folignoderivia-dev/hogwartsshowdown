@@ -102,7 +102,7 @@ const capThestralIncomingDamage = (wand: string | undefined, amount: number): nu
   return amount
 }
 
-const applyDamage = (hp: HPState, amount: number, opts?: { thestral?: boolean }): HPState => {
+const applyDamage = (hp: HPState, amount: number, opts?: { thestral?: boolean; undead?: boolean }): HPState => {
   const bars = [...hp.bars]
   let remaining = amount
   for (let i = bars.length - 1; i >= 0; i--) {
@@ -113,6 +113,12 @@ const applyDamage = (hp: HPState, amount: number, opts?: { thestral?: boolean })
       bars[i] = 1
       remaining -= 99
       continue
+    }
+    // Morto Vivo: HP não cairá abaixo de 1 no turno de ativação
+    if (opts?.undead && bars[i] - absorbed < 1) {
+      bars[i] = 1
+      remaining = 0
+      break
     }
     bars[i] -= absorbed
     remaining -= absorbed
@@ -169,7 +175,8 @@ export const calculateAccuracy = (
   base: number,
   spell?: SpellInfo,
   attackerRoundSpellName?: string,
-  occamyAccRepeatStacks = 0
+  occamyAccRepeatStacks = 0,
+  combatLogs?: string[]
 ) => {
   let accuracy = base
   const un = spell?.isUnforgivable
@@ -179,7 +186,13 @@ export const calculateAccuracy = (
   // Dragão: -15% acerto (atualizado de -10%)
   if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "crit20_acc_minus15") accuracy -= 15
   // Veela (defensor): penalidade aleatória de 0-25% em quem ataca o Veela
-  if (WAND_PASSIVES[defender.wand]?.effect === "veela_acc_penalty") accuracy -= Math.floor(Math.random() * 26)
+  if (WAND_PASSIVES[defender.wand]?.effect === "veela_acc_penalty") {
+    const penalty = Math.floor(Math.random() * 26)
+    accuracy -= penalty
+    if (combatLogs && penalty > 0) {
+      combatLogs.push(`→ 🧚 Cabelo de Veela: ${defender.name} reduziu a acurácia em -${penalty}% (aleatório 0-25%).`)
+    }
+  }
   // Occamy (atacante): espelho ativo → −10% acc por "camada" de repetição (−10, −20, −30…)
   if (!wandJammed && WAND_PASSIVES[attacker.wand]?.effect === "occamy_mirror" && attackerRoundSpellName) {
     if (normSpell(defender.lastSpellUsed ?? "") === normSpell(attackerRoundSpellName)) {
@@ -217,13 +230,14 @@ const rollHit = (
   spell: SpellInfo,
   missStreak = 0,
   spellName?: string,
-  occamyAccRepeatStacks = 0
+  occamyAccRepeatStacks = 0,
+  combatLogs?: string[]
 ) => {
   if (spell.accuracy >= 100) return true
   const pityBonus = Math.min(20, missStreak * 7)
   const finalAcc = Math.min(
     100,
-    calculateAccuracy(attacker, defender, spell.accuracy, spell, spellName, occamyAccRepeatStacks) + pityBonus
+    calculateAccuracy(attacker, defender, spell.accuracy, spell, spellName, occamyAccRepeatStacks, combatLogs) + pityBonus
   )
   return Math.random() * 100 <= finalAcc
 }
@@ -270,20 +284,25 @@ const calculateDamage = (
   return Math.round(damage)
 }
 
-const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: string): number => {
+const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: string, combatLogs?: string[]): number => {
   // Scarlatum: NUNCA pode causar crítico (magia caótica)
   if (spellNameNorm?.includes("scarlatum")) return 0
   // Veela: defensor nunca pode ser critado (verificado antes de mark/glacius)
-  if (WAND_PASSIVES[defender?.wand ?? ""]?.effect === "veela_acc_penalty") return 0
+  if (WAND_PASSIVES[defender?.wand ?? ""]?.effect === "veela_acc_penalty") {
+    if (combatLogs) {
+      combatLogs.push(`→ 🧚 Cabelo de Veela: ${defender?.name ?? "Alvo"} é imune a críticos!`)
+    }
+    return 0
+  }
   // MARCA: crítico garantido
   if (defender?.debuffs.some((d) => d.type === "mark")) return 1.0
   // Glacius: crítico garantido se alvo congelado
   if (spellNameNorm?.includes("glacius") && defender?.debuffs.some((d) => d.type === "freeze")) return 1.0
   let c = 0.25 // taxa base: 25%
   if (defender?.debuffs.some((d) => d.type === "crit_down")) c = Math.max(0, c - 0.1)
-  // Dragão: +20% crit (não mudou)
+  // Dragão: +20% crit
   if (WAND_PASSIVES[attacker.wand]?.effect === "crit20_acc_minus15") c += 0.2
-  // Sonserina: +25% crit chance (novo, substitui extraCritTakenChance)
+  // Sonserina: +25% crit chance (novo)
   if (attacker.house === "slytherin") c += HOUSE_GDD.slytherin.critBonus
   if (attacker.debuffs.some((d) => d.type === "crit_boost")) c += 0.25
   return Math.min(0.95, c)
@@ -353,7 +372,7 @@ export function calculateTurnOutcome(params: {
   actions: RoundAction[]
   spellDatabase: SpellInfo[]
   turnNumber: number
-  gameMode: "teste" | "challenge" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch"
+  gameMode: "teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch"
   circumFlames: Record<string, number>
 }): TurnOutcome {
   let state: Duelist[] = params.duelists.map((d) => ({ ...d, damageReceivedThisTurn: 0 }))
@@ -471,10 +490,9 @@ export function calculateTurnOutcome(params: {
         logs.push(`→ ${attacker.name} usou Edurus! Todos os debuffs limpos + Imunidade por 1 turno.`)
 
       } else if (potKey === "mortovivo") {
-        // Aplica buff Undead: HP não cai abaixo de 1 por 1 turno
         state = state.map((d) =>
           d.id === attacker.id
-            ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "undead"), { type: "undead" as DebuffType, duration: 1 }] }
+            ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "undead"), { type: "undead" as DebuffType, duration: 1 }], isUndeadThisTurn: true }
             : d
         )
         logs.push(`→ ${attacker.name} usou Morto Vivo! HP não cairá abaixo de 1 por 1 turno.`)
@@ -490,23 +508,46 @@ export function calculateTurnOutcome(params: {
         logs.push(`→ ${attacker.name} usou Foco! +10% Accuracy permanente.`)
 
       } else if (potKey === "merlin") {
-        // Troca a mana da spell do usuário com menos mana pelo valor da spell do oponente com mais mana
+        // Poção de Merlin: copia a última poção utilizada pelo oponente, com eficácia aumentada em 25%
         const opponent = state.find((d) => d.team !== attacker.team && !isDefeated(d.hp))
-        if (opponent?.spellMana && attacker.spellMana) {
-          const atkEntries = Object.entries(attacker.spellMana)
-          const oppEntries = Object.entries(opponent.spellMana)
-          if (atkEntries.length && oppEntries.length) {
-            const minAtkEntry = atkEntries.reduce((a, b) => a[1].current <= b[1].current ? a : b)
-            const maxOppEntry = oppEntries.reduce((a, b) => a[1].current >= b[1].current ? a : b)
-            const gainedMana = maxOppEntry[1].current
-            state = state.map((d) => {
-              if (d.id !== attacker.id) return d
-              const sm = { ...(d.spellMana ?? {}) }
-              sm[minAtkEntry[0]] = { ...sm[minAtkEntry[0]], current: Math.min(sm[minAtkEntry[0]].max, gainedMana) }
-              return { ...d, spellMana: sm }
-            })
-            logs.push(`→ ${attacker.name} usou Poção de Merlin! "${minAtkEntry[0]}" ganhou ${Math.min(attacker.spellMana[minAtkEntry[0]].max, gainedMana)} de mana.`)
+        if (opponent?.usedPotions && opponent.usedPotions.length > 0) {
+          const lastPotion = opponent.usedPotions[opponent.usedPotions.length - 1]
+          if (!attacker.usedPotions?.includes(lastPotion)) {
+            state = state.map((d) => d.id === attacker.id ? { ...d, usedPotions: [...(d.usedPotions ?? []), lastPotion] } : d)
+            // Aplica o efeito da poção copiada com +25% de eficácia
+            if (lastPotion === "wiggenweld") {
+              const self = state.find((d) => d.id === attacker.id)
+              const healAmt = Math.round((self?.lastSingleHitDamageReceived ?? 0) * 1.25)
+              state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healAmt > 0 ? healFlatTotal(d.hp, healAmt) : d.hp } : d))
+              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou Wiggenweld do oponente (+25%): recuperou ${healAmt} HP.`)
+            } else if (lastPotion === "edurus") {
+              state = state.map((d) =>
+                d.id === attacker.id
+                  ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "immunity"), { type: "immunity" as DebuffType, duration: 1 }] }
+                  : d
+              )
+              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou Edurus do oponente (+25%): Imunidade por 2 turnos.`)
+            } else if (lastPotion === "maxima") {
+              state = state.map((d) => (d.id === attacker.id ? { ...d, nextDamagePotionMult: 1.875 } : d)) // 1.5 * 1.25 = 1.875
+              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou Maxima do oponente (+25%): +87.5% dano no próximo turno.`)
+            } else if (lastPotion === "foco") {
+              state = state.map((d) => (d.id === attacker.id ? { ...d, permanentAccBonus: (d.permanentAccBonus ?? 0) + 12.5 } : d)) // 10 * 1.25 = 12.5
+              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou Foco do oponente (+25%): +12.5% Accuracy permanente.`)
+            } else if (lastPotion === "mortovivo") {
+              state = state.map((d) =>
+                d.id === attacker.id
+                  ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "undead"), { type: "undead" as DebuffType, duration: 1 }], isUndeadThisTurn: true }
+                  : d
+              )
+              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou Morto Vivo do oponente (+25%): HP não cairá abaixo de 1 por 2 turnos.`)
+            } else {
+              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou ${lastPotion} do oponente (+25% eficácia).`)
+            }
+          } else {
+            logs.push(`→ ${attacker.name} já usou a poção ${lastPotion} nesta batalha. Merlin falhou.`)
           }
+        } else {
+          logs.push(`→ ${attacker.name} usou Poção de Merlin! O oponente ainda não usou nenhuma poção. Merlin falhou.`)
         }
 
       } else if (potKey === "felix") {
@@ -535,15 +576,19 @@ export function calculateTurnOutcome(params: {
         }
 
       } else if (potKey === "amortentia") {
-        // Aplica CHARM no alvo por 2 turnos (meta = ID do usuário da poção)
-        const target = state.find((d) => d.team !== attacker.team && !isDefeated(d.hp))
-        if (target) {
-          state = state.map((d) =>
-            d.id === target.id
-              ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "charm"), { type: "charm" as DebuffType, duration: 2, meta: attacker.id }] }
-              : d
-          )
-          logs.push(`→ ${attacker.name} usou Amortentia! ${target.name} está encantado por 2 turnos.`)
+        // Poção Amortentia: Se o oponente NÃO usou a poção dele, troca-a aleatoriamente por outra do game-data.ts
+        const opponent = state.find((d) => d.team !== attacker.team && !isDefeated(d.hp))
+        if (opponent) {
+          if (!opponent.usedPotions || opponent.usedPotions.length === 0) {
+            // Oponente ainda não usou poção - troca por uma aleatória
+            const availablePotions = ["wiggenweld", "edurus", "maxima", "foco", "merlin", "felix", "aconito", "amortentia", "mortovivo"]
+            const randomPotion = availablePotions[Math.floor(Math.random() * availablePotions.length)]
+            state = state.map((d) => d.id === opponent.id ? { ...d, replacedPotion: randomPotion } : d)
+            logs.push(`→ ${attacker.name} usou Amortentia! A poção de ${opponent.name} foi substituída por ${randomPotion}.`)
+          } else {
+            // Oponente já usou poção - Amortentia falha
+            logs.push(`→ ${attacker.name} usou Amortentia! ${opponent.name} já usou sua poção. Amortentia falhou.`)
+          }
         }
       }
 
@@ -720,7 +765,9 @@ export function calculateTurnOutcome(params: {
       if (WAND_PASSIVES[def.wand ?? ""]?.effect === "thestral_cap300" && dmg > effectiveDmg) {
         logs.push(`→ 🪶 Pêlo de Testrálio: ${def.name} limitou o golpe de ${dealerName} a ${effectiveDmg} (${dmg} → cap 300).`)
       }
-      if (def.debuffs.some((x) => x.type === "undead")) {
+      // UNDEAD: HP não pode cair abaixo de 1 neste turno (debuff ou flag de ativação)
+      const isUndead = def.debuffs.some((x) => x.type === "undead") || def.isUndeadThisTurn
+      if (isUndead) {
         const totalHp = getTotalHP(def.hp)
         const beforeUndead = effectiveDmg
         effectiveDmg = Math.max(0, Math.min(effectiveDmg, totalHp - 1))
@@ -732,7 +779,7 @@ export function calculateTurnOutcome(params: {
         d.id === defId
           ? {
               ...d,
-              hp: applyDamage(d.hp, effectiveDmg, {}),
+              hp: applyDamage(d.hp, effectiveDmg, { undead: isUndead }),
               damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + effectiveDmg,
               lastSingleHitDamageReceived: effectiveDmg,
             }
@@ -1064,7 +1111,7 @@ export function calculateTurnOutcome(params: {
           normSpell(params.actions.find((a) => a.casterId === target.id)?.spellName ?? "") === n
         const occKeySt = occamyRepeatKey(target.id, n)
         const occRepeatSt = occamyMirror ? (atkLive.occamyRepeatByTargetSpell?.[occKeySt] ?? 0) : 0
-        const hit = rollHit(atkLive, target, spell, streak, sn, occRepeatSt)
+        const hit = rollHit(atkLive, target, spell, streak, sn, occRepeatSt, logs)
         if (!hit && WAND_PASSIVES[atkLive.wand]?.effect === "occamy_mirror") {
           state = state.map((d) => (d.id === atkLive.id ? stripOccamyRepeatsForTarget(d, target.id) : d))
         }
@@ -1098,7 +1145,7 @@ export function calculateTurnOutcome(params: {
             damage = Math.round(damage * (1 + 0.3 * target.debuffs.length))
           }
 
-          if (damage > 0 && spell.canCrit !== false && Math.random() < getCritChance(attacker, target, n)) {
+          if (damage > 0 && spell.canCrit !== false && Math.random() < getCritChance(attacker, target, n, logs)) {
             damage *= 2
             isCrit = true
           }
@@ -1456,6 +1503,11 @@ export function calculateTurnOutcome(params: {
       animationsToPlay.push({ type: "cast", casterId: bd.id, spellName: "Subito", targetId: bd.id, isMiss: false, isCrit: false, delay: 200, damage: bombDmg, isBlock: false, fctOnly: true })
     }
   }
+  // ── Final do turno: limpa flags temporários e reduz debuffs ───────────────────────
+  state = state.map((d) => ({
+    ...d,
+    isUndeadThisTurn: false, // Limpa flag de imortalidade temporária
+  }))
   state = state.map(reduceDebuffs)
   state = state.map((d) => ({
     ...d,
