@@ -67,6 +67,12 @@ export const getSpellMaxPower = (spell: SpellInfo): number => {
   return spell.power ?? 0
 }
 
+/** Pelo de Testrálio: cada pacote de dano recebido (um “hit”) é limitado a 300. */
+const capThestralIncomingDamage = (wand: string | undefined, amount: number): number => {
+  if (WAND_PASSIVES[wand ?? ""]?.effect === "thestral_cap300") return Math.min(Math.max(0, amount), 300)
+  return amount
+}
+
 const applyDamage = (hp: HPState, amount: number, opts?: { thestral?: boolean }): HPState => {
   const bars = [...hp.bars]
   let remaining = amount
@@ -218,14 +224,12 @@ const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target
   return Math.round(base)
 }
 
-const getSpellCastPriority = (spellName: string, spell: SpellInfo | undefined, attacker: Duelist): number => {
+const getSpellCastPriority = (_spellName: string, spell: SpellInfo | undefined, attacker: Duelist): number => {
   if (!spell) return 0
   let p = spell.priority ?? 0
-  // Casas com bônus/penalidade de prioridade (Grifinória +2, Lufa-Lufa -3)
-  if (!isSelfTargetSpell(spellName) && getSpellMaxPower(spell) > 0) {
-    const hg = HOUSE_GDD[attacker.house as keyof typeof HOUSE_GDD]
-    if (hg && "attackPriorityBonus" in hg) p += (hg as { attackPriorityBonus: number }).attackPriorityBonus
-  }
+  // Grifinória +2 / Lufa-Lufa -3 em todas as magias (inclui self, cura e power 0 — ex.: Protego age mais cedo)
+  const hg = HOUSE_GDD[attacker.house as keyof typeof HOUSE_GDD]
+  if (hg && "attackPriorityBonus" in hg) p += (hg as { attackPriorityBonus: number }).attackPriorityBonus
   // Thunderbird: +1 prioridade global
   if (WAND_PASSIVES[attacker.wand]?.effect === "thunder_priority") p += 1
   // PARALISIA: força prioridade máxima 0
@@ -547,11 +551,7 @@ export function calculateTurnOutcome(params: {
     const applyDamageWithCircum = (defId: string, dmg: number, dealerId: string, sourceSpellNorm?: string) => {
       const def = state.find((d) => d.id === defId)
       if (!def) return
-      let effectiveDmg = dmg
-      // Testrálio: dano único máximo 300
-      if (WAND_PASSIVES[def.wand]?.effect === "thestral_cap300") {
-        effectiveDmg = Math.min(effectiveDmg, 300)
-      }
+      let effectiveDmg = capThestralIncomingDamage(def.wand, dmg)
       // UNDEAD: HP não pode cair abaixo de 1 neste turno
       if (def.debuffs.some((x) => x.type === "undead")) {
         const totalHp = getTotalHP(def.hp)
@@ -562,10 +562,12 @@ export function calculateTurnOutcome(params: {
           ? { ...d, hp: applyDamage(d.hp, effectiveDmg, {}), damageReceivedThisTurn: (d.damageReceivedThisTurn ?? 0) + effectiveDmg }
           : d
       )
-      // Lufa-Lufa espinhos: reflete 10% do dano recebido para o atacante
+      // Lufa-Lufa espinhos: reflete 10% do dano recebido para o atacante (Testrálio do atingido limita o reflexo)
       if (def.house === "hufflepuff" && dealerId !== defId && effectiveDmg > 0) {
-        const thornDmg = Math.round(effectiveDmg * HOUSE_GDD.hufflepuff.thornsPercent)
-        if (thornDmg > 0) state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, thornDmg, {}) } : d))
+        const dealer = state.find((d) => d.id === dealerId)
+        const thornRaw = Math.round(effectiveDmg * HOUSE_GDD.hufflepuff.thornsPercent)
+        const thornDmg = dealer ? capThestralIncomingDamage(dealer.wand, thornRaw) : thornRaw
+        if (thornDmg > 0) state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, thornDmg, { thestral: d.wand === "thestral" }) } : d))
       }
       // Cinzal: se recebeu > 100 de dano, o atacante fica debilitado (-15% dano futuros)
       if (WAND_PASSIVES[def.wand]?.effect === "cinzal_weaken" && dealerId !== defId && effectiveDmg > 100) {
@@ -573,7 +575,10 @@ export function calculateTurnOutcome(params: {
         logs.push(`→ Cinzal: ${dealerId} foi debilitado! Próximos ataques causam 15% menos dano.`)
       }
       if (def.debuffs.some((d) => d.type === "salvio_reflect") && dealerId !== defId && effectiveDmg > 0) {
-        state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, Math.round(effectiveDmg), {}) } : d))
+        const dealer = state.find((d) => d.id === dealerId)
+        const refRaw = Math.round(effectiveDmg)
+        const refDmg = dealer ? capThestralIncomingDamage(dealer.wand, refRaw) : refRaw
+        if (refDmg > 0) state = state.map((d) => (d.id === dealerId ? { ...d, hp: applyDamage(d.hp, refDmg, { thestral: d.wand === "thestral" }) } : d))
       }
       const circumOn = (def.circumAura ?? 0) > 0 || (params.circumFlames[defId] ?? 0) > 0
       if (circumOn && dealerId !== defId) {
@@ -768,7 +773,10 @@ export function calculateTurnOutcome(params: {
         const freshAtk = state.find((d) => d.id === attacker.id)
         const dmgReceived = freshAtk?.damageReceivedThisTurn ?? 0
         const pct = Math.floor(Math.random() * 126) + 25
-        const retalDmg = Math.round(dmgReceived * pct / 100)
+        let retalDmg = Math.round(dmgReceived * pct / 100)
+        if (attacker.cinzalWeaken) retalDmg = Math.round(retalDmg * 0.85)
+        const targWand = state.find((d) => d.id === target.id)?.wand
+        retalDmg = capThestralIncomingDamage(targWand, retalDmg)
         const bloq = protegoBlocks(target)
         if (retalDmg > 0 && !bloq) {
           // ignoreBuffs: aplica dano direto sem defesa nem modifiers
@@ -831,7 +839,8 @@ export function calculateTurnOutcome(params: {
 
           // AQUA ERUCTO: +25 dano por debuff no atacante; limpa BURN próprio
           if (n.includes("aqua") && n.includes("eructo")) {
-            const debuffBonus = attacker.debuffs.length * 25
+            let debuffBonus = attacker.debuffs.length * 25
+            if (attacker.cinzalWeaken) debuffBonus = Math.round(debuffBonus * 0.85)
             if (debuffBonus > 0 && !bloqueado) {
               applyDamageWithCircum(target.id, debuffBonus, attacker.id, n)
               logs.push(`→ Aqua Eructo: +${debuffBonus} dano (${attacker.debuffs.length} debuffs no usuário)!`)
@@ -1005,8 +1014,14 @@ export function calculateTurnOutcome(params: {
   state = state.map((d) => {
     let hp = d.hp
     let burnDmg = 0, poisonDmg = 0
-    if (d.debuffs.some((x) => x.type === "burn")) { burnDmg = 25; hp = applyDamage(hp, burnDmg, { thestral: d.wand === "thestral" }) }
-    if (d.debuffs.some((x) => x.type === "poison")) { poisonDmg = 50; hp = applyDamage(hp, poisonDmg, { thestral: d.wand === "thestral" }) }
+    if (d.debuffs.some((x) => x.type === "burn")) {
+      burnDmg = capThestralIncomingDamage(d.wand, 25)
+      hp = applyDamage(hp, burnDmg, { thestral: d.wand === "thestral" })
+    }
+    if (d.debuffs.some((x) => x.type === "poison")) {
+      poisonDmg = capThestralIncomingDamage(d.wand, 50)
+      hp = applyDamage(hp, poisonDmg, { thestral: d.wand === "thestral" })
+    }
     if (burnDmg > 0 || poisonDmg > 0) dotInfo.push({ id: d.id, name: d.name, burnDmg, poisonDmg })
     return { ...d, hp }
   })
@@ -1023,7 +1038,7 @@ export function calculateTurnOutcome(params: {
   // BOMBA: explode quando o contador expira (duration === 1, prestes a ser removido)
   const bombaTargets = state.filter((d) => d.debuffs.some((x) => x.type === "bomba" && x.duration === 1))
   for (const bd of bombaTargets) {
-    const bombDmg = Math.round(((500 - getTotalHP(bd.hp)) / 100) * 25)
+    const bombDmg = capThestralIncomingDamage(bd.wand, Math.round(((500 - getTotalHP(bd.hp)) / 100) * 25))
     if (bombDmg > 0) {
       logs.push(`💣 BOMBA explodiu em ${bd.name}! ${bombDmg} de dano!`)
       state = state.map((d) => (d.id === bd.id ? { ...d, hp: applyDamage(d.hp, bombDmg, { thestral: d.wand === "thestral" }) } : d))

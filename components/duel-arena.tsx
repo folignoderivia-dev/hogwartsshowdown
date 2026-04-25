@@ -220,23 +220,16 @@ function getCritChance(attacker: Duelist, defender?: Duelist, spellNameNorm?: st
   return Math.min(0.95, c)
 }
 
-function isOffensiveForHousePriority(spellName: string, spell: SpellInfo): boolean {
-  const n = normSpell(spellName)
-  if (isSelfTargetSpell(spellName)) return false
-  if (n.includes("aqua") && n.includes("eructo")) return false
-  return getSpellMaxPower(spell) > 0
-}
-
+/** Alinhado ao turn-engine: Grifinória +2 / Lufa -3 em todas as magias (+ ajuste Aqua Eructo legado). */
 function getSpellCastPriority(spellName: string, spell: SpellInfo | undefined, attacker: Duelist): number {
   if (!spell) return 0
   let p = spell.priority ?? 0
   const n = normSpell(spellName)
   if (n.includes("aqua") && n.includes("eructo")) p += 5
-  if (isOffensiveForHousePriority(spellName, spell)) {
-    const hg = HOUSE_GDD[attacker.house as keyof typeof HOUSE_GDD]
-    if (hg && "attackPriorityBonus" in hg) p += (hg as { attackPriorityBonus: number }).attackPriorityBonus
-  }
+  const hg = HOUSE_GDD[attacker.house as keyof typeof HOUSE_GDD]
+  if (hg && "attackPriorityBonus" in hg) p += (hg as { attackPriorityBonus: number }).attackPriorityBonus
   if (WAND_PASSIVES[attacker.wand]?.effect === "thunder_priority") p += 1
+  if (attacker.debuffs.some((d) => d.type === "paralysis")) p = Math.min(0, p)
   return p
 }
 
