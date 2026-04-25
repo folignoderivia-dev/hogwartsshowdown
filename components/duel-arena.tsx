@@ -149,6 +149,7 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   charm: "💖 ENCANTO",
   unforgivable_block: "🜏 BLOQUEIO MALDIÇÕES",
   invulnerable: "🪶 INVULNERÁVEL",
+  invisibility: "👻 INVISÍVEL",
 }
 /** Mensagem flutuante curta ao aplicar debuff do grimório. */
 const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
@@ -167,6 +168,7 @@ const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
   damage_amp: "AMPLIFICOU DANO!",
   arestum_penalty: "FREOU!",
   lumus_acc_down: "CEGOU!",
+  invisibility: "INVISIBILIZOU!",
   spell_disable: "DESABILITOU!",
   salvio_reflect: "REFLEXO!",
   anti_debuff: "IMUNIZOU!",

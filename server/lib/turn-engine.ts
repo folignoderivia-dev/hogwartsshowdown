@@ -216,6 +216,8 @@ export const calculateAccuracy = (
   accuracy -= (defender.arrestoStacks ?? 0) * 5
   // Debuffs de redução de accuracy (aplicados corretamente)
   if (attacker.debuffs.some((d) => d.type === "lumus_acc_down")) accuracy -= 10
+  // DESILUSÃO: +25% chance de errar
+  if (attacker.debuffs.some((d) => d.type === "invisibility")) accuracy -= 25
   // ARESTUM MOMENTUM: -5% acerto por stack
   const arestumOnAtk = attacker.debuffs.filter((d) => d.type === "arestum_penalty").length
   if (arestumOnAtk > 0) accuracy -= arestumOnAtk * 5
@@ -555,7 +557,7 @@ export function calculateTurnOutcome(params: {
         }
       } else if (potKey === "dragon_tonic") {
         state = state.map((d) => d.id === attacker.id ? { ...d, nextTurnPriorityBonus: (d.nextTurnPriorityBonus ?? 0) + 4 } : d)
-        logs.push(`→ ${attacker.name} usou Tônico de Dragão! +4 de prioridade no próximo turno.`)
+        logs.push(`→ 🐉 Tônico de Dragão! ${attacker.name} ganha +4 de prioridade no próximo turno.`)
       } else if (potKey === "despair_potion") {
         const opponent = state.find((d) => d.team !== attacker.team && !isDefeated(d.hp))
         if (opponent?.lastSpellUsed && opponent.spellMana) {
@@ -573,9 +575,9 @@ export function calculateTurnOutcome(params: {
             }
             return d
           })
-          logs.push(`→ ${attacker.name} usou Poção do Desespero! Reduziu 3 de mana de ${opponent.lastSpellUsed} do oponente.`)
+          logs.push(`→ 💀 Poção do Desespero! ${attacker.name} reduziu 3 de mana de ${opponent.lastSpellUsed} de ${opponent.name}.`)
         } else {
-          logs.push(`→ ${attacker.name} usou Poção do Desespero! O oponente ainda não usou nenhuma magia. Efeito falhou.`)
+          logs.push(`→ 💀 Poção do Desespero! ${opponent?.name ?? "Oponente"} ainda não usou nenhuma magia. Efeito falhou.`)
         }
 
       } else if (potKey === "felix") {
@@ -694,6 +696,23 @@ export function calculateTurnOutcome(params: {
         })
         continue
       }
+    }
+
+    // SILÊNCIO: verifica se a magia está silenciada
+    const silencedSpells = attacker.silencedSpells ?? []
+    if (silencedSpells.includes(sn)) {
+      logs.push(`→ ${attacker.name} tentou usar ${sn}, mas está silenciada!`)
+      animationsToPlay.push({
+        type: "cast",
+        casterId: attacker.id,
+        spellName: sn,
+        targetId: attacker.id,
+        isMiss: true,
+        fctOnly: true,
+        delay: 500,
+        fctMessage: "Silenciado",
+      })
+      continue
     }
 
     const isFFAMode = params.gameMode === "ffa" || params.gameMode === "ffa3"
@@ -1212,8 +1231,13 @@ export function calculateTurnOutcome(params: {
           if (isCrit && damage > 0 && !bloqueado && WAND_PASSIVES[target.wand]?.effect === "oraq_orala_invuln_crit") {
             if (Math.random() < 0.3) {
               state = state.map((d) => (d.id === target.id ? { ...d, debuffs: [...d.debuffs, { type: "invulnerable" as DebuffType, duration: 1 }] } : d))
-              logs.push(`→ 🪶 Pena de Oraqui Orala ativada! Invulnerabilidade garantida para o próximo turno.`)
+              logs.push(`→ 🪶 Pena de Oraqui Orala! ${target.name} ganha invulnerabilidade no próximo turno (30% ativo).`)
             }
+          }
+
+          // INCREMENTA CONTADOR DE MALDIÇÕES: Crucio, Imperio, Avada Kedavra
+          if (spell.isUnforgivable) {
+            state = state.map((d) => (d.id === attacker.id ? { ...d, unforgivableUsedCount: (d.unforgivableUsedCount ?? 0) + 1 } : d))
           }
 
           animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit, delay: 1000, damage, isBlock: bloqueado, fctOnly: true })
@@ -1413,6 +1437,63 @@ export function calculateTurnOutcome(params: {
             logs.push(`🔍 Revele seus Segredos! Núcleo de ${target.name}: ${passive?.name ?? "Desconhecido"} — ${passive?.description ?? ""}`)
           }
 
+          // PIERTOTUM LOCOMOTOR: dano = 100 × contador de Maldições do oponente
+          if (spell.special === "piertotum_scale" && !bloqueado) {
+            const opponentCount = target.unforgivableUsedCount ?? 0
+            const piertotumDamage = 100 * opponentCount
+            if (piertotumDamage > 0) {
+              applyDamageWithCircum(target.id, piertotumDamage, attacker.id, sn)
+              logs.push(`→ Piertotum Locomotor! ${attacker.name} causou ${piertotumDamage} de dano baseado nas ${opponentCount} Maldições de ${target.name}!`)
+            } else {
+              logs.push(`→ Piertotum Locomotor! ${target.name} ainda não usou Maldições. Dano 0.`)
+            }
+          }
+
+          // BRANQUIUM REMENDO: cura errática para ambos
+          if (spell.special === "branquium_heal" && !bloqueado) {
+            const totalHpAttacker = getTotalHP(attacker.hp)
+            const totalHpTarget = getTotalHP(target.hp)
+            const multAttacker = 0.25 + Math.random() * 1.75 // 0.25 to 2.0
+            const multTarget = 0.30 + Math.random() * 2.70 // 0.30 to 3.0
+            const healAttacker = Math.round(totalHpAttacker * multAttacker)
+            const healTarget = Math.round(totalHpTarget * multTarget)
+            state = state.map((d) => {
+              if (d.id === attacker.id) return { ...d, hp: healFlatTotal(d.hp, healAttacker) }
+              if (d.id === target.id) return { ...d, hp: healFlatTotal(d.hp, healTarget) }
+              return d
+            })
+            logs.push(`→ Branquium Remendo! ${attacker.name} curou ${healAttacker} HP (${(multAttacker * 100).toFixed(0)}×) e ${target.name} curou ${healTarget} HP (${(multTarget * 100).toFixed(0)}×)!`)
+          }
+
+          // SILÊNCIO: silencia última magia do oponente por 1 turno
+          if (spell.special === "silence_spell" && !bloqueado) {
+            const freshTarget = state.find((d) => d.id === target.id)
+            const lastSpell = freshTarget?.lastSpellUsed
+            if (lastSpell) {
+              state = state.map((d) => {
+                if (d.id === target.id) {
+                  const silenced = [...(d.silencedSpells || []), lastSpell]
+                  return { ...d, silencedSpells: silenced }
+                }
+                return d
+              })
+              logs.push(`→ Silêncio! "${lastSpell}" de ${target.name} foi silenciada por 1 turno!`)
+            } else {
+              logs.push(`→ Silêncio! ${target.name} ainda não usou nenhuma magia. Efeito falhou.`)
+            }
+          }
+
+          // DESILUSÃO: aplica invisibilidade ao oponente (1 turno) - oponente tem +25% chance de errar
+          if (spell.special === "desilusao_invisibility") {
+            state = state.map((d) => {
+              if (d.id === target.id) {
+                return { ...d, debuffs: [...d.debuffs, { type: "invisibility" as DebuffType, duration: 1 }] }
+              }
+              return d
+            })
+            logs.push(`→ Desilusão! ${target.name} está invisível! +25% chance de errar no próximo turno.`)
+          }
+
           // EXPULSO: remove 1 spell e insere outra imediatamente (sem "buraco" em spellMana/spells)
           // SEMINVISO: se a magia alvo estiver trancada, Expulso falha
           if (spell.special === "expulso_swap" && !bloqueado) {
@@ -1493,6 +1574,8 @@ export function calculateTurnOutcome(params: {
         lastRoundSpellWasLumus: n.includes("lumus") ? d.lastRoundSpellWasLumus : false,
         nextAccBonusPct: undefined,
         nextDamagePotionMult: undefined,
+        silencedSpells: undefined,
+        unforgivableUsedCount: undefined,
       }
     })
 

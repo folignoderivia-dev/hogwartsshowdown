@@ -150,6 +150,10 @@ export const SPELL_DATABASE: SpellInfo[] = [
   // Novas spells
   { name: "Locomotor Mortis", power: 0, accuracy: 100, pp: 10, cost: 1, priority: -1, canCrit: false, special: "locomotor_retaliate", effect: "Prioridade -1; devolve 25-150% do dano recebido no turno (sem crítico)" },
   { name: "Fiantu Dure", power: 0, accuracy: 100, pp: 3, cost: 1, special: "fiantu_mana_restore", effect: "Self: recupera 1-3 de mana em todos os feitiços do usuário" },
+  { name: "Piertotum Locomotor", power: 0, accuracy: 100, pp: 5, cost: 1, priority: 4, special: "piertotum_scale", effect: "Prioridade +4; dano = 100 × contador de Maldições do oponente" },
+  { name: "Branquium Remendo", power: 0, accuracy: 100, pp: 5, cost: 2, special: "branquium_heal", effect: "Cura errática: Self (0.25-2.0× HP) + Alvo (0.30-3.0× HP)" },
+  { name: "Silêncio", power: 0, accuracy: 80, pp: 5, cost: 1, special: "silence_spell", effect: "Se acertar: silencia última magia do oponente por 1 turno" },
+  { name: "Desilusão", power: 0, accuracy: 100, pp: 5, cost: 1, special: "desilusao_invisibility", effect: "Self: invisibilidade (1t) — oponente +25% chance de errar" },
   // ── Feitiços Exclusivos VIP ──────────────────────────────────────────────
   { name: "Legilimens", power: 0, accuracy: 100, pp: 5, cost: 2, isVipOnly: true, canCrit: false, special: "legilimens_reveal", effect: "👑 VIP: Revela o Grimório atual do oponente" },
   { name: "Fogo Maldito", powerMin: 100, powerMax: 100, accuracy: 44, pp: 5, cost: 2, isVipOnly: true, debuff: { type: "burn", chance: 100, duration: 2 }, special: "fogo_maldito_scale", effect: "👑 VIP: Área; poder +50 por 100 HP perdido; BURN (2t)" },

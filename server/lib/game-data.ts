@@ -133,6 +133,11 @@ export const SPELL_DATABASE: SpellInfo[] = [
   { name: "Protego Diabólico", power: 0, accuracy: 100, pp: 3, cost: 1, priority: 4, special: "protego_diabolico_unforgivable_acc_down", effect: "Área (exceto em si): reduz em 15% a precisão de Crucius, Avada Kedavra e Imperio por 2 turnos." },
   { name: "Protego Maximo", power: 0, accuracy: 100, pp: 2, cost: 1, priority: 6, special: "protego_maximo_unforgivable_heal", effect: "Self: ao receber Crucius/Avada/Imperio, cura totalmente a vida." },
   { name: "Maximos", power: 0, accuracy: 100, pp: 5, cost: 1, priority: 0, special: "maximos_charge", effect: "Self: proximo feitico +10% a +100% poder" },
+  // Novas spells
+  { name: "Piertotum Locomotor", power: 0, accuracy: 100, pp: 5, cost: 1, priority: 4, special: "piertotum_scale", effect: "Prioridade +4; dano = 100 × contador de Maldições do oponente" },
+  { name: "Branquium Remendo", power: 0, accuracy: 100, pp: 5, cost: 2, special: "branquium_heal", effect: "Cura errática: Self (0.25-2.0× HP) + Alvo (0.30-3.0× HP)" },
+  { name: "Silêncio", power: 0, accuracy: 80, pp: 5, cost: 1, special: "silence_spell", effect: "Se acertar: silencia última magia do oponente por 1 turno" },
+  { name: "Desilusão", power: 0, accuracy: 100, pp: 5, cost: 1, special: "desilusao_invisibility", effect: "Self: invisibilidade (1t) — oponente +25% chance de errar" },
   // ── Feitiços Exclusivos VIP ──────────────────────────────────────────────
   { name: "Legilimens", power: 0, accuracy: 100, pp: 5, cost: 2, isVipOnly: true, special: "legilimens_reveal", effect: "VIP: Revela o Grimório atual do oponente" },
   { name: "Fogo Maldito", powerMin: 100, powerMax: 100, accuracy: 44, pp: 5, cost: 2, isVipOnly: true, debuff: { type: "burn", chance: 100, duration: 2 }, special: "fogo_maldito_scale", effect: "VIP: Área; poder +50 por 100 HP perdido; BURN (2t)" },

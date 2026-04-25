@@ -35,6 +35,7 @@ export type DebuffType =
   | "unforgivable_block" // Expecto Patronum: bloqueia Maldições do alvo (1t)
   // Status de núcleos
   | "invulnerable" // Oraqui Orala: dano recebido será 0 (1 turno)
+  | "invisibility" // Desilusão: oponente tem +25% chance de errar (1 turno)
 
 export type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 
@@ -96,6 +97,10 @@ export interface Duelist {
   cinzalWeakenStacks?: number
   /** Tônico de Dragão: bônus de prioridade no próximo turno */
   nextTurnPriorityBonus?: number
+  /** Piertotum Locomotor: contador de Maldições Imperdoáveis usadas pelo jogador */
+  unforgivableUsedCount?: number
+  /** Silêncio: array de magias silenciadas por 1 turno */
+  silencedSpells?: string[]
 }
 
 export type Point = { x: number; y: number }
