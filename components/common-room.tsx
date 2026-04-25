@@ -417,8 +417,27 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const isVip = currentUser?.isVip ?? false
 
   const PIX_KEY = "guilhermefoligno@gmail.com"
-  const META_GOAL = 60
-  const META_CURRENT = 0
+  const [metaGoal, setMetaGoal] = useState(60)
+  const [metaCurrent, setMetaCurrent] = useState(0)
+
+  useEffect(() => {
+    const fetchMeta = async () => {
+      try {
+        const supabase = getSupabaseClient()
+        const { data, error } = await supabase
+          .from("game_settings")
+          .select("monthly_goal_value")
+          .eq("key", "monthly_goal")
+          .maybeSingle()
+        if (data?.monthly_goal_value) {
+          setMetaGoal(data.monthly_goal_value)
+        }
+      } catch {
+        // Keep default 60 on error
+      }
+    }
+    fetchMeta()
+  }, [])
 
   const handlePixCopy = () => {
     navigator.clipboard.writeText(PIX_KEY).then(() => { setPixCopied(true); setTimeout(() => setPixCopied(false), 2000) })
@@ -877,15 +896,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <div className="mx-auto mb-4 w-full max-w-2xl rounded-xl border border-amber-700/40 bg-stone-900/80 px-4 py-3 shadow-lg">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             {/* Barra de meta */}
-            <div className="flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-amber-300">☕ Meta do Servidor: R$ {META_CURRENT} / R$ {META_GOAL}</p>
-              </div>
-              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-stone-700">
+            <div className="mt-3 rounded border border-amber-700/50 bg-stone-800/80 p-2">
+              <p className="text-xs font-semibold text-amber-300">☕ Meta do Servidor: R$ {metaCurrent} / R$ {metaGoal}</p>
+              <div className="mt-1 h-2 rounded-full bg-stone-700">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all"
-                  style={{ width: `${Math.min(100, (META_CURRENT / META_GOAL) * 100)}%` }}
-                />
+                  className="h-2 rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
+                  style={{ width: `${Math.min(100, (metaCurrent / metaGoal) * 100)}%` }}
+                ></div>
               </div>
             </div>
             {/* Pitch VIP + botão */}
