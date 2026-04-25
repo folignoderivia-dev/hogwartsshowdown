@@ -44,7 +44,7 @@ interface CommonRoomProps {
   onCreateRoom?: (build: PlayerBuild) => void
   onJoinRoom?: (build: PlayerBuild, matchId: string) => void
   onRefreshRooms?: () => void
-  openRooms?: Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number }>
+  openRooms?: Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number; isVipRoom?: boolean }>
   onQuidditchRoomsUpdate?: (rooms: Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number }>) => void
   onSpectateMatch: (matchId: string, mode: PlayerBuild["gameMode"]) => void
   onResumeMatch?: () => void
@@ -647,6 +647,27 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const handleJoinRoomClick = (matchId: string) => {
     if (!currentUser || !onJoinRoom) return
     const room = openRooms.find((r) => r.matchId === matchId)
+    if (!room) return
+    
+    // VIP room validation: check if user has prohibited items
+    if (room.isVipRoom && customSettings.bannedSpells.length > 0) {
+      const prohibitedItems = customSettings.bannedSpells.filter((item) => 
+        selectedSpells.includes(item) || wand === item || potion === item
+      )
+      if (prohibitedItems.length > 0) {
+        setAuthError(`Sua build contém itens proibidos nesta sala VIP (${prohibitedItems.join(", ")}). Troque sua build para entrar.`)
+        return
+      }
+    }
+    
+    // Check if selected mode matches room mode
+    if (gameMode && gameMode !== "" && room.mode !== gameMode) {
+      setAuthError(`Modo selecionado (${gameMode}) não corresponde ao modo da sala (${room.mode}). Selecione o modo correto ou resete sua seleção.`)
+      // Reset mode selection to match the room
+      setGameMode(room.mode)
+      return
+    }
+    
     // Salas de Quadribol não exigem build completo — usa payload mínimo
     if (room?.mode === "quidditch") {
       const qPayload: PlayerBuild = {
@@ -1091,6 +1112,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     <div key={r.matchId} className="flex flex-col gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-amber-100">
                         {modeLabel} · Host: {r.host} · {r.playersJoined}/{r.playersExpected}
+                        {r.isVipRoom && <span className="ml-2 text-yellow-400 font-bold">[SALA VIP]</span>}
                       </span>
                       <Button
                         size="sm"
@@ -1923,20 +1945,38 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </div>
         </div>
 
-        {/* ── Botão Sala Personalizada (VIP) ─────────────────────────────── */}
+        {/* ── Botão Sala VIP/Torneio (VIP) ─────────────────────────────────── */}
         {isVip && gameMode !== "teste" && gameMode !== "torneio-offline" && (
-          <div className="mt-2">
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Button
               variant="outline"
               size="sm"
-              className={`w-full border text-xs ${showCustomRoom ? "border-yellow-500 bg-yellow-900/30 text-yellow-300" : "border-yellow-700/50 bg-stone-800/60 text-yellow-400 hover:bg-yellow-900/20"}`}
+              className="border-yellow-700/50 bg-stone-800/60 text-yellow-400 hover:bg-yellow-900/20 text-xs"
+              onClick={() => {
+                const payload = buildPayload()
+                if (!payload || !onCreateRoom) return
+                // Mark as VIP room by adding a special property
+                onCreateRoom({ ...payload, isVipRoom: true })
+              }}
+              disabled={!isReady}
+            >
+              <Crown className="mr-1.5 h-3.5 w-3.5" />
+              Criar Sala VIP
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`border text-xs ${showCustomRoom ? "border-yellow-500 bg-yellow-900/30 text-yellow-300" : "border-yellow-700/50 bg-stone-800/60 text-yellow-400 hover:bg-yellow-900/20"}`}
               onClick={() => setShowCustomRoom((v) => !v)}
             >
               <Crown className="mr-1.5 h-3.5 w-3.5" />
-              {showCustomRoom ? "Ocultar Regras da Sala" : "Criar Sala Personalizada VIP"}
+              {showCustomRoom ? "Ocultar Regras" : "Sala Personalizada"}
             </Button>
+          </div>
+        )}
 
-            {showCustomRoom && (
+        {/* ── Regras da Sala Personalizada (VIP) ─────────────────────────────── */}
+        {isVip && showCustomRoom && gameMode !== "teste" && gameMode !== "torneio-offline" && (
               <div className="mt-2 rounded-lg border border-yellow-700/40 bg-stone-900/90 p-4 text-sm">
                 <p className="mb-3 font-semibold text-yellow-300">👑 Regras da Sala Personalizada</p>
 
@@ -2038,7 +2078,6 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 <p className="text-[10px] text-amber-600">As regras serão compartilhadas com o oponente ao entrar na sala.</p>
               </div>
             )}
-          </div>
         )}
         {!isVip && isReady && gameMode && gameMode !== "teste" && gameMode !== "torneio-offline" && (
           <p className="mt-1 text-center text-[10px] text-amber-600/70">

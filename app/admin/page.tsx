@@ -57,11 +57,22 @@ export default function AdminPage() {
   const [userSearch, setUserSearch] = useState("")
   const [resettingRanking, setResettingRanking] = useState(false)
 
-  const fetchRequests = useCallback(async (s: string) => {
+  const fetchRequests = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
-      const res = await fetch(`/api/admin/vip-requests?secret=${encodeURIComponent(s)}`)
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError("Sessão não encontrada")
+        return
+      }
+      
+      const res = await fetch("/api/admin/vip-requests", {
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`
+        }
+      })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error ?? "Erro ao buscar requests")
@@ -69,7 +80,6 @@ export default function AdminPage() {
       }
       setRequests(data.requests ?? [])
       setAuthenticated(true)
-      setAdminSecret(s)
     } catch {
       setError("Falha de conexão")
     } finally {
@@ -77,11 +87,22 @@ export default function AdminPage() {
     }
   }, [])
 
-  const fetchReports = useCallback(async (s: string) => {
+  const fetchReports = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
-      const res = await fetch(`/api/admin/reports?secret=${encodeURIComponent(s)}`)
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError("Sessão não encontrada")
+        return
+      }
+      
+      const res = await fetch("/api/admin/reports", {
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`
+        }
+      })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error ?? "Erro ao buscar denúncias")
@@ -89,7 +110,6 @@ export default function AdminPage() {
       }
       setReports(data.reports ?? [])
       setAuthenticated(true)
-      setAdminSecret(s)
     } catch {
       setError("Falha de conexão")
     } finally {
@@ -97,12 +117,22 @@ export default function AdminPage() {
     }
   }, [])
 
-  const fetchUsers = useCallback(async (s: string, search = "") => {
+  const fetchUsers = useCallback(async (search = "") => {
     setLoading(true)
     setError("")
     try {
-      const url = `/api/admin/users?secret=${encodeURIComponent(s)}${search ? `&search=${encodeURIComponent(search)}` : ""}`
-      const res = await fetch(url)
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError("Sessão não encontrada")
+        return
+      }
+      
+      const res = await fetch("/api/admin/users", {
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`
+        }
+      })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error ?? "Erro ao buscar usuários")
@@ -110,7 +140,6 @@ export default function AdminPage() {
       }
       setUsers(data.users ?? [])
       setAuthenticated(true)
-      setAdminSecret(s)
     } catch {
       setError("Falha de conexão")
     } finally {
@@ -131,9 +160,8 @@ export default function AdminPage() {
             .eq("id", session.user.id)
             .maybeSingle()
           if (data?.is_admin === true) {
-            // Admin logado: buscar requests com senha padrão de admin
-            const envSecret = process.env.NEXT_PUBLIC_ADMIN_SECRET ?? "hogwarts-admin-2026"
-            await fetchRequests(envSecret)
+            // Admin logado: buscar requests
+            await fetchRequests()
           }
         }
       } catch {
@@ -147,16 +175,26 @@ export default function AdminPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    await fetchRequests(secret)
+    await fetchRequests()
   }
 
   const handleApprove = async (req: VipRequest, days = 30) => {
     setApproving(req.user_id)
     try {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setFeedback((prev) => ({ ...prev, [req.id]: "✗ Sessão não encontrada" }))
+        return
+      }
+      
       const res = await fetch("/api/vip/grant", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminSecret, userId: req.user_id, days }),
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ userId: req.user_id, days }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -283,9 +321,9 @@ export default function AdminPage() {
 
   const handleTabChange = (tab: AdminTab) => {
     setActiveTab(tab)
-    if (tab === "vip" && authenticated) fetchRequests(adminSecret)
-    if (tab === "reports" && authenticated) fetchReports(adminSecret)
-    if (tab === "users" && authenticated) fetchUsers(adminSecret, userSearch)
+    if (tab === "vip" && authenticated) fetchRequests()
+    if (tab === "reports" && authenticated) fetchReports()
+    if (tab === "users" && authenticated) fetchUsers(userSearch)
   }
 
   if (checkingSession) {
@@ -302,28 +340,9 @@ export default function AdminPage() {
         <div className="w-full max-w-sm rounded-xl border border-amber-800/40 bg-stone-900 p-8 shadow-2xl">
           <h1 className="mb-2 text-center text-2xl font-bold text-amber-300">🔒 Painel Admin</h1>
           <p className="mb-6 text-center text-xs text-stone-500">Hogwarts Showdown</p>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-xs text-amber-400">Senha de Admin</label>
-              <input
-                type="password"
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
-                placeholder="••••••••"
-                className="w-full rounded border border-amber-700/50 bg-stone-800 px-3 py-2 text-amber-100 placeholder:text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-600"
-              />
-            </div>
-            {error && <p className="text-xs text-red-400">{error}</p>}
-            <Button
-              type="submit"
-              disabled={loading || !secret}
-              className="w-full bg-amber-700 text-white hover:bg-amber-600"
-            >
-              {loading ? "Verificando..." : "Entrar"}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-xs text-stone-600">
-            Ou entre com uma conta Admin no jogo para acesso automático.
+          {error && <p className="mb-4 text-xs text-red-400">{error}</p>}
+          <p className="text-center text-xs text-stone-400">
+            Faça login no jogo com uma conta Admin para acessar este painel.
           </p>
         </div>
       </div>
@@ -402,7 +421,7 @@ export default function AdminPage() {
                 size="sm"
                 variant="outline"
                 className="border-amber-700 text-amber-400"
-                onClick={() => fetchRequests(adminSecret)}
+                onClick={() => fetchRequests()}
                 disabled={loading}
               >
                 {loading ? "Carregando..." : "↻ Atualizar"}
@@ -501,11 +520,11 @@ export default function AdminPage() {
                   placeholder="Buscar por nome ou email..."
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && fetchUsers(adminSecret, userSearch)}
+                  onKeyDown={(e) => e.key === "Enter" && fetchUsers(userSearch)}
                   className="border-amber-700 bg-stone-800 text-amber-100 placeholder:text-amber-700"
                 />
                 <Button
-                  onClick={() => fetchUsers(adminSecret, userSearch)}
+                  onClick={() => fetchUsers(userSearch)}
                   disabled={loading}
                   className="bg-amber-700 text-white hover:bg-amber-600"
                 >
@@ -594,7 +613,7 @@ export default function AdminPage() {
                 size="sm"
                 variant="outline"
                 className="border-amber-700 text-amber-400"
-                onClick={() => fetchReports(adminSecret)}
+                onClick={() => fetchReports()}
                 disabled={loading}
               >
                 {loading ? "Carregando..." : "↻ Atualizar"}

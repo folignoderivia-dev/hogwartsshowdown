@@ -20,5 +20,6 @@ export interface PlayerBuild {
   username?: string
   elo?: number
   isVip?: boolean
+  isVipRoom?: boolean
   customRoomSettings?: CustomRoomSettings
 }

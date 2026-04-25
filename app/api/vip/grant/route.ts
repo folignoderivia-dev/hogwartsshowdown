@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSupabaseClient } from "@/lib/supabase"
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET ?? "hogwarts-admin-2026"
 const PIX_MIN_CENTS = 1000  // R$ 10,00 em centavos
 
 function addDays(n: number): string {
@@ -14,11 +13,31 @@ export async function POST(req: NextRequest) {
 
   const supabase = getSupabaseClient()
 
-  // ── Ativação manual pelo Admin ─────────────────────────────────────────────
-  if (body.adminSecret) {
-    if (body.adminSecret !== ADMIN_SECRET) {
+  // ── Ativação manual pelo Admin (com autenticação de sessão) ─────────────────
+  if (body.userId && body.days) {
+    // Get session from Authorization header
+    const authHeader = req.headers.get("authorization")
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
+    
+    const token = authHeader.substring(7)
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) {
+      return NextResponse.json({ error: "Sessão inválida" }, { status: 401 })
+    }
+    
+    // Check if user is admin
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", user.id)
+      .maybeSingle()
+      
+    if (profileError || !profile?.is_admin) {
+      return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
+    }
+    
     const userId = String(body.userId ?? "")
     const days   = Number(body.days ?? 30)
     if (!userId) return NextResponse.json({ error: "userId obrigatório" }, { status: 400 })
