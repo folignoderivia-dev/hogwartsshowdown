@@ -2034,7 +2034,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               size="lg"
               disabled={!isReady}
               onClick={() => {
-                if (gameMode === "teste" || gameMode === "torneio-offline") {
+                if (gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta") {
                   handleStartDuel()
                 } else {
                   handleCreateRoomClick()
