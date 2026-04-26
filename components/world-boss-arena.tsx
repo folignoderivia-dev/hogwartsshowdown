@@ -84,26 +84,38 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
       }
       
       // Get boss index from world_boss_state table (id is always 1)
-      const { data: bossData } = await supabase
-        .from("world_boss_state")
-        .select("boss_index, current_hp")
-        .eq("id", 1)
-        .single()
-      
-      if (bossData) {
-        setBossIndex(bossData.boss_index || 0)
-        setBossHp(bossData.current_hp || 5000)
+      // If table doesn't exist or query fails, use defaults
+      try {
+        const { data: bossData } = await supabase
+          .from("world_boss_state")
+          .select("boss_index, current_hp")
+          .eq("id", 1)
+          .single()
+        
+        if (bossData) {
+          setBossIndex(bossData.boss_index || 0)
+          setBossHp(bossData.current_hp || 5000)
+        }
+      } catch (bossError) {
+        console.error("Failed to load boss state, using defaults:", bossError)
+        // Use defaults if table doesn't exist
+        setBossIndex(0)
+        setBossHp(5000)
       }
       
       // Get player's total damage
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("damagewb")
-        .eq("id", currentUser.id)
-        .single()
-      
-      if (profileData?.damagewb) {
-        setTotalDamage(profileData.damagewb)
+      try {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("damagewb")
+          .eq("id", currentUser.id)
+          .single()
+        
+        if (profileData?.damagewb) {
+          setTotalDamage(profileData.damagewb)
+        }
+      } catch (profileError) {
+        console.error("Failed to load player damage:", profileError)
       }
       
       setIsLoaded(true)
@@ -316,7 +328,7 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
             <div className="flex items-center justify-between mb-4 p-4 bg-stone-800/50 rounded-lg border border-amber-900/30">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-amber-800 rounded-full flex items-center justify-center overflow-hidden">
-                  {playerBuild.avatar ? (
+                  {playerBuild.avatar && playerBuild.avatar.startsWith('http') ? (
                     <img src={playerBuild.avatar} alt={currentUser.username} className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-2xl">🧙</span>
