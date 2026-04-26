@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     siteName: 'Varinhas Cruzadas',
     images: [
       {
-        url: '/og-image.png',
+        url: '/og-image.webp',
         width: 1200,
         height: 630,
         alt: 'Varinhas Cruzadas - Duelos Bruxos PvP',
@@ -46,10 +46,10 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Varinhas Cruzadas - Simulador de Duelos Bruxos & PvP Online',
     description: 'O sucessor espiritual dos jogos de navegador de HP. Duelos táticos, sistema de ranking estilo Pokémon Showdown e combate competitivo em tempo real.',
-    images: ['/og-image.png'],
+    images: ['/og-image.webp'],
   },
   icons: {
-    icon: '/favicon.png',
+    icon: '/favicon.webp',
     apple: '/apple-icon.png',
   },
 }
