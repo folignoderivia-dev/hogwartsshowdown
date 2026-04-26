@@ -894,7 +894,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     variant="outline"
                     size="sm"
                     className="border-purple-700 bg-purple-950/40 px-3 py-1 text-purple-300"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation()
                       if (tentativasFloresta > 0 && isReady) {
                         setShowForestTower(true)
                       }
