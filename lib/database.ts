@@ -85,6 +85,17 @@ export async function getRankingTop(limit = 50): Promise<DbUser[]> {
   return (data as ProfileRow[]).map((p) => mapProfile(p, ""))
 }
 
+export async function getRankingTopOffline(limit = 50): Promise<DbUser[]> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_SELECT)
+    .order("offline_wins", { ascending: false })
+    .limit(limit)
+  if (error || !data) return []
+  return (data as ProfileRow[]).map((p) => mapProfile(p, ""))
+}
+
 /** Concede status VIP por N dias (padrão 30). */
 export async function grantVip(userId: string, days = 30): Promise<boolean> {
   const supabase = getSupabaseClient()

@@ -25,6 +25,7 @@ import {
   getFriendMessages,
   getFriendsWithStats,
   getRankingTop,
+  getRankingTopOffline,
   loginUser,
   registerUser,
   removeFriend,
@@ -223,6 +224,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [showRankingPanel, setShowRankingPanel] = useState(true)
+  const [rankingMode, setRankingMode] = useState<"elo" | "offline">("elo")
   const [shareFeedback, setShareFeedback] = useState("")
 
   const [name, setName] = useState("")
@@ -507,7 +509,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     ))
 
   const refreshRanking = async () => {
-    const list = await getRankingTop(50)
+    const list = rankingMode === "elo" ? await getRankingTop(50) : await getRankingTopOffline(50)
     setRanking(list)
   }
 
@@ -522,7 +524,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
   useEffect(() => {
     void refreshRanking()
-  }, [currentUser])
+  }, [currentUser, rankingMode])
 
   // Refaz a lista quando o perfil muda (ex.: após duelo applyMatchElo atualiza wins/elo/favorite_spell).
   useEffect(() => {
@@ -1275,10 +1277,18 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           <CardHeader className={showRankingPanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
             <CardTitle className={`flex items-center text-sm text-amber-200 ${showRankingPanel ? "justify-between" : "justify-center"}`}>
               {showRankingPanel ? (
-                <span className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-amber-400" />
-                  {locale === 'en' ? 'Global Ranking (Top 50)' : 'Ranking global (Top 50)'}
-                </span>
+                  <span>{rankingMode === "elo" ? (locale === 'en' ? 'Global Ranking (Top 50)' : 'Ranking global (Top 50)') : (locale === 'en' ? 'PVE Ranking (Top 50)' : 'Ranking PVE (Top 50)')}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 border-amber-700 px-2 text-xs text-amber-300"
+                    onClick={() => setRankingMode(rankingMode === "elo" ? "offline" : "elo")}
+                  >
+                    {rankingMode === "elo" ? (locale === 'en' ? 'PVE' : 'PVE') : (locale === 'en' ? 'ELO' : 'ELO')}
+                  </Button>
+                </div>
               ) : (
                 <span className="sr-only">{locale === 'en' ? 'Global Ranking' : 'Ranking global'}</span>
               )}
@@ -1303,7 +1313,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   <span className="text-amber-200">
                     {i + 1}. {u.username}
                   </span>
-                  <span className="font-mono text-amber-400">{u.elo}</span>
+                  <span className="font-mono text-amber-400">{rankingMode === "elo" ? u.elo : u.offlineWins}</span>
                 </li>
               ))}
             </ol>
