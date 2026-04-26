@@ -27,6 +27,7 @@ import {
   getRankingTop,
   getRankingTopOffline,
   getRankingTopForest,
+  getForestAttempts,
   getUserById,
   loginUser,
   registerUser,
@@ -39,6 +40,7 @@ import {
 } from "@/lib/database"
 import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/supabase"
 import HomeLobbyChat from "@/components/home-lobby-chat"
+import ForestTower from "@/components/forest-tower"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
 
@@ -231,6 +233,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [showRankingPanel, setShowRankingPanel] = useState(true)
   const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest">("elo")
   const [shareFeedback, setShareFeedback] = useState("")
+  const [showForestTower, setShowForestTower] = useState(false)
+  const [tentativasFloresta, setTentativasFloresta] = useState(3)
 
   const [name, setName] = useState("")
   const [house, setHouse] = useState("")
@@ -538,6 +542,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     void refreshRanking()
   }, [currentUser, rankingMode])
 
+  useEffect(() => {
+    if (currentUser?.id) {
+      void (async () => {
+        const attempts = await getForestAttempts(currentUser.id)
+        setTentativasFloresta(attempts.attempts)
+      })()
+    }
+  }, [currentUser?.id])
 
   // Refaz a lista quando o perfil muda (ex.: após duelo applyMatchElo atualiza wins/elo/favorite_spell).
   useEffect(() => {
@@ -876,6 +888,22 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   {currentUser.username} {currentUser.offlineWins && currentUser.offlineWins > 0 && <span className="ml-1">🥇 ({currentUser.offlineWins})</span>} · ELO {currentUser.elo}
                   {isVip && <span className="ml-1 text-[10px] text-yellow-400">VIP</span>}
                 </Badge>
+                {currentUser && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-purple-700 bg-purple-950/40 px-3 py-1 text-purple-300"
+                    onClick={() => {
+                      if (tentativasFloresta > 0 && isReady) {
+                        setShowForestTower(true)
+                      }
+                    }}
+                    disabled={tentativasFloresta === 0 || !isReady}
+                  >
+                    🌲 {locale === "pt" ? "Floresta" : "Forest"} ({tentativasFloresta}/3)
+                  </Button>
+                )}
                 {currentUser?.isAdmin && (
                   <Button
                     type="button"
@@ -2005,7 +2033,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               size="lg"
               disabled={!isReady}
               onClick={() => {
-                if (gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta") {
+                if (gameMode === "teste" || gameMode === "torneio-offline") {
                   handleStartDuel()
                 } else {
                   handleCreateRoomClick()
@@ -2192,6 +2220,32 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         </div>
       </div>
 
+      {/* ── Forest Tower ──────────────────────────────────────────────────────── */}
+      {showForestTower && currentUser && (
+        <ForestTower
+          playerBuild={{
+            name: currentUser.username,
+            house,
+            wand,
+            potion,
+            spells: selectedSpells,
+            avatar,
+            gameMode: "torneio-offline",
+            userId: currentUser.id,
+            username: currentUser.username,
+            elo: currentUser.elo,
+          }}
+          currentUser={currentUser}
+          onExit={async () => {
+            setShowForestTower(false)
+            const attempts = await getForestAttempts(currentUser.id)
+            setTentativasFloresta(attempts.attempts)
+            const updatedUser = await getUserById(currentUser.id)
+            if (updatedUser) onAuthChange(updatedUser)
+          }}
+          onAuthChange={onAuthChange}
+        />
+      )}
 
       {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
       <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-[10px] text-amber-700/60">
