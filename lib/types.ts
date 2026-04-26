@@ -15,7 +15,7 @@ export interface PlayerBuild {
   potion: string
   spells: string[]
   avatar: string
-  gameMode: GameMode
+  gameMode?: GameMode
   userId?: string
   username?: string
   elo?: number

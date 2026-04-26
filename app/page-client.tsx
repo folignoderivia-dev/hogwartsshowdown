@@ -9,6 +9,7 @@ import type { PlayerBuild } from "@/lib/types"
 import CommonRoom from "@/components/common-room"
 import DuelArena from "@/components/duel-arena"
 import QuidditchArena from "@/components/quidditch-arena"
+import ForestTower from "@/components/forest-tower"
 
 export default function PageClient() {
   const [isClient, setIsClient] = useState(false)
@@ -345,6 +346,15 @@ export default function PageClient() {
           playerBuild={playerBuild!}
           matchId={activeMatchId || undefined}
           onReturn={handleReturnToCommonRoom}
+        />
+      ) : playerBuild?.gameMode === "floresta" ? (
+        <ForestTower
+          playerBuild={playerBuild!}
+          currentUser={accountUser!}
+          onExit={async () => {
+            handleReturnToCommonRoom()
+          }}
+          onAuthChange={setAccountUser}
         />
       ) : (
         <DuelArena
