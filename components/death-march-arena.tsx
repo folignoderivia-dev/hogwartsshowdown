@@ -135,7 +135,10 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
   
   const loadProgress = async () => {
     try {
-      const { data } = await supabase.from("profiles").select("march").eq("id", currentUser.id).single()
+      const { data, error } = await supabase.from("profiles").select("march").eq("id", currentUser.id).single()
+      if (error) {
+        console.log("March column not found, starting from 0")
+      }
       if (data && data.march) setMarchWins(data.march)
       setIsLoaded(true)
     } catch (error) {
@@ -226,7 +229,7 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
       addLog(locale === "en" ? `[March ${marchWins + 1}] Battle started! Field Rule: ${ruleName}` : `[Marcha ${marchWins + 1}] Batalha iniciada! Regra de Campo: ${ruleName}`)
       beginRoundSelection(round)
     }
-  }, [isLoaded, marchWins, selectRandomRule, buildDeathMarchRound, locale, addLog])
+  }, [isLoaded, selectRandomRule, buildDeathMarchRound, locale, addLog])
   
   const beginRoundSelection = (state: Duelist[] = duelists) => {
     if (gameOver) return
@@ -447,8 +450,8 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     addLog(locale === "en" ? "You were defeated..." : "Você foi derrotado...")
     
     try {
-      const { data } = await supabase.from("profiles").select("march").eq("id", currentUser.id).single()
-      if (data && marchWins > (data.march || 0)) {
+      const { data, error } = await supabase.from("profiles").select("march").eq("id", currentUser.id).single()
+      if (!error && data && marchWins > (data.march || 0)) {
         await supabase.from("profiles").update({ march: marchWins }).eq("id", currentUser.id)
         addLog(locale === "en" ? `🏆 New record: ${marchWins} wins!` : `🏆 Novo recorde: ${marchWins} vitórias!`)
       }
