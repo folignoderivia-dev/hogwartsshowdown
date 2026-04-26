@@ -65,9 +65,13 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
   
   // Initialize combat
   useEffect(() => {
-    initializeCombat()
     loadAttempts()
   }, [])
+  
+  // Initialize combat after loading attempts
+  useEffect(() => {
+    initializeCombat()
+  }, [currentFloor])
   
   const loadAttempts = async () => {
     try {
