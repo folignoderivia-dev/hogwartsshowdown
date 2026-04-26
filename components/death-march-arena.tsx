@@ -690,6 +690,17 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     const newMarchWins = marchWins + 1
     setMarchWins(newMarchWins)
     
+    // Save march record to database
+    try {
+      const { data, error } = await supabase.from("profiles").select("march").eq("id", currentUser.id).single()
+      if (!error && newMarchWins > (data?.march || 0)) {
+        await supabase.from("profiles").update({ march: newMarchWins }).eq("id", currentUser.id)
+        addLog(locale === "en" ? `🏆 New record: ${newMarchWins} wins!` : `🏆 Novo recorde: ${newMarchWins} vitórias!`)
+      }
+    } catch (error) {
+      console.error("Failed to save march record:", error)
+    }
+    
     setTimeout(() => {
       setGameOver(null)
       setPotionUsed(false)

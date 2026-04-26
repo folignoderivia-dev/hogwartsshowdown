@@ -136,6 +136,7 @@ export async function getRankingTopMarch(limit = 50): Promise<DbUser[]> {
   const { data, error } = await supabase
     .from("profiles")
     .select(PROFILE_SELECT)
+    .not("march", "is", null)
     .order("march", { ascending: false })
     .limit(limit)
   if (error || !data) return []
@@ -147,6 +148,7 @@ export async function getRankingTopDamagewb(limit = 50): Promise<DbUser[]> {
   const { data, error } = await supabase
     .from("profiles")
     .select(PROFILE_SELECT)
+    .not("damagewb", "is", null)
     .order("damagewb", { ascending: false })
     .limit(limit)
   if (error || !data) return []

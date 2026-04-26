@@ -34,11 +34,12 @@ const BOSS_IMAGES = [
 function buildSpellManaForSpells(spells: string[], house: string): Record<string, { current: number; max: number }> {
   const out: Record<string, { current: number; max: number }> = {}
   spells.forEach((sn) => {
-    const info = getSpellInfo(sn, SPELL_DATABASE)
-    if (!info) return
-    let max = info.pp
+    const spell = SPELL_DATABASE.find(s => s.name === sn)
+    if (!spell) return
+    // Use standard spell cost (same as regular duel arena)
+    let max = spell.cost || 3
     if (house === "gryffindor") max = Math.max(1, max + HOUSE_GDD.gryffindor.manaStartDelta)
-    if (house === "ravenclaw" && !info.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
+    if (house === "ravenclaw" && !spell.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
     out[sn] = { current: max, max }
   })
   return out
@@ -191,19 +192,19 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     }
     
     // Apply damage to boss
-    setBossHp(prev => Math.max(0, prev - damage))
-    setTotalDamage(prev => prev + damage)
-    
-    // Update world_boss_state table
-    try {
-      const newHp = Math.max(0, bossHp - damage)
-      await supabase
+    setBossHp(prev => {
+      const newHp = Math.max(0, prev - damage)
+      // Update world_boss_state table with the new HP
+      void supabase
         .from("world_boss_state")
         .update({ current_hp: newHp })
         .eq("id", 1)
-    } catch (error) {
-      console.error("Failed to update boss HP:", error)
-    }
+        .then(({ error }) => {
+          if (error) console.error("Failed to update boss HP:", error)
+        })
+      return newHp
+    })
+    setTotalDamage(prev => prev + damage)
     
     setSelectedSpell(null)
     
