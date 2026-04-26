@@ -1,0 +1,651 @@
+import { useState, useEffect, useCallback, useRef } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { getSupabaseClient } from "@/lib/supabase"
+import { FOREST_MONSTERS, getMonsterByFloor, type ForestMonster } from "@/lib/forest-data"
+import { SPELL_DATABASE, INITIAL_PLAYER_BUILD } from "@/lib/data-store"
+import type { PlayerBuild } from "@/lib/types"
+import { useLanguage } from "@/contexts/language-context"
+import type { AppLocale } from "@/contexts/language-context"
+import { Swords, Heart, Shield, Zap, X, Trophy } from "lucide-react"
+
+interface ForestTowerProps {
+  playerBuild: PlayerBuild
+  currentUser: { id: string; username: string; email: string; elo: number }
+  onExit: () => void
+  onAuthChange: (user: any) => void
+}
+
+interface CombatLog {
+  message: string
+  type: "player" | "monster" | "system" | "passive"
+}
+
+export default function ForestTower({ playerBuild, currentUser, onExit, onAuthChange }: ForestTowerProps) {
+  const { locale } = useLanguage()
+  const supabase = getSupabaseClient()
+  
+  const [currentFloor, setCurrentFloor] = useState(1)
+  const [playerHp, setPlayerHp] = useState(6)
+  const [maxPlayerHp] = useState(6)
+  const [monsterHp, setMonsterHp] = useState(0)
+  const [maxMonsterHp, setMaxMonsterHp] = useState(0)
+  const [selectedSpell, setSelectedSpell] = useState<string | null>(null)
+  const [turnNumber, setTurnNumber] = useState(0)
+  const [combatLog, setCombatLog] = useState<CombatLog[]>([])
+  const [isPlayerTurn, setIsPlayerTurn] = useState(true)
+  const [isCombatOver, setIsCombatOver] = useState(false)
+  const [combatResult, setCombatResult] = useState<"win" | "lose" | null>(null)
+  const [monster, setMonster] = useState<ForestMonster | null>(null)
+  
+  // Debuff states
+  const [playerDebuffs, setPlayerDebuffs] = useState<Set<string>>(new Set())
+  const [monsterDebuffs, setMonsterDebuffs] = useState<Set<string>>(new Set())
+  
+  // Passive states
+  const [monsterDamageMultiplier, setMonsterDamageMultiplier] = useState(1)
+  const [monsterDamageReduction, setMonsterDamageReduction] = useState(0)
+  const [arpeuMissCount, setArpeuMissCount] = useState(0)
+  const [barreteCritRate, setBarreteCritRate] = useState(25)
+  const [centaurTurnCount, setCentaurTurnCount] = useState(0)
+  const [erumpentTurnCount, setErumpentTurnCount] = useState(0)
+  const [werewolfHealed, setWerewolfHealed] = useState(false)
+  const [acromantulaTurnCount, setAcromantulaTurnCount] = useState(0)
+  const [playerSleepTurns, setPlayerSleepTurns] = useState(0)
+  const [playerPoisonTurns, setPlayerPoisonTurns] = useState(0)
+  const [monsterPoisonTurns, setMonsterPoisonTurns] = useState(0)
+  
+  const [attempts, setAttempts] = useState(3)
+  
+  // Initialize combat
+  useEffect(() => {
+    initializeCombat()
+    loadAttempts()
+  }, [])
+  
+  const loadAttempts = async () => {
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("forest_attempts, last_forest_attempt_date, floresta")
+        .eq("id", currentUser.id)
+        .single()
+      
+      if (data) {
+        const today = new Date().toISOString().split('T')[0]
+        const lastAttempt = data.last_forest_attempt_date ? new Date(data.last_forest_attempt_date).toISOString().split('T')[0] : null
+        
+        if (lastAttempt !== today) {
+          // Reset attempts for new day
+          await supabase
+            .from("profiles")
+            .update({ forest_attempts: 3, last_forest_attempt_date: today })
+            .eq("id", currentUser.id)
+          setAttempts(3)
+        } else {
+          setAttempts(data.forest_attempts || 3)
+        }
+        
+        if (data.floresta) {
+          setCurrentFloor(data.floresta + 1)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load attempts:", error)
+    }
+  }
+  
+  const initializeCombat = () => {
+    const currentMonster = getMonsterByFloor(currentFloor)
+    if (!currentMonster) return
+    
+    setMonster(currentMonster)
+    setMonsterHp(currentMonster.hp)
+    setMaxMonsterHp(currentMonster.hp)
+    setPlayerHp(maxPlayerHp)
+    setTurnNumber(0)
+    setCombatLog([])
+    setIsPlayerTurn(true)
+    setIsCombatOver(false)
+    setCombatResult(null)
+    setPlayerDebuffs(new Set())
+    setMonsterDebuffs(new Set())
+    setMonsterDamageMultiplier(1)
+    setMonsterDamageReduction(0)
+    setArpeuMissCount(0)
+    setBarreteCritRate(25)
+    setCentaurTurnCount(0)
+    setErumpentTurnCount(0)
+    setWerewolfHealed(false)
+    setAcromantulaTurnCount(0)
+    setPlayerSleepTurns(0)
+    setPlayerPoisonTurns(0)
+    setMonsterPoisonTurns(0)
+    
+    addLog(locale === "en" ? `Floor ${currentFloor}: ${currentMonster.nameEn} appears!` : `Andar ${currentFloor}: ${currentMonster.name} aparece!`, "system")
+  }
+  
+  const addLog = (message: string, type: CombatLog["type"]) => {
+    setCombatLog(prev => [...prev, { message, type }])
+  }
+  
+  const rollAccuracy = (accuracy: number): boolean => {
+    return Math.random() * 100 < accuracy
+  }
+  
+  const calculateDamage = (minDmg: number, maxDmg: number): number => {
+    return Math.floor(Math.random() * (maxDmg - minDmg + 1)) + minDmg
+  }
+  
+  const applyMonsterPassives = useCallback(() => {
+    if (!monster) return
+    
+    // Kelpie and Hippogrifo always have priority
+    if (monster.passive === "priority" || monster.passive === "priority_no_crit") {
+      return true // Monster acts first
+    }
+    return false
+  }, [monster])
+  
+  const handlePlayerAttack = async () => {
+    if (!selectedSpell || !monster || !isPlayerTurn || isCombatOver) return
+    
+    setIsPlayerTurn(false)
+    
+    // Check if player is sleeping
+    if (playerSleepTurns > 0) {
+      addLog(locale === "en" ? "You are sleeping and skip this turn!" : "Você está dormindo e perde este turno!", "system")
+      setPlayerSleepTurns(prev => prev - 1)
+      setTimeout(() => handleMonsterAttack(), 1000)
+      return
+    }
+    
+    const spell = SPELL_DATABASE.find(s => s.name === selectedSpell)
+    if (!spell) return
+    
+    // Calculate player accuracy with monster's reduction
+    const accReduction = Math.random() * (monster.opponentAccReduction.max - monster.opponentAccReduction.min) + monster.opponentAccReduction.min
+    const playerAccuracy = 100 - accReduction
+    
+    // Basilisco immunity to unforgivable curses
+    if (monster.passive === "basilisco_immunities" && spell.isUnforgivable) {
+      addLog(locale === "en" ? "The Basilisk is immune to unforgivable curses!" : "O Basilisco é imune a maldições imperdoáveis!", "passive")
+      setTimeout(() => handleMonsterAttack(), 1000)
+      return
+    }
+    
+    // Hippogrifo doesn't receive critical hits
+    const canCrit = monster.passive !== "priority_no_crit" && spell.canCrit !== false
+    const isCrit = canCrit && Math.random() * 100 < 10
+    
+    if (rollAccuracy(playerAccuracy)) {
+      let damage = calculateDamage(spell.powerMin || spell.power || 0, spell.powerMax || spell.power || 0)
+      
+      // Apply Arpeu damage growth on miss (opposite - player hit, so no growth)
+      if (monster.passive === "damage_on_miss") {
+        // No growth on hit
+      }
+      
+      // Rapinomonio mana drain on crit
+      if (monster.passive === "mana_drain_on_crit" && isCrit) {
+        addLog(locale === "en" ? "Rapinomonio drains your spell mana on critical hit!" : "Rapinomonio drena a mana da sua magia no acerto crítico!", "passive")
+      }
+      
+      // Centaur damage reduction
+      if (monster.passive === "damage_reduction_growth") {
+        const reduction = centaurTurnCount * 10
+        damage = Math.floor(damage * (1 - reduction / 100))
+      }
+      
+      // Acromantula damage reduction
+      if (monster.passive === "growth_stats") {
+        const reduction = acromantulaTurnCount * 20
+        damage = Math.floor(damage * (1 - reduction / 100))
+      }
+      
+      // Ocammy reflect damage
+      if (monster.passive === "reflect_damage") {
+        const reflectedDamage = Math.floor(damage * 0.2)
+        setPlayerHp(prev => Math.max(0, prev - reflectedDamage))
+        addLog(locale === "en" ? `Ocammy reflects ${reflectedDamage} damage to you!` : `Ocammy reflete ${reflectedDamage} de dano para você!`, "passive")
+      }
+      
+      if (isCrit) {
+        damage = Math.floor(damage * 1.5)
+        addLog(locale === "en" ? `CRITICAL HIT! ${spell.name} deals ${damage} damage!` : `ACERTO CRÍTICO! ${spell.name} causa ${damage} de dano!`, "player")
+      } else {
+        addLog(locale === "en" ? `${spell.name} deals ${damage} damage!` : `${spell.name} causa ${damage} de dano!`, "player")
+      }
+      
+      // Apply poison if spell has it (simplified)
+      if (monster.passive !== "poison_on_hit_immune" && spell.effect === "poison") {
+        setMonsterPoisonTurns(2)
+        addLog(locale === "en" ? "Monster is poisoned for 2 turns!" : "Monstro está envenenado por 2 turnos!", "system")
+      }
+      
+      setMonsterHp(prev => {
+        const newHp = Math.max(0, prev - damage)
+        if (newHp === 0) {
+          handleWin()
+        }
+        return newHp
+      })
+    } else {
+      addLog(locale === "en" ? `${spell.name} misses!` : `${spell.name} erra!`, "player")
+      
+      // Arpeu damage on miss
+      if (monster.passive === "damage_on_miss") {
+        setArpeuMissCount(prev => prev + 1)
+        addLog(locale === "en" ? "Arpeu's damage increases!" : "O dano do Arpeu aumenta!", "passive")
+      }
+    }
+    
+    setSelectedSpell(null)
+    
+    if (!isCombatOver) {
+      setTimeout(() => handleMonsterAttack(), 1000)
+    }
+  }
+  
+  const handleMonsterAttack = () => {
+    if (!monster || isCombatOver) return
+    
+    setTurnNumber(prev => prev + 1)
+    
+    // Apply monster turn-based passives
+    if (monster.passive === "critical_growth") {
+      setBarreteCritRate(prev => Math.min(100, prev + 10))
+    }
+    
+    if (monster.passive === "damage_reduction_growth") {
+      setCentaurTurnCount(prev => prev + 1)
+    }
+    
+    if (monster.passive === "growth_stats") {
+      setAcromantulaTurnCount(prev => prev + 1)
+    }
+    
+    if (monster.passive === "explode_after_6") {
+      setErumpentTurnCount(prev => prev + 1)
+      if (erumpentTurnCount + 1 >= 6) {
+        addLog(locale === "en" ? "Erumpent explodes for 400 damage!" : "Erumpente explode causando 400 de dano!", "passive")
+        setPlayerHp(prev => Math.max(0, prev - 400))
+        if (playerHp <= 400) {
+          handleLose()
+          return
+        }
+      }
+    }
+    
+    // Apply poison damage to monster
+    if (monsterPoisonTurns > 0) {
+      const poisonDamage = 1
+      setMonsterHp(prev => {
+        const newHp = Math.max(0, prev - poisonDamage)
+        setMonsterPoisonTurns(p => p - 1)
+        if (newHp === 0) {
+          handleWin()
+        }
+        return newHp
+      })
+      addLog(locale === "en" ? `Monster takes ${poisonDamage} poison damage!` : `Monstro recebe ${poisonDamage} de dano de veneno!`, "system")
+    }
+    
+    if (isCombatOver) return
+    
+    // Check if monster is immune to debuffs (Inferi, Basilisco)
+    const monsterImmuneToDebuffs = monster.passive === "immune_all_debuffs" || monster.passive === "basilisco_immunities"
+    
+    // Apply poison damage to player
+    if (playerPoisonTurns > 0) {
+      const poisonDamage = 1
+      setPlayerHp(prev => Math.max(0, prev - poisonDamage))
+      setPlayerPoisonTurns(p => p - 1)
+      addLog(locale === "en" ? `You take ${poisonDamage} poison damage!` : `Você recebe ${poisonDamage} de dano de veneno!`, "system")
+      
+      if (playerHp <= poisonDamage) {
+        handleLose()
+        return
+      }
+    }
+    
+    if (isCombatOver) return
+    
+    // Calculate monster damage
+    let damage = calculateDamage(monster.minDmg, monster.maxDmg)
+    
+    // Apply Arpeu damage on miss
+    if (monster.passive === "damage_on_miss" && arpeuMissCount > 0) {
+      damage = Math.floor(damage * (1 + arpeuMissCount * 0.5))
+    }
+    
+    // Apply Acromantula growth
+    if (monster.passive === "growth_stats") {
+      damage = Math.floor(damage * (1 + acromantulaTurnCount * 0.2))
+    }
+    
+    // Apply Barrete critical
+    if (monster.passive === "critical_growth" && Math.random() * 100 < barreteCritRate) {
+      damage = Math.floor(damage * 1.5)
+      addLog(locale === "en" ? "Red Cap critical hit!" : "Acerto crítico do Barrete Vermelho!", "passive")
+    }
+    
+    // Vampire life steal
+    if (monster.passive === "life_steal") {
+      const stolen = Math.floor(damage * 0.3)
+      setMonsterHp(prev => Math.min(maxMonsterHp, prev + stolen))
+      addLog(locale === "en" ? `Vampire steals ${stolen} HP!` : `Vampiro rouba ${stolen} de HP!`, "passive")
+    }
+    
+    // Sereiana random heal
+    if (monster.passive === "random_heal" && Math.random() < 0.3) {
+      const heal = Math.floor(damage * 0.5)
+      setMonsterHp(prev => Math.min(maxMonsterHp, prev + heal))
+      addLog(locale === "en" ? `Mermaid heals for ${heal} HP!` : `Sereiana cura ${heal} de HP!`, "passive")
+    }
+    
+    // Werewolf full heal once
+    if (monster.passive === "full_heal_once" && !werewolfHealed && monsterHp < maxMonsterHp * 0.3) {
+      setMonsterHp(maxMonsterHp)
+      setWerewolfHealed(true)
+      addLog(locale === "en" ? "Werewolf heals completely!" : "Lobisomem se cura completamente!", "passive")
+    }
+    
+    if (rollAccuracy(monster.accuracy)) {
+      setPlayerHp(prev => {
+        const newHp = Math.max(0, prev - damage)
+        if (newHp === 0) {
+          handleLose()
+        }
+        return newHp
+      })
+      addLog(locale === "en" ? `${monster.name} deals ${damage} damage!` : `${monster.name} causa ${damage} de dano!`, "monster")
+      
+      // Apply monster passives on hit
+      if (!monsterImmuneToDebuffs) {
+        // Fada sleep on hit
+        if (monster.passive === "sleep_on_hit" && Math.random() < 0.4) {
+          setPlayerSleepTurns(1)
+          addLog(locale === "en" ? "Fairy puts you to sleep! You skip next turn!" : "Fada coloca você para dormir! Você perde o próximo turno!", "passive")
+        }
+        
+        // Cava Charco poison on hit
+        if (monster.passive === "poison_on_hit_immune") {
+          setPlayerPoisonTurns(2)
+          addLog(locale === "en" ? "Dugbog poisons you for 2 turns!" : "Cava Charco envenena você por 2 turnos!", "passive")
+        }
+        
+        // Trasgo stun on hit
+        if (monster.passive === "stun_on_hit" && Math.random() < 0.25) {
+          setPlayerSleepTurns(1)
+          addLog(locale === "en" ? "Troll stuns you! You skip next turn!" : "Trasgo atordoa você! Você perde o próximo turno!", "passive")
+        }
+      }
+      
+      // Basilisco poison on hit (always applies, immune check is for debuffs from player)
+      if (monster.passive === "basilisco_immunities") {
+        setPlayerPoisonTurns(2)
+        addLog(locale === "en" ? "Basilisk poisons you for 2 turns!" : "Basilisco envenena você por 2 turnos!", "passive")
+      }
+      
+      // Bicho Papão reflect debuffs
+      if (monster.passive === "reflect_debuffs" && playerDebuffs.size > 0) {
+        addLog(locale === "en" ? "Bogeyman reflects debuffs back to you!" : "Bicho Papão reflete debuffs de volta para você!", "passive")
+        // Simplified: just add a message
+      }
+    } else {
+      addLog(locale === "en" ? `${monster.name} misses!` : `${monster.name} erra!`, "monster")
+    }
+    
+    setIsPlayerTurn(true)
+  }
+  
+  const handleWin = async () => {
+    setIsCombatOver(true)
+    setCombatResult("win")
+    addLog(locale === "en" ? "You defeated the monster!" : "Você derrotou o monstro!", "system")
+    
+    // Recover 100% HP
+    setPlayerHp(maxPlayerHp)
+    
+    // Update floor in Supabase
+    try {
+      const newFloor = currentFloor + 1
+      await supabase
+        .from("profiles")
+        .update({ floresta: newFloor })
+        .eq("id", currentUser.id)
+      
+      setCurrentFloor(newFloor)
+      
+      // Check if completed all floors
+      if (newFloor > 20) {
+        addLog(locale === "en" ? "🎉 Congratulations! You completed the Forbidden Forest Tower!" : "🎉 Parabéns! Você completou a Torre da Floresta Proibida!", "system")
+      } else {
+        addLog(locale === "en" ? `Advancing to floor ${newFloor}...` : `Avançando para o andar ${newFloor}...`, "system")
+        setTimeout(() => {
+          initializeCombat()
+        }, 2000)
+      }
+    } catch (error) {
+      console.error("Failed to update floor:", error)
+    }
+  }
+  
+  const handleLose = async () => {
+    setIsCombatOver(true)
+    setCombatResult("lose")
+    addLog(locale === "en" ? "You were defeated..." : "Você foi derrotado...", "system")
+    
+    // Decrease attempts
+    try {
+      const newAttempts = Math.max(0, attempts - 1)
+      await supabase
+        .from("profiles")
+        .update({ forest_attempts: newAttempts })
+        .eq("id", currentUser.id)
+      setAttempts(newAttempts)
+      
+      setTimeout(() => {
+        onExit()
+      }, 2000)
+    } catch (error) {
+      console.error("Failed to update attempts:", error)
+    }
+  }
+  
+  const handleExit = () => {
+    onExit()
+  }
+  
+  const playerSpells = playerBuild.spells || []
+  
+  return (
+    <div className="relative min-h-screen w-full overflow-hidden">
+      {/* Background */}
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url(https://i.postimg.cc/4yCRvvB2/floresta-noite.jpg)" }}
+      />
+      <div className="absolute inset-0 bg-black/40" />
+      
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4">
+        {/* Header */}
+        <div className="w-full max-w-4xl mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Badge className="bg-amber-900/80 border-amber-700 text-amber-100">
+                <Trophy className="w-4 h-4 mr-1" />
+                {locale === "en" ? "Floor" : "Andar"} {currentFloor}/20
+              </Badge>
+              <Badge className="bg-purple-900/80 border-purple-700 text-purple-100">
+                {locale === "en" ? "Attempts" : "Tentativas"}: {attempts}/3
+              </Badge>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-700 text-amber-100 hover:bg-amber-900/50"
+              onClick={handleExit}
+            >
+              <X className="w-4 h-4 mr-1" />
+              {locale === "en" ? "Exit" : "Sair"}
+            </Button>
+          </div>
+        </div>
+        
+        {/* Arena */}
+        {monster && (
+          <Card className="w-full max-w-4xl bg-stone-900/90 border-amber-800/50 backdrop-blur-sm">
+            <CardContent className="p-6">
+              {/* Monster Section */}
+              <div className="flex flex-col items-center mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="text-xl font-bold text-amber-100">
+                    {locale === "en" ? monster.nameEn : monster.name}
+                  </h2>
+                  <Badge className="bg-red-900/80 border-red-700 text-red-100">
+                    <Heart className="w-3 h-3 mr-1" />
+                    {monsterHp}/{maxMonsterHp}
+                  </Badge>
+                </div>
+                
+                {/* Monster Avatar */}
+                <div className="relative w-[75px] h-[75px] mb-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={monster.image}
+                    alt={locale === "en" ? monster.nameEn : monster.name}
+                    className="w-full h-full object-contain animate-bounce"
+                  />
+                </div>
+                
+                {/* Monster Passive */}
+                <p className="text-xs text-amber-300/80 text-center max-w-md">
+                  {locale === "en" ? monster.passiveDescriptionEn : monster.passiveDescription}
+                </p>
+              </div>
+              
+              {/* Player HUD */}
+              <div className="flex items-center justify-between mb-4 p-4 bg-stone-800/50 rounded-lg border border-amber-900/30">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-amber-800 rounded-full flex items-center justify-center text-2xl">
+                    🧙
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-amber-100">{currentUser.username}</p>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-green-900/80 border-green-700 text-green-100">
+                        <Heart className="w-3 h-3 mr-1" />
+                        {playerHp}/{maxPlayerHp}
+                      </Badge>
+                      <Badge className="bg-blue-900/80 border-blue-700 text-blue-100">
+                        <Zap className="w-3 h-3 mr-1" />
+                        {locale === "en" ? "Turn" : "Turno"} {turnNumber}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                
+                {playerSleepTurns > 0 && (
+                  <Badge className="bg-purple-900/80 border-purple-700 text-purple-100">
+                    💤 {playerSleepTurns} {locale === "en" ? "turn" : "turno"}
+                  </Badge>
+                )}
+                
+                {playerPoisonTurns > 0 && (
+                  <Badge className="bg-green-900/80 border-green-700 text-green-100">
+                    ☠️ {playerPoisonTurns} {locale === "en" ? "turn" : "turno"}
+                  </Badge>
+                )}
+              </div>
+              
+              {/* Combat Log */}
+              <div className="mb-4 p-3 bg-stone-950/50 rounded-lg border border-amber-900/30 max-h-32 overflow-y-auto">
+                {combatLog.map((log, i) => (
+                  <p key={i} className={`text-xs mb-1 ${
+                    log.type === "player" ? "text-green-400" :
+                    log.type === "monster" ? "text-red-400" :
+                    log.type === "passive" ? "text-purple-400" :
+                    "text-amber-300"
+                  }`}>
+                    {log.message}
+                  </p>
+                ))}
+              </div>
+              
+              {/* Spell Selection */}
+              {!isCombatOver && isPlayerTurn && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {playerSpells.map((spellName: string) => {
+                    const spell = SPELL_DATABASE.find(s => s.name === spellName)
+                    if (!spell) return null
+                    
+                    return (
+                      <Button
+                        key={spell.name}
+                        variant={selectedSpell === spell.name ? "default" : "outline"}
+                        className={`h-auto py-3 px-2 text-xs border-amber-700 ${
+                          selectedSpell === spell.name
+                            ? "bg-amber-700 text-white"
+                            : "text-amber-100 hover:bg-amber-900/50"
+                        }`}
+                        onClick={() => setSelectedSpell(spell.name)}
+                        disabled={playerSleepTurns > 0}
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="font-bold">{spell.name}</span>
+                          <span className="text-[10px] opacity-80">
+                            {spell.powerMin || spell.power}-{spell.powerMax || spell.power}
+                          </span>
+                          <span className="text-[10px] opacity-60">{spell.cost} pts</span>
+                        </div>
+                      </Button>
+                    )
+                  })}
+                </div>
+              )}
+              
+              {/* Attack Button */}
+              {!isCombatOver && isPlayerTurn && selectedSpell && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    className="bg-amber-700 hover:bg-amber-600 text-white px-8"
+                    onClick={handlePlayerAttack}
+                  >
+                    <Swords className="w-4 h-4 mr-2" />
+                    {locale === "en" ? "Cast Spell" : "Lançar Magia"}
+                  </Button>
+                </div>
+              )}
+              
+              {/* Combat Over */}
+              {isCombatOver && (
+                <div className="mt-4 text-center">
+                  {combatResult === "win" && (
+                    <div className="text-green-400 text-lg font-bold mb-4">
+                      🎉 {locale === "en" ? "Victory!" : "Vitória!"}
+                    </div>
+                  )}
+                  {combatResult === "lose" && (
+                    <div className="text-red-400 text-lg font-bold mb-4">
+                      💀 {locale === "en" ? "Defeated..." : "Derrotado..."}
+                    </div>
+                  )}
+                  <Button
+                    className="bg-amber-700 hover:bg-amber-600 text-white"
+                    onClick={handleExit}
+                  >
+                    {locale === "en" ? "Return to Lobby" : "Voltar ao Lobby"}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  )
+}

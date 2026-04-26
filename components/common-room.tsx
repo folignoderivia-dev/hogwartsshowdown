@@ -26,6 +26,8 @@ import {
   getFriendsWithStats,
   getRankingTop,
   getRankingTopOffline,
+  getRankingTopForest,
+  getForestAttempts,
   loginUser,
   registerUser,
   removeFriend,
@@ -37,6 +39,7 @@ import {
 } from "@/lib/database"
 import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/supabase"
 import HomeLobbyChat from "@/components/home-lobby-chat"
+import ForestTower from "@/components/forest-tower"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
 
@@ -224,7 +227,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [showRankingPanel, setShowRankingPanel] = useState(true)
-  const [rankingMode, setRankingMode] = useState<"elo" | "offline">("elo")
+  const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest">("elo")
+  const [showForestTower, setShowForestTower] = useState(false)
+  const [forestAttempts, setForestAttempts] = useState(3)
   const [shareFeedback, setShareFeedback] = useState("")
 
   const [name, setName] = useState("")
@@ -509,7 +514,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     ))
 
   const refreshRanking = async () => {
-    const list = rankingMode === "elo" ? await getRankingTop(50) : await getRankingTopOffline(50)
+    let list
+    if (rankingMode === "elo") {
+      list = await getRankingTop(50)
+    } else if (rankingMode === "offline") {
+      list = await getRankingTopOffline(50)
+    } else {
+      list = await getRankingTopForest(50)
+    }
     setRanking(list)
   }
 
@@ -525,6 +537,15 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   useEffect(() => {
     void refreshRanking()
   }, [currentUser, rankingMode])
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      void (async () => {
+        const attempts = await getForestAttempts(currentUser.id)
+        setForestAttempts(attempts.attempts)
+      })()
+    }
+  }, [currentUser?.id])
 
   // Refaz a lista quando o perfil muda (ex.: após duelo applyMatchElo atualiza wins/elo/favorite_spell).
   useEffect(() => {
@@ -856,6 +877,22 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
               🟢 {onlineWizards} {locale === "pt" ? "Bruxos Online" : "Wizards Online"}
             </Badge>
+            {currentUser && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-purple-700 bg-purple-950/40 px-3 py-1 text-purple-300"
+                onClick={() => {
+                  if (forestAttempts > 0 && isReady) {
+                    setShowForestTower(true)
+                  }
+                }}
+                disabled={forestAttempts === 0 || !isReady}
+              >
+                🌲 {locale === "pt" ? "Floresta" : "Forest"} ({forestAttempts}/3)
+              </Button>
+            )}
             {currentUser ? (
               <>
                 <Badge className={`border-amber-600 bg-stone-900 px-3 py-1 ${isVip ? "text-yellow-300" : "text-amber-200"}`}>
@@ -1279,14 +1316,18 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               {showRankingPanel ? (
                 <div className="flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-amber-400" />
-                  <span>{rankingMode === "elo" ? (locale === 'en' ? 'Global Ranking (Top 50)' : 'Ranking global (Top 50)') : (locale === 'en' ? 'PVE Ranking (Top 50)' : 'Ranking PVE (Top 50)')}</span>
+                  <span>{rankingMode === "elo" ? (locale === 'en' ? 'Global Ranking (Top 50)' : 'Ranking global (Top 50)') : rankingMode === "offline" ? (locale === 'en' ? 'PVE Ranking (Top 50)' : 'Ranking PVE (Top 50)') : (locale === 'en' ? 'Forest Ranking (Top 50)' : 'Ranking da Floresta (Top 50)')}</span>
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-6 border-amber-700 px-2 text-xs text-amber-300"
-                    onClick={() => setRankingMode(rankingMode === "elo" ? "offline" : "elo")}
+                    onClick={() => {
+                      if (rankingMode === "elo") setRankingMode("offline")
+                      else if (rankingMode === "offline") setRankingMode("forest")
+                      else setRankingMode("elo")
+                    }}
                   >
-                    {rankingMode === "elo" ? (locale === 'en' ? 'PVE' : 'PVE') : (locale === 'en' ? 'ELO' : 'ELO')}
+                    {rankingMode === "elo" ? (locale === 'en' ? 'PVE' : 'PVE') : rankingMode === "offline" ? (locale === 'en' ? 'Forest' : 'Floresta') : (locale === 'en' ? 'ELO' : 'ELO')}
                   </Button>
                 </div>
               ) : (
@@ -1313,7 +1354,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   <span className="text-amber-200">
                     {i + 1}. {u.username}
                   </span>
-                  <span className="font-mono text-amber-400">{rankingMode === "elo" ? u.elo : u.offlineWins}</span>
+                  <span className="font-mono text-amber-400">{rankingMode === "elo" ? u.elo : rankingMode === "offline" ? u.offlineWins : u.floresta || 0}</span>
                 </li>
               ))}
             </ol>
@@ -2168,6 +2209,33 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         )}
         </div>
       </div>
+
+      {/* ── Forest Tower ──────────────────────────────────────────────────────── */}
+      {showForestTower && currentUser && (
+        <ForestTower
+          playerBuild={{
+            name: currentUser.username,
+            house,
+            wand,
+            potion,
+            spells: selectedSpells,
+            avatar,
+            gameMode: "torneio-offline",
+            userId: currentUser.id,
+            username: currentUser.username,
+            elo: currentUser.elo,
+          }}
+          currentUser={currentUser}
+          onExit={async () => {
+            setShowForestTower(false)
+            const attempts = await getForestAttempts(currentUser.id)
+            setForestAttempts(attempts.attempts)
+            const updatedUser = await getUserById(currentUser.id)
+            if (updatedUser) onAuthChange(updatedUser)
+          }}
+          onAuthChange={onAuthChange}
+        />
+      )}
 
       {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
       <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-[10px] text-amber-700/60">

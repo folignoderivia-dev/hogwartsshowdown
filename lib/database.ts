@@ -20,6 +20,9 @@ export interface DbUser {
   vipExpires?: string | null
   avatarUrl?: string | null
   isAdmin?: boolean
+  floresta?: number
+  forestAttempts?: number
+  lastForestAttemptDate?: string | null
 }
 
 interface ProfileRow {
@@ -35,9 +38,12 @@ interface ProfileRow {
   vip_expires?: string | null
   avatar_url?: string | null
   is_admin?: boolean | null
+  floresta?: number | null
+  forest_attempts?: number | null
+  last_forest_attempt_date?: string | null
 }
 
-const PROFILE_SELECT = "id,username,elo,wins,losses,offline_wins,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin"
+const PROFILE_SELECT = "id,username,elo,wins,losses,offline_wins,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin,floresta,forest_attempts,last_forest_attempt_date"
 
 function isVipActive(row: ProfileRow): boolean {
   if (!row.is_vip) return false
@@ -60,6 +66,9 @@ function mapProfile(profile: ProfileRow, email: string): DbUser {
     isVip: isVipActive(profile),
     vipExpires: profile.vip_expires ?? null,
     avatarUrl: profile.avatar_url ?? null,
+    floresta: profile.floresta ?? 0,
+    forestAttempts: profile.forest_attempts ?? 3,
+    lastForestAttemptDate: profile.last_forest_attempt_date ?? null,
   }
 }
 
@@ -94,6 +103,69 @@ export async function getRankingTopOffline(limit = 50): Promise<DbUser[]> {
     .limit(limit)
   if (error || !data) return []
   return (data as ProfileRow[]).map((p) => mapProfile(p, ""))
+}
+
+export async function getRankingTopForest(limit = 50): Promise<DbUser[]> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_SELECT)
+    .order("floresta", { ascending: false })
+    .limit(limit)
+  if (error || !data) return []
+  return (data as ProfileRow[]).map((p) => mapProfile(p, ""))
+}
+
+export async function updateForestFloor(userId: string, floor: number): Promise<boolean> {
+  const supabase = getSupabaseClient()
+  const { error } = await supabase
+    .from("profiles")
+    .update({ floresta: floor })
+    .eq("id", userId)
+  return !error
+}
+
+export async function decrementForestAttempts(userId: string): Promise<number> {
+  const supabase = getSupabaseClient()
+  const profile = await getProfileById(userId)
+  if (!profile) return 0
+  
+  const currentAttempts = profile.forest_attempts ?? 3
+  const newAttempts = Math.max(0, currentAttempts - 1)
+  const today = new Date().toISOString().split('T')[0]
+  
+  const { error } = await supabase
+    .from("profiles")
+    .update({ forest_attempts: newAttempts, last_forest_attempt_date: today })
+    .eq("id", userId)
+  
+  if (error) return currentAttempts
+  return newAttempts
+}
+
+export async function getForestAttempts(userId: string): Promise<{ attempts: number; lastAttemptDate: string | null }> {
+  const supabase = getSupabaseClient()
+  const { data } = await supabase
+    .from("profiles")
+    .select("forest_attempts, last_forest_attempt_date")
+    .eq("id", userId)
+    .single()
+  
+  if (!data) return { attempts: 3, lastAttemptDate: null }
+  
+  const today = new Date().toISOString().split('T')[0]
+  const lastAttempt = data.last_forest_attempt_date ? new Date(data.last_forest_attempt_date).toISOString().split('T')[0] : null
+  
+  // Reset attempts if it's a new day
+  if (lastAttempt !== today) {
+    await supabase
+      .from("profiles")
+      .update({ forest_attempts: 3, last_forest_attempt_date: today })
+      .eq("id", userId)
+    return { attempts: 3, lastAttemptDate: today }
+  }
+  
+  return { attempts: data.forest_attempts ?? 3, lastAttemptDate: data.last_forest_attempt_date ?? null }
 }
 
 /** Concede status VIP por N dias (padrão 30). */
