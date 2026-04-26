@@ -11,6 +11,7 @@ import DuelArena from "@/components/duel-arena"
 import QuidditchArena from "@/components/quidditch-arena"
 import ForestTower from "@/components/forest-tower"
 import StoryArena from "@/components/story-arena"
+import DeathMarchArena from "@/components/death-march-arena"
 
 export default function PageClient() {
   const [isClient, setIsClient] = useState(false)
@@ -365,6 +366,14 @@ export default function PageClient() {
             handleReturnToCommonRoom()
           }}
           onAuthChange={setAccountUser}
+        />
+      ) : playerBuild?.gameMode === "death-march" ? (
+        <DeathMarchArena
+          playerBuild={playerBuild!}
+          currentUser={accountUser!}
+          onExit={async () => {
+            handleReturnToCommonRoom()
+          }}
         />
       ) : (
         <DuelArena

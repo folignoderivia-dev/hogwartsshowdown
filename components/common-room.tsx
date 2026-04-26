@@ -135,6 +135,7 @@ const GAME_MODES = [
   { value: "teste" },
   { value: "torneio-offline" },
   { value: "historia" },
+  { value: "death-march" },
   { value: "1v1" },
   { value: "2v2" },
   { value: "ffa3" },
@@ -148,6 +149,7 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
     teste: "TESTE (BOT)",
     "torneio-offline": "TORNEIO-OFFLINE",
     historia: "📖 MODO HISTÓRIA (OFFLINE)",
+    "death-march": "💀 MARCHA DA MORTE (OFFLINE)",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
@@ -159,6 +161,7 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
     teste: "TEST (BOT)",
     "torneio-offline": "TOURNAMENT-OFFLINE",
     historia: "📖 STORY MODE (OFFLINE)",
+    "death-march": "💀 DEATH MARCH (OFFLINE)",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
@@ -246,7 +249,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
   const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
-  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "historia" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "">("")
+  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "historia" | "death-march" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "">("")
 
   // ── Builds Salvas ────────────────────────────────────────────────────────
   interface SavedBuild {
@@ -739,7 +742,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     }
     
     // Check if selected mode matches room mode
-    if (gameMode && room.mode !== gameMode) {
+    if (gameMode && room.mode && room.mode !== gameMode) {
       setAuthError(locale === 'en' ? `Selected mode (${gameMode}) does not match room mode (${room.mode}). Select the correct mode or reset your selection.` : `Modo selecionado (${gameMode}) não corresponde ao modo da sala (${room.mode}). Selecione o modo correto ou resete sua seleção.`)
       // Reset mode selection to match the room
       setGameMode(room.mode)
@@ -1137,7 +1140,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                         className="h-7 border-amber-700 text-amber-200"
                         onClick={async () => {
                           const origin = typeof window !== "undefined" ? window.location.origin : ""
-                          const shareUrl = `${origin}/?spectate=${encodeURIComponent(d.matchId)}&mode=${encodeURIComponent(d.mode)}`
+                          const mode = d.mode || "1v1"
+                          const shareUrl = `${origin}/?spectate=${encodeURIComponent(d.matchId)}&mode=${encodeURIComponent(mode)}`
                           await navigator.clipboard.writeText(shareUrl)
                           setShareFeedback(locale === 'en' ? 'Spectator link copied.' : 'Link de espectador copiado.')
                           window.setTimeout(() => setShareFeedback(""), 1800)
@@ -1211,7 +1215,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               ) : (
                 <div className="space-y-2">
                   {openRooms.map((r) => {
-                    const modeLabel = r.mode === "1v1" ? ui.duel1v1 : r.mode === "2v2" ? ui.battle2v2 : r.mode === "ffa" ? ui.ffa4 : r.mode === "ffa3" ? ui.ffa3 : r.mode === "quidditch" ? MODE_LABELS[locale].quidditch : r.mode.toUpperCase()
+                    const modeLabel = r.mode === "1v1" ? ui.duel1v1 : r.mode === "2v2" ? ui.battle2v2 : r.mode === "ffa" ? ui.ffa4 : r.mode === "ffa3" ? ui.ffa3 : r.mode === "quidditch" ? MODE_LABELS[locale].quidditch : (r.mode || "").toUpperCase()
                     return (
                     <div key={r.matchId} className="flex flex-col gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-amber-100">
