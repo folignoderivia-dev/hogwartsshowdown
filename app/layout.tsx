@@ -59,8 +59,31 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Varinhas Cruzadas',
+    description: 'O sucessor espiritual dos jogos de navegador de HP. Duelos táticos, sistema de ranking estilo Pokémon Showdown e combate competitivo em tempo real.',
+    url: 'https://varinhascruzadas.com.br',
+    applicationCategory: 'GameApplication',
+    genre: 'RPG',
+    keywords: 'Hogwarts MMO, Harry Potter MMO, Hogwarts Online, Harry Potter Online, Varinhas Cruzadas, Hogwarts PvP, Simulador de Duelo, Duelos Bruxos, Pokémon Showdown',
+    operatingSystem: 'Web Browser',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'BRL',
+    },
+  }
+
   return (
-    <html lang="en" className="dark bg-background">
+    <html lang="pt-BR" className="dark bg-background">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body className={`font-sans antialiased ${_cinzel.variable} ${_playfair.variable} ${oswald.variable}`}>
         <LanguageProvider>
           {children}

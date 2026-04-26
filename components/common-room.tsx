@@ -1821,7 +1821,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     >
                       <img
                         src={av.image}
-                        alt={av.label}
+                        alt={`${av.label} - Avatar de bruxo para Varinhas Cruzadas`}
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         onError={(e) => {
@@ -2592,7 +2592,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               ) : (
                 <div className="flex flex-col items-center gap-4">
                   <div className="relative w-32 h-32">
-                    <img src={revealedSticker} alt="Sticker" className="w-full h-full object-contain" />
+                    <img src={revealedSticker} alt="Sticker coletável do jogo Varinhas Cruzadas" className="w-full h-full object-contain" />
                   </div>
                   <p className="text-center text-amber-300">
                     {locale === "pt" ? "Você ganhou um sticker!" : "You won a sticker!"}
