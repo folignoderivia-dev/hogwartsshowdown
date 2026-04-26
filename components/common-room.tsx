@@ -43,6 +43,7 @@ import {
   signOutUser,
   updateServerMeta,
   getServerMeta,
+  logAppError,
 } from "@/lib/database"
 import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/supabase"
 import HomeLobbyChat from "@/components/home-lobby-chat"
@@ -258,6 +259,86 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [showAdminPanel, setShowAdminPanel] = useState(false)
   const [isGmModalOpen, setIsGmModalOpen] = useState(false)
   const [gmMessage, setGmMessage] = useState("")
+
+  // ── Global Error Telemetry ─────────────────────────────────────────────────
+  const lastLoggedErrorRef = useRef<{ message: string; timestamp: number } | null>(null)
+  const ERROR_DEBOUNCE_MS = 1000 // Prevent logging same error within 1 second
+
+  const sanitizeError = (error: string): string => {
+    // Remove potential sensitive data (passwords, tokens, etc.)
+    return error
+      .replace(/password["']?\s*[:=]\s*["']?[^"'\s]+/gi, 'password=[REDACTED]')
+      .replace(/token["']?\s*[:=]\s*["']?[^"'\s]+/gi, 'token=[REDACTED]')
+      .replace(/api[_-]?key["']?\s*[:=]\s*["']?[^"'\s]+/gi, 'api_key=[REDACTED]')
+      .replace(/secret["']?\s*[:=]\s*["']?[^"'\s]+/gi, 'secret=[REDACTED]')
+  }
+
+  const logGlobalError = async (errorName: string, errorMessage: string, stackTrace?: string) => {
+    const sanitizedMessage = sanitizeError(errorMessage)
+    const sanitizedStack = stackTrace ? sanitizeError(stackTrace) : undefined
+
+    // Spam filter - prevent logging same error within debounce window
+    const now = Date.now()
+    if (lastLoggedErrorRef.current) {
+      const { message, timestamp } = lastLoggedErrorRef.current
+      if (message === sanitizedMessage && now - timestamp < ERROR_DEBOUNCE_MS) {
+        return // Skip duplicate error within debounce window
+      }
+    }
+
+    lastLoggedErrorRef.current = { message: sanitizedMessage, timestamp: now }
+
+    try {
+      await logAppError({
+        userId: currentUser?.id || "unknown",
+        username: currentUser?.username || "Unknown",
+        errorName,
+        errorMessage: sanitizedMessage,
+        component: "GLOBAL",
+        stackTrace: sanitizedStack,
+        url: typeof window !== "undefined" ? window.location.href : undefined,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      })
+    } catch (e) {
+      console.error("Failed to log global error:", e)
+    }
+  }
+
+  useEffect(() => {
+    // Handle global JavaScript errors
+    const handleGlobalError = (event: ErrorEvent) => {
+      console.error("Global error caught:", event.error)
+      logGlobalError(
+        "Global Error",
+        event.message || "Unknown error",
+        event.error?.stack
+      )
+    }
+
+    // Handle unhandled promise rejections
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error("Unhandled promise rejection:", event.reason)
+      logGlobalError(
+        "Unhandled Promise Rejection",
+        event.reason?.toString() || "Unknown rejection reason",
+        event.reason?.stack
+      )
+    }
+
+    // Add event listeners
+    if (typeof window !== "undefined") {
+      window.addEventListener('error', handleGlobalError)
+      window.addEventListener('unhandledrejection', handleUnhandledRejection)
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener('error', handleGlobalError)
+        window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+      }
+    }
+  }, [currentUser])
 
   const [name, setName] = useState("")
   const [house, setHouse] = useState("")
