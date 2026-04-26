@@ -5,7 +5,7 @@ import { FlaskConical, Wand2, X, Skull } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { HOUSE_GDD, HOUSE_MODIFIERS, SPELL_DATABASE } from "@/lib/data-store"
-import type { ArenaVfxState, BattleStatus, Duelist, HPState } from "@/lib/arena-types"
+import type { ArenaVfxState, BattleStatus, Duelist, HPState, DebuffType } from "@/lib/arena-types"
 import type { PlayerBuild } from "@/lib/types"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
@@ -213,8 +213,8 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
   useEffect(() => {
     if (isLoaded) {
       setBackgroundImage(SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)])
-      selectRandomRule()
-      const swapSpells = currentRule?.id === "amnesia_arcana"
+      const rule = selectRandomRule()
+      const swapSpells = rule.id === "amnesia_arcana"
       const round = buildDeathMarchRound(swapSpells)
       setDuelists(round)
       setPotionUsed(false)
@@ -222,10 +222,11 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
       setPendingActions({})
       setTurnNumber(1)
       setGameOver(null)
-      addLog(locale === "en" ? `[March ${marchWins + 1}] Battle started!` : `[Marcha ${marchWins + 1}] Batalha iniciada!`)
+      const ruleName = locale === "en" ? rule.nameEn : rule.name
+      addLog(locale === "en" ? `[March ${marchWins + 1}] Battle started! Field Rule: ${ruleName}` : `[Marcha ${marchWins + 1}] Batalha iniciada! Regra de Campo: ${ruleName}`)
       beginRoundSelection(round)
     }
-  }, [isLoaded, marchWins, currentRule, selectRandomRule, buildDeathMarchRound, locale, addLog])
+  }, [isLoaded, marchWins, selectRandomRule, buildDeathMarchRound, locale, addLog])
   
   const beginRoundSelection = (state: Duelist[] = duelists) => {
     if (gameOver) return
@@ -286,6 +287,37 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
         }
         return { ...d, hp: { bars: newBars } }
       })
+    }
+    
+    if (currentRule?.id === "maldicao_caos") {
+      const debuffTypes: DebuffType[] = ["burn", "poison", "slow", "damage_amp", "damage_reduce"]
+      state = state.map((d) => {
+        if (isDefeated(d.hp)) return d
+        const randomDebuff = debuffTypes[Math.floor(Math.random() * debuffTypes.length)]
+        const existing = d.debuffs.find((db) => db.type === randomDebuff)
+        if (existing) return d
+        return { ...d, debuffs: [...d.debuffs, { type: randomDebuff, duration: 1 }] }
+      })
+    }
+    
+    if (currentRule?.id === "bencao_acaso") {
+      const alive = state.filter((d) => !isDefeated(d.hp))
+      if (alive.length > 0) {
+        const luckyOne = alive[Math.floor(Math.random() * alive.length)]
+        const healAmount = Math.floor(Math.random() * 151) + 50 // 50-200
+        state = state.map((d) => {
+          if (d.id !== luckyOne.id) return d
+          const total = getTotalHP(d.hp)
+          const newTotal = Math.min(500, total + healAmount)
+          const newBars: number[] = []
+          let remaining = newTotal
+          for (let i = 0; i < d.hp.bars.length; i++) {
+            newBars.push(Math.min(100, remaining))
+            remaining -= 100
+          }
+          return { ...d, hp: { bars: newBars } }
+        })
+      }
     }
     
     setDuelists(state)
@@ -393,14 +425,15 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     setTimeout(() => {
       setGameOver(null)
       setPotionUsed(false)
-      selectRandomRule()
-      const swapSpells = currentRule?.id === "amnesia_arcana"
+      const rule = selectRandomRule()
+      const swapSpells = rule.id === "amnesia_arcana"
       const round = buildDeathMarchRound(swapSpells)
       setDuelists(round)
       setTurnNumber(1)
       turnNumberRef.current = 1
       setBattleStatus("selecting")
-      addLog(locale === "en" ? `[March ${newMarchWins + 1}] New battle!` : `[Marcha ${newMarchWins + 1}] Nova batalha!`)
+      const ruleName = locale === "en" ? rule.nameEn : rule.name
+      addLog(locale === "en" ? `[March ${newMarchWins + 1}] New battle! Field Rule: ${ruleName}` : `[Marcha ${newMarchWins + 1}] Nova batalha! Regra de Campo: ${ruleName}`)
       beginRoundSelection(round)
     }, 2000)
   }
