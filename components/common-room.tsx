@@ -145,7 +145,6 @@ const GAME_MODES = [
   { value: "ffa" },
   { value: "quidditch" },
   { value: "floresta" },
-  { value: "worldboss" },
 ] as const
 
 const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"], string>> = {
@@ -160,7 +159,6 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
     ffa: "ALL IN ONE (4 FFA)",
     quidditch: "🏆 QUADRIBOL 1v1",
     floresta: "🌲 FLORESTA PROIBIDA (OFFLINE)",
-    worldboss: "🐉 WORLD BOSS (OFFLINE)",
   },
   en: {
     teste: "TEST (BOT)",
@@ -173,7 +171,6 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
     ffa: "ALL IN ONE (4 FFA)",
     quidditch: "🏆 QUIDDITCH 1v1",
     floresta: "🌲 FORBIDDEN FOREST (OFFLINE)",
-    worldboss: "🐉 WORLD BOSS (OFFLINE)",
   },
 }
 
