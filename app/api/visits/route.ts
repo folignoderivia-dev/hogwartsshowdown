@@ -1,36 +1,40 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseClient } from '@/lib/supabase'
+import { revalidatePath } from 'next/cache'
 
-// Table name for visit tracking
-const VISITS_TABLE = 'site_visits'
+// Simple file-based visit counter that doesn't require database
+const VISIT_COUNT_FILE = 'public/visit-count.json'
+
+// Helper to read visit count from file
+async function readVisitCount(): Promise<number> {
+  try {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const filePath = path.join(process.cwd(), VISIT_COUNT_FILE)
+    const data = await fs.readFile(filePath, 'utf-8')
+    const json = JSON.parse(data)
+    return json.count || 0
+  } catch (error) {
+    // File doesn't exist or error reading, return 0
+    return 0
+  }
+}
+
+// Helper to write visit count to file
+async function writeVisitCount(count: number): Promise<void> {
+  try {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const filePath = path.join(process.cwd(), VISIT_COUNT_FILE)
+    await fs.writeFile(filePath, JSON.stringify({ count }), 'utf-8')
+  } catch (error) {
+    console.error('Failed to write visit count:', error)
+  }
+}
 
 export async function GET() {
   try {
-    const supabase = getSupabaseClient()
-    
-    // Get current visit count
-    const { data, error } = await supabase
-      .from(VISITS_TABLE)
-      .select('count')
-      .eq('id', 1)
-      .single()
-    
-    if (error) {
-      // If table doesn't exist or no row, create it
-      const { error: insertError } = await supabase
-        .from(VISITS_TABLE)
-        .insert({ id: 1, count: 0 })
-      
-      if (insertError && insertError.code !== '42P01') {
-        // Error other than table not found
-        console.error('Visit counter error:', insertError)
-        return NextResponse.json({ count: 0 }, { status: 500 })
-      }
-      
-      return NextResponse.json({ count: 0 })
-    }
-    
-    return NextResponse.json({ count: data?.count || 0 })
+    const count = await readVisitCount()
+    return NextResponse.json({ count })
   } catch (error) {
     console.error('Visit counter error:', error)
     return NextResponse.json({ count: 0 }, { status: 500 })
@@ -39,41 +43,10 @@ export async function GET() {
 
 export async function POST() {
   try {
-    const supabase = getSupabaseClient()
-    
-    // Increment visit count
-    const { data, error } = await supabase
-      .from(VISITS_TABLE)
-      .select('count')
-      .eq('id', 1)
-      .single()
-    
-    if (error) {
-      // Create row if it doesn't exist
-      const { error: insertError } = await supabase
-        .from(VISITS_TABLE)
-        .insert({ id: 1, count: 1 })
-      
-      if (insertError) {
-        console.error('Visit counter error:', insertError)
-        return NextResponse.json({ count: 0 }, { status: 500 })
-      }
-      
-      return NextResponse.json({ count: 1 })
-    }
-    
-    const newCount = (data?.count || 0) + 1
-    
-    const { error: updateError } = await supabase
-      .from(VISITS_TABLE)
-      .update({ count: newCount })
-      .eq('id', 1)
-    
-    if (updateError) {
-      console.error('Visit counter error:', updateError)
-      return NextResponse.json({ count: data?.count || 0 }, { status: 500 })
-    }
-    
+    const currentCount = await readVisitCount()
+    const newCount = currentCount + 1
+    await writeVisitCount(newCount)
+    revalidatePath('/')
     return NextResponse.json({ count: newCount })
   } catch (error) {
     console.error('Visit counter error:', error)
