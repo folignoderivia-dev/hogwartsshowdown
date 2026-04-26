@@ -937,7 +937,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             title={locale === "pt" ? "Enviar mensagem para o GM" : "Send message to GM"}
           >
             <img
-              src="https://i.postimg.cc/4xZxZcQ6/owl-icon.png"
+              src="https://i.postimg.cc/PqWKsK2N/pngwing-com-(29).png"
               alt="Owl"
               className="h-12 w-12 object-contain"
               onError={(e) => {
