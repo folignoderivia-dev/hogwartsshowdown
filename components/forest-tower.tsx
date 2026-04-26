@@ -56,7 +56,10 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
   const [acromantulaTurnCount, setAcromantulaTurnCount] = useState(0)
   const [playerSleepTurns, setPlayerSleepTurns] = useState(0)
   const [playerPoisonTurns, setPlayerPoisonTurns] = useState(0)
+  const [monsterStunTurns, setMonsterStunTurns] = useState(0)
+  const [monsterFreezeTurns, setMonsterFreezeTurns] = useState(0)
   const [monsterPoisonTurns, setMonsterPoisonTurns] = useState(0)
+  const [monsterBurnTurns, setMonsterBurnTurns] = useState(0)
   
   const [attempts, setAttempts] = useState(3)
   
@@ -263,14 +266,14 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       // Apply spell effects (burn, stun, freeze, etc)
       if (spell.effect && !monsterImmuneToDebuffs) {
         if (spell.effect === "burn") {
-          addLog(locale === "en" ? `${spell.name} burns the monster!` : `${spell.name} queima o monstro!`, "passive")
-          // Simplified: just log for now
+          setMonsterBurnTurns(2)
+          addLog(locale === "en" ? `${spell.name} burns the monster for 2 turns!` : `${spell.name} queima o monstro por 2 turnos!`, "passive")
         } else if (spell.effect === "stun") {
-          addLog(locale === "en" ? `${spell.name} stuns the monster!` : `${spell.name} atordoa o monstro!`, "passive")
-          // Simplified: just log for now
+          setMonsterStunTurns(1)
+          addLog(locale === "en" ? `${spell.name} stuns the monster for 1 turn!` : `${spell.name} atordoa o monstro por 1 turno!`, "passive")
         } else if (spell.effect === "freeze") {
-          addLog(locale === "en" ? `${spell.name} freezes the monster!` : `${spell.name} congela o monstro!`, "passive")
-          // Simplified: just log for now
+          setMonsterFreezeTurns(1)
+          addLog(locale === "en" ? `${spell.name} freezes the monster for 1 turn!` : `${spell.name} congela o monstro por 1 turno!`, "passive")
         }
       }
       
@@ -278,8 +281,18 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       if (spell.debuff && !monsterImmuneToDebuffs) {
         const debuffChance = spell.debuff.chance || 0
         if (Math.random() * 100 < debuffChance) {
-          addLog(locale === "en" ? `${spell.name} applies ${spell.debuff.type}!` : `${spell.name} aplica ${spell.debuff.type}!`, "passive")
-          // Simplified: just log for now
+          if (spell.debuff.type === "stun") {
+            setMonsterStunTurns(spell.debuff.duration || 1)
+            addLog(locale === "en" ? `${spell.name} stuns the monster!` : `${spell.name} atordoa o monstro!`, "passive")
+          } else if (spell.debuff.type === "freeze") {
+            setMonsterFreezeTurns(spell.debuff.duration || 1)
+            addLog(locale === "en" ? `${spell.name} freezes the monster!` : `${spell.name} congela o monstro!`, "passive")
+          } else if (spell.debuff.type === "burn") {
+            setMonsterBurnTurns(spell.debuff.duration || 2)
+            addLog(locale === "en" ? `${spell.name} burns the monster!` : `${spell.name} queima o monstro!`, "passive")
+          } else {
+            addLog(locale === "en" ? `${spell.name} applies ${spell.debuff.type}!` : `${spell.name} aplica ${spell.debuff.type}!`, "passive")
+          }
         }
       }
       
@@ -320,6 +333,51 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     
     // Get wand effect for damage cap
     const wandEffect = WAND_PASSIVES[playerBuild.wand]?.effect
+    
+    // Check if monster is stunned or frozen
+    if (monsterStunTurns > 0) {
+      setMonsterStunTurns(prev => prev - 1)
+      addLog(locale === "en" ? "Monster is stunned and skips its turn!" : "Monstro está atordoado e perde o turno!", "system")
+      
+      // Apply burn damage even if stunned
+      if (monsterBurnTurns > 0) {
+        const burnDamage = 10
+        setMonsterHp(prev => {
+          const newHp = Math.max(0, prev - burnDamage)
+          if (newHp === 0) {
+            handleWin()
+          }
+          return newHp
+        })
+        setMonsterBurnTurns(prev => prev - 1)
+        addLog(locale === "en" ? `Monster takes ${burnDamage} burn damage!` : `Monstro recebe ${burnDamage} de dano de queima!`, "system")
+      }
+      
+      setIsPlayerTurn(true)
+      return
+    }
+    
+    if (monsterFreezeTurns > 0) {
+      setMonsterFreezeTurns(prev => prev - 1)
+      addLog(locale === "en" ? "Monster is frozen and skips its turn!" : "Monstro está congelado e perde o turno!", "system")
+      
+      // Apply burn damage even if frozen
+      if (monsterBurnTurns > 0) {
+        const burnDamage = 10
+        setMonsterHp(prev => {
+          const newHp = Math.max(0, prev - burnDamage)
+          if (newHp === 0) {
+            handleWin()
+          }
+          return newHp
+        })
+        setMonsterBurnTurns(prev => prev - 1)
+        addLog(locale === "en" ? `Monster takes ${burnDamage} burn damage!` : `Monstro recebe ${burnDamage} de dano de queima!`, "system")
+      }
+      
+      setIsPlayerTurn(true)
+      return
+    }
     
     // Apply monster turn-based passives
     if (monster.passive === "critical_growth") {
@@ -367,6 +425,20 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         return newHp
       })
       addLog(locale === "en" ? `Monster takes ${poisonDamage} poison damage!` : `Monstro recebe ${poisonDamage} de dano de veneno!`, "system")
+    }
+    
+    // Apply burn damage to monster
+    if (monsterBurnTurns > 0) {
+      const burnDamage = 10
+      setMonsterHp(prev => {
+        const newHp = Math.max(0, prev - burnDamage)
+        setMonsterBurnTurns(p => p - 1)
+        if (newHp === 0) {
+          handleWin()
+        }
+        return newHp
+      })
+      addLog(locale === "en" ? `Monster takes ${burnDamage} burn damage!` : `Monstro recebe ${burnDamage} de dano de queima!`, "system")
     }
     
     if (isCombatOver) return
