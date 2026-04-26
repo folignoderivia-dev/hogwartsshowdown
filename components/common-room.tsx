@@ -2223,29 +2223,31 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
       {/* ── Forest Tower ──────────────────────────────────────────────────────── */}
       {showForestTower && currentUser && (
-        <ForestTower
-          playerBuild={{
-            name: currentUser.username,
-            house,
-            wand,
-            potion,
-            spells: selectedSpells,
-            avatar,
-            gameMode: undefined as any,
-            userId: currentUser.id,
-            username: currentUser.username,
-            elo: currentUser.elo,
-          }}
-          currentUser={currentUser}
-          onExit={async () => {
-            setShowForestTower(false)
-            const attempts = await getForestAttempts(currentUser.id)
-            setTentativasFloresta(attempts.attempts)
-            const updatedUser = await getUserById(currentUser.id)
-            if (updatedUser) onAuthChange(updatedUser)
-          }}
-          onAuthChange={onAuthChange}
-        />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <ForestTower
+            playerBuild={{
+              name: currentUser.username,
+              house,
+              wand,
+              potion,
+              spells: selectedSpells,
+              avatar,
+              gameMode: undefined as any,
+              userId: currentUser.id,
+              username: currentUser.username,
+              elo: currentUser.elo,
+            }}
+            currentUser={currentUser}
+            onExit={async () => {
+              setShowForestTower(false)
+              const attempts = await getForestAttempts(currentUser.id)
+              setTentativasFloresta(attempts.attempts)
+              const updatedUser = await getUserById(currentUser.id)
+              if (updatedUser) onAuthChange(updatedUser)
+            }}
+            onAuthChange={onAuthChange}
+          />
+        </div>
       )}
 
       {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
