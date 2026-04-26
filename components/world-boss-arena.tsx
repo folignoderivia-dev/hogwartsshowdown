@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getSupabaseClient } from "@/lib/supabase"
-import { SPELL_DATABASE, WAND_PASSIVES, HOUSE_GDD, HOUSE_MODIFIERS } from "@/lib/data-store"
-import { getSpellInfo, getSpellMaxPower } from "@/lib/turn-engine"
+import { SPELL_DATABASE, WAND_PASSIVES, HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower } from "@/lib/data-store"
+import { calculateAccuracy, getSpellInfo, getSpellMaxPower, getTotalHP } from "@/lib/turn-engine"
+import type { Duelist, HPState } from "@/lib/arena-types"
 import type { PlayerBuild } from "@/lib/types"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
@@ -30,6 +31,10 @@ const BOSS_IMAGES = [
   "https://i.postimg.cc/bJp9VPh5/nundu.png",
   "https://i.postimg.cc/fLDfqsN1/sphynx.png",
 ]
+
+function buildHpBars(house: string): number[] {
+  return house === "slytherin" ? [100, 100, 100, 100] : [100, 100, 100, 100, 100]
+}
 
 function buildSpellManaForSpells(spells: string[], house: string): Record<string, { current: number; max: number }> {
   const out: Record<string, { current: number; max: number }> = {}
@@ -157,25 +162,84 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     const spell = SPELL_DATABASE.find(s => s.name === selectedSpell)
     if (!spell) return
     
+    // Create a mock duelist for accuracy calculation
+    const playerDuelist: Duelist = {
+      id: currentUser.id,
+      name: currentUser.username,
+      house: playerBuild.house,
+      wand: playerBuild.wand,
+      avatar: playerBuild.avatar,
+      spells: playerBuild.spells,
+      hp: { bars: buildHpBars(playerBuild.house) },
+      speed: 100,
+      debuffs: [],
+      isPlayer: true,
+      team: "player",
+      spellMana,
+      turnsInBattle: 0,
+      disabledSpells: {},
+      missStreakBySpell: {},
+    }
+    
+    const bossDuelist: Duelist = {
+      id: "world-boss",
+      name: "World Boss",
+      house: "gryffindor",
+      wand: "dragon",
+      avatar: "avatar1",
+      spells: [],
+      hp: { bars: [100, 100, 100, 100, 100] },
+      speed: 80,
+      debuffs: [],
+      team: "enemy",
+      spellMana: {},
+      turnsInBattle: 0,
+      disabledSpells: {},
+      missStreakBySpell: {},
+    }
+    
+    // Calculate accuracy
+    const accuracy = calculateAccuracy(playerDuelist, bossDuelist, spell.accuracy || 80, spell)
+    const hitRoll = Math.random() * 100
+    const isHit = hitRoll < accuracy
+    
+    if (!isHit) {
+      addLog(locale === "en" ? `${spell.name} missed! (${Math.round(accuracy)}% accuracy)` : `${spell.name} errou! (${Math.round(accuracy)}% de acurácia)`, "system")
+      // Decrease spell mana even on miss
+      setSpellMana(prev => ({
+        ...prev,
+        [selectedSpell]: { ...prev[selectedSpell], current: Math.max(0, prev[selectedSpell].current - 1) }
+      }))
+      setSelectedSpell(null)
+      
+      if (turnNumber >= 3) {
+        endBattle()
+      } else {
+        setTurnNumber(prev => prev + 1)
+      }
+      return
+    }
+    
     // Decrease spell mana
     setSpellMana(prev => ({
       ...prev,
       [selectedSpell]: { ...prev[selectedSpell], current: Math.max(0, prev[selectedSpell].current - 1) }
     }))
     
-    // Calculate damage
-    let damage = calculateDamage(spell.powerMin || spell.power || 0, spell.powerMax || spell.power || 0)
+    // Calculate damage using rollSpellPower
+    const baseDamage = rollSpellPower(spell)
     
     // Apply wand core passives
     const wandEffect = WAND_PASSIVES[playerBuild.wand]?.effect
+    let damage = baseDamage
     if (wandEffect === "crupe_triple" && !spell.debuff && Math.random() < 0.25) {
-      damage *= 3
+      damage = Math.floor(baseDamage * 3)
       addLog(locale === "en" ? "Crupe Hair: Triple damage!" : "Pelo de Crupe: Dano triplicado!", "system")
     }
     
     // Apply house modifiers
     if (playerBuild.house === "gryffindor") {
-      damage *= 1.05
+      damage = Math.floor(damage * 1.05)
     }
     
     // Crit chance
