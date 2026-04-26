@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getSupabaseClient } from "@/lib/supabase"
 import { FOREST_MONSTERS, getMonsterByFloor, type ForestMonster } from "@/lib/forest-data"
-import { SPELL_DATABASE, INITIAL_PLAYER_BUILD } from "@/lib/data-store"
+import { SPELL_DATABASE, INITIAL_PLAYER_BUILD, WAND_PASSIVES, HOUSE_GDD } from "@/lib/data-store"
 import type { PlayerBuild } from "@/lib/types"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
@@ -175,7 +175,16 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     
     // Calculate player accuracy with monster's reduction
     const accReduction = Math.random() * (monster.opponentAccReduction.max - monster.opponentAccReduction.min) + monster.opponentAccReduction.min
-    const playerAccuracy = 100 - accReduction
+    let playerAccuracy = 100 - accReduction
+    
+    // Apply wand core passives to accuracy
+    const wandEffect = WAND_PASSIVES[playerBuild.wand]?.effect
+    if (!spell.isUnforgivable && wandEffect === "accuracy_plus10") {
+      playerAccuracy += 10
+    }
+    if (wandEffect === "crit20_acc_minus15") {
+      playerAccuracy -= 15
+    }
     
     // Basilisco immunity to unforgivable curses
     if (monster.passive === "basilisco_immunities" && spell.isUnforgivable) {
@@ -186,10 +195,31 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     
     // Hippogrifo doesn't receive critical hits
     const canCrit = monster.passive !== "priority_no_crit" && spell.canCrit !== false
-    const isCrit = canCrit && Math.random() * 100 < 10
+    
+    // Calculate crit chance
+    let critChance = 10
+    if (wandEffect === "crit20_acc_minus15") {
+      critChance += 20
+    }
+    if (playerBuild.house === "slytherin") {
+      critChance += 25 // Slytherin gets +25% crit chance
+    }
+    
+    const isCrit = canCrit && Math.random() * 100 < critChance
     
     if (rollAccuracy(playerAccuracy)) {
       let damage = calculateDamage(spell.powerMin || spell.power || 0, spell.powerMax || spell.power || 0)
+      
+      // Apply wand core passives to damage
+      if (wandEffect === "crupe_triple" && !spell.debuff && Math.random() < 0.25) {
+        damage *= 3
+        addLog(locale === "en" ? "Crupe Hair: Triple damage!" : "Pelo de Crupe: Dano triplicado!", "passive")
+      }
+      
+      // Apply house GDD to damage
+      if (playerBuild.house === "gryffindor") {
+        damage *= 1.05 // Gryffindor slight damage bonus
+      }
       
       // Apply Arpeu damage growth on miss (opposite - player hit, so no growth)
       if (monster.passive === "damage_on_miss") {
@@ -262,6 +292,9 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     
     setTurnNumber(prev => prev + 1)
     
+    // Get wand effect for damage cap
+    const wandEffect = WAND_PASSIVES[playerBuild.wand]?.effect
+    
     // Apply monster turn-based passives
     if (monster.passive === "critical_growth") {
       setBarreteCritRate(prev => Math.min(100, prev + 10))
@@ -279,12 +312,21 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       setErumpentTurnCount(prev => prev + 1)
       if (erumpentTurnCount + 1 >= 6) {
         addLog(locale === "en" ? "Erumpent explodes for 400 damage!" : "Erumpente explode causando 400 de dano!", "passive")
-        setPlayerHp(prev => Math.max(0, prev - 400))
-        if (playerHp <= 400) {
+        // Apply Thestral cap to explosion damage
+        const explosionDamage = wandEffect === "thestral_cap300" ? Math.min(400, 300) : 400
+        setPlayerHp(prev => Math.max(0, prev - explosionDamage))
+        if (playerHp <= explosionDamage) {
           handleLose()
           return
         }
       }
+    }
+    
+    // Apply Phoenix regeneration at end of player turn
+    if (wandEffect === "phoenix_regen" && playerHp < maxPlayerHp) {
+      const regenAmount = Math.floor(Math.random() * (75 - 25 + 1)) + 25
+      setPlayerHp(prev => Math.min(maxPlayerHp, prev + regenAmount))
+      addLog(locale === "en" ? `Phoenix Feather regenerates ${regenAmount} HP!` : `Pena de Fênix regenera ${regenAmount} de HP!`, "passive")
     }
     
     // Apply poison damage to monster
@@ -323,6 +365,11 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     
     // Calculate monster damage
     let damage = calculateDamage(monster.minDmg, monster.maxDmg)
+    
+    // Apply Thestral cap to monster damage
+    if (wandEffect === "thestral_cap300") {
+      damage = Math.min(damage, 300)
+    }
     
     // Apply Arpeu damage on miss
     if (monster.passive === "damage_on_miss" && arpeuMissCount > 0) {
