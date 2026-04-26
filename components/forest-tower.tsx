@@ -10,6 +10,7 @@ import type { PlayerBuild } from "@/lib/types"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
 import { Swords, Heart, Shield, Zap, X, Trophy, FlaskConical } from "lucide-react"
+import { logAppError } from "@/lib/database"
 
 interface ForestTowerProps {
   playerBuild: PlayerBuild
@@ -644,6 +645,14 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       
       if (error) {
         console.error("Forest Mode: Failed to update floresta", error)
+        await logAppError({
+          userId: currentUser.id,
+          username: currentUser.username,
+          errorName: "Forest Mode Update Floor",
+          errorMessage: "Failed to update floresta",
+          component: "forest-tower.tsx",
+          stackTrace: error.stack,
+        })
         throw error
       }
       
@@ -662,6 +671,14 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       }
     } catch (error) {
       console.error("Failed to update floor:", error)
+      await logAppError({
+        userId: currentUser.id,
+        username: currentUser.username,
+        errorName: "Forest Mode Update Floor",
+        errorMessage: "Failed to update floresta on win",
+        component: "forest-tower.tsx",
+        stackTrace: error instanceof Error ? error.stack : String(error),
+      })
       addLog(locale === "en" ? "Failed to save progress!" : "Falha ao salvar progresso!", "system")
     }
   }
@@ -681,6 +698,14 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       
       if (error) {
         console.error("Forest Mode: Failed to update tentativas_floresta", error)
+        await logAppError({
+          userId: currentUser.id,
+          username: currentUser.username,
+          errorName: "Forest Mode Update Attempts",
+          errorMessage: "Failed to update tentativas_floresta",
+          component: "forest-tower.tsx",
+          stackTrace: error.stack,
+        })
         throw error
       }
       
@@ -692,6 +717,14 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       }, 2000)
     } catch (error) {
       console.error("Failed to update attempts:", error)
+      await logAppError({
+        userId: currentUser.id,
+        username: currentUser.username,
+        errorName: "Forest Mode Update Attempts",
+        errorMessage: "Failed to update tentativas_floresta on lose",
+        component: "forest-tower.tsx",
+        stackTrace: error instanceof Error ? error.stack : String(error),
+      })
     }
   }
   
@@ -707,6 +740,14 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         
         if (error) {
           console.error("Forest Mode: Failed to update tentativas_floresta on exit", error)
+          await logAppError({
+            userId: currentUser.id,
+            username: currentUser.username,
+            errorName: "Forest Mode Exit",
+            errorMessage: "Failed to update tentativas_floresta on exit",
+            component: "forest-tower.tsx",
+            stackTrace: error.stack,
+          })
           throw error
         }
         
@@ -714,6 +755,14 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         setAttempts(newAttempts)
       } catch (error) {
         console.error("Failed to update attempts:", error)
+        await logAppError({
+          userId: currentUser.id,
+          username: currentUser.username,
+          errorName: "Forest Mode Exit",
+          errorMessage: "Failed to update tentativas_floresta on exit",
+          component: "forest-tower.tsx",
+          stackTrace: error instanceof Error ? error.stack : String(error),
+        })
       }
     }
     onExit()

@@ -10,6 +10,7 @@ import type { PlayerBuild } from "@/lib/types"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useLanguage } from "@/contexts/language-context"
+import { logAppError } from "@/lib/database"
 import {
   calculateTurnOutcome,
   type EngineAnimation,
@@ -442,6 +443,15 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
           if (!resetError) {
             localStorage.setItem(`story_reset:${currentUser.id}`, today)
             setAttempts(3)
+          } else {
+            await logAppError({
+              userId: currentUser.id,
+              username: currentUser.username,
+              errorName: "Story Mode Load Progress",
+              errorMessage: "Failed to reset daily attempts",
+              component: "story-arena.tsx",
+              stackTrace: resetError.stack,
+            })
           }
         } else {
           setAttempts(data.tentativas_historia || 3)
@@ -455,6 +465,14 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       setIsLoaded(true)
     } catch (error) {
       console.error("Failed to load progress:", error)
+      await logAppError({
+        userId: currentUser.id,
+        username: currentUser.username,
+        errorName: "Story Mode Load Progress",
+        errorMessage: "Failed to load progress from database",
+        component: "story-arena.tsx",
+        stackTrace: error instanceof Error ? error.stack : String(error),
+      })
       setIsLoaded(true)
     }
   }
@@ -482,6 +500,8 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       turnsInBattle: 0,
       disabledSpells: {},
       missStreakBySpell: {},
+      silencedSpells: [],
+      usedPotions: [],
     }
     
     const bossSpells = currentBoss.spells.length > 0 ? currentBoss.spells : SPELL_DATABASE.filter(s => !s.isVipOnly).map(s => s.name)
@@ -501,6 +521,8 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       turnsInBattle: 0,
       disabledSpells: {},
       missStreakBySpell: {},
+      silencedSpells: [],
+      usedPotions: [],
     }
     
     return [playerDuelist, bossDuelist]
@@ -520,6 +542,8 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       setPendingActions({})
       setTurnNumber(1)
       setGameOver(null)
+      setBattleStatus("selecting")
+      setTimeLeft(120)
       addLog(locale === "en" ? `[Stage ${currentStage}] Battle started!` : `[Etapa ${currentStage}] Batalha iniciada!`)
       beginRoundSelection(round)
     }
@@ -782,6 +806,14 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       }
     } catch (error) {
       console.error("Failed to update progress:", error)
+      await logAppError({
+        userId: currentUser.id,
+        username: currentUser.username,
+        errorName: "Story Mode Update Progress",
+        errorMessage: "Failed to update modo_historia",
+        component: "story-arena.tsx",
+        stackTrace: error instanceof Error ? error.stack : String(error),
+      })
       addLog(locale === "en" ? "Failed to save progress!" : "Falha ao salvar progresso!")
     }
   }
@@ -810,6 +842,14 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       }, 2000)
     } catch (error) {
       console.error("Failed to update attempts:", error)
+      await logAppError({
+        userId: currentUser.id,
+        username: currentUser.username,
+        errorName: "Story Mode Update Attempts",
+        errorMessage: "Failed to update tentativas_historia",
+        component: "story-arena.tsx",
+        stackTrace: error instanceof Error ? error.stack : String(error),
+      })
     }
   }
   
@@ -832,6 +872,14 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
         setAttempts(newAttempts)
       } catch (error) {
         console.error("Failed to update attempts:", error)
+        await logAppError({
+          userId: currentUser.id,
+          username: currentUser.username,
+          errorName: "Story Mode Exit",
+          errorMessage: "Failed to update tentativas_historia on exit",
+          component: "story-arena.tsx",
+          stackTrace: error instanceof Error ? error.stack : String(error),
+        })
       }
     }
     onExit()
