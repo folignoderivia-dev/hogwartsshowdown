@@ -28,6 +28,7 @@ import {
   getRankingTopOffline,
   getRankingTopForest,
   getForestAttempts,
+  getUserById,
   loginUser,
   registerUser,
   removeFriend,
@@ -229,7 +230,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [showRankingPanel, setShowRankingPanel] = useState(true)
   const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest">("elo")
   const [showForestTower, setShowForestTower] = useState(false)
-  const [forestAttempts, setForestAttempts] = useState(3)
+  const [tentativasFloresta, setTentativasFloresta] = useState(3)
   const [shareFeedback, setShareFeedback] = useState("")
 
   const [name, setName] = useState("")
@@ -542,7 +543,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     if (currentUser?.id) {
       void (async () => {
         const attempts = await getForestAttempts(currentUser.id)
-        setForestAttempts(attempts.attempts)
+        setTentativasFloresta(attempts.attempts)
       })()
     }
   }, [currentUser?.id])
@@ -884,13 +885,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 size="sm"
                 className="border-purple-700 bg-purple-950/40 px-3 py-1 text-purple-300"
                 onClick={() => {
-                  if (forestAttempts > 0 && isReady) {
+                  if (tentativasFloresta > 0 && isReady) {
                     setShowForestTower(true)
                   }
                 }}
-                disabled={forestAttempts === 0 || !isReady}
+                disabled={tentativasFloresta === 0 || !isReady}
               >
-                🌲 {locale === "pt" ? "Floresta" : "Forest"} ({forestAttempts}/3)
+                🌲 {locale === "pt" ? "Floresta" : "Forest"} ({tentativasFloresta}/3)
               </Button>
             )}
             {currentUser ? (
@@ -2229,7 +2230,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           onExit={async () => {
             setShowForestTower(false)
             const attempts = await getForestAttempts(currentUser.id)
-            setForestAttempts(attempts.attempts)
+            setTentativasFloresta(attempts.attempts)
             const updatedUser = await getUserById(currentUser.id)
             if (updatedUser) onAuthChange(updatedUser)
           }}

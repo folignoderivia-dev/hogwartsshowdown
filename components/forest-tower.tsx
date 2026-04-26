@@ -68,24 +68,12 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     try {
       const { data } = await supabase
         .from("profiles")
-        .select("forest_attempts, last_forest_attempt_date, floresta")
+        .select("tentativas_floresta, floresta")
         .eq("id", currentUser.id)
         .single()
       
       if (data) {
-        const today = new Date().toISOString().split('T')[0]
-        const lastAttempt = data.last_forest_attempt_date ? new Date(data.last_forest_attempt_date).toISOString().split('T')[0] : null
-        
-        if (lastAttempt !== today) {
-          // Reset attempts for new day
-          await supabase
-            .from("profiles")
-            .update({ forest_attempts: 3, last_forest_attempt_date: today })
-            .eq("id", currentUser.id)
-          setAttempts(3)
-        } else {
-          setAttempts(data.forest_attempts || 3)
-        }
+        setAttempts(data.tentativas_floresta ?? 3)
         
         if (data.floresta) {
           setCurrentFloor(data.floresta + 1)
@@ -443,7 +431,7 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       const newAttempts = Math.max(0, attempts - 1)
       await supabase
         .from("profiles")
-        .update({ forest_attempts: newAttempts })
+        .update({ tentativas_floresta: newAttempts })
         .eq("id", currentUser.id)
       setAttempts(newAttempts)
       
