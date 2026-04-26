@@ -73,7 +73,26 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         .single()
       
       if (data) {
-        setAttempts(data.tentativas_floresta ?? 3)
+        // Check if it's a new day (after 00:01) and reset attempts to 3
+        const today = new Date().toISOString().split('T')[0]
+        const lastReset = localStorage.getItem(`forest_reset:${currentUser.id}`)
+        
+        if (lastReset !== today) {
+          // Reset attempts to 3 for new day
+          const { error: resetError } = await supabase
+            .from("profiles")
+            .update({ tentativas_floresta: 3 })
+            .eq("id", currentUser.id)
+          
+          if (!resetError) {
+            localStorage.setItem(`forest_reset:${currentUser.id}`, today)
+            setAttempts(3)
+          } else {
+            setAttempts(data.tentativas_floresta ?? 3)
+          }
+        } else {
+          setAttempts(data.tentativas_floresta ?? 3)
+        }
         
         if (data.floresta) {
           setCurrentFloor(data.floresta + 1)

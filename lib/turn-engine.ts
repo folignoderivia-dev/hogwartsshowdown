@@ -378,7 +378,7 @@ export function calculateTurnOutcome(params: {
   actions: RoundAction[]
   spellDatabase: SpellInfo[]
   turnNumber: number
-  gameMode: "teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch"
+  gameMode: "teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta"
   circumFlames: Record<string, number>
 }): TurnOutcome {
   let state: Duelist[] = params.duelists.map((d) => ({ ...d, damageReceivedThisTurn: 0 }))

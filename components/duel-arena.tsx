@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { submitReport, saveMatchHistory } from "@/lib/database"
 import { HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower, SPELL_DATABASE, type SpellInfo, WAND_PASSIVES } from "@/lib/data-store"
+import { FOREST_MONSTERS, getMonsterByFloor, type ForestMonster } from "@/lib/forest-data"
 import type { ArenaVfxState, BattleStatus, Duelist, HPState, DebuffType, Point } from "@/lib/arena-types"
 import type { PlayerBuild } from "@/lib/types"
 import { useArenaMatchSync } from "@/hooks/useArenaMatchSync"
@@ -351,7 +352,7 @@ const DuelArena = (
   const { locale, cycleLocale } = useLanguage()
   const ui = uiTexts[locale]
   if (typeof window === "undefined") return null
-  const isOfflineMode = playerBuild.gameMode === "teste" || playerBuild.gameMode === "torneio-offline"
+  const isOfflineMode = playerBuild.gameMode === "teste" || playerBuild.gameMode === "torneio-offline" || playerBuild.gameMode === "floresta"
   const selfDuelistId = playerBuild.userId ?? null
   const isIdentityReady = isOfflineMode || !!selfDuelistId
   if (!isOfflineMode && !selfDuelistId) {
@@ -503,9 +504,53 @@ const DuelArena = (
     return [playerDuelist, bot]
   }, [playerBuild.avatar, playerBuild.house, playerBuild.name, playerBuild.spells, playerBuild.wand, selfDuelistId])
 
+  const buildForestRound = useCallback((floor: number): Duelist[] => {
+    const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
+    const playerDuelist: Duelist = {
+      id: selfDuelistId ?? "",
+      name: playerBuild.name,
+      house: playerBuild.house,
+      wand: playerBuild.wand,
+      avatar: playerBuild.avatar,
+      spells: playerBuild.spells,
+      hp: { bars: buildHpBars(playerBuild.house) },
+      speed: Math.round(100 * playerMod.speed),
+      debuffs: [],
+      isPlayer: true,
+      team: "player",
+      spellMana: buildSpellManaForSpells(playerBuild.spells, playerBuild.house),
+      turnsInBattle: 0,
+      disabledSpells: {},
+      missStreakBySpell: {},
+    }
+    const monster = getMonsterByFloor(floor)
+    if (!monster) return [playerDuelist]
+    // Forest monsters use basic attack spells
+    const monsterSpells = ["Bombarda", "Incendio", "Confrigo", "Expelliarmus"]
+    const bot: Duelist = {
+      id: `forest-monster-${floor}`,
+      name: locale === "en" ? monster.nameEn : monster.name,
+      house: "slytherin",
+      wand: "dragon",
+      avatar: "",
+      spells: monsterSpells,
+      hp: { bars: [100, 100, 100, 100, 100].slice(0, Math.ceil(monster.hp / 100)) },
+      speed: 90 + floor * 2,
+      debuffs: [],
+      team: "enemy",
+      spellMana: buildSpellManaForSpells(monsterSpells, "slytherin"),
+      turnsInBattle: 0,
+      disabledSpells: {},
+      missStreakBySpell: {},
+    }
+    return [playerDuelist, bot]
+  }, [playerBuild.avatar, playerBuild.house, playerBuild.name, playerBuild.spells, playerBuild.wand, selfDuelistId, locale])
+
   const [battleStatus, setBattleStatus] = useState<BattleStatus>("idle")
   const [turnNumber, setTurnNumber] = useState(1)
   const [challengeStage, setChallengeStage] = useState(0)
+  const [forestFloor, setForestFloor] = useState(1)
+  const [forestAttempts, setForestAttempts] = useState(3)
   const [timeLeft, setTimeLeft] = useState(120)
   const [pendingSpell, setPendingSpell] = useState<string | null>(null)
   const [pendingActions, setPendingActions] = useState<Record<string, RoundAction>>({})
@@ -1062,12 +1107,57 @@ const DuelArena = (
           beginRoundSelection(nextRound)
           return
         }
+        if (playerBuild.gameMode === "floresta" && outcome.outcome === "win" && forestFloor < 20) {
+          const nextFloor = forestFloor + 1
+          // Save progress to Supabase
+          void (async () => {
+            const supabase = getSupabaseClient()
+            await supabase
+              .from("profiles")
+              .update({ floresta: nextFloor })
+              .eq("id", playerBuild.userId)
+          })()
+          setForestFloor(nextFloor)
+          addLog(`[Floresta]: ${playerBuild.name} avançou para o andar ${nextFloor}!`)
+          const nextRound = applyRapinomonioBlock(buildForestRound(nextFloor))
+          setDuelists(nextRound)
+          setPendingActions({})
+          setPotionUsed(false)
+          setPendingSpell(null)
+          setGameOver(null)
+          setIsParryingActive(false)
+          turnNumberRef.current = 1
+          setTurnNumber(1)
+          setBattleStatus("selecting")
+          beginRoundSelection(nextRound)
+          return
+        }
+        if (playerBuild.gameMode === "floresta" && outcome.outcome === "win" && forestFloor >= 20) {
+          addLog(`[Floresta]: ${playerBuild.name} completou a Torre da Floresta Proibida!`)
+          setGameOver(outcome.outcome)
+          setIsParryingActive(false)
+          onBattleEnd?.(outcome.outcome, playerBuild.userId)
+          setBattleStatus("finished")
+          return
+        }
+        if (playerBuild.gameMode === "floresta" && outcome.outcome === "lose") {
+          // Deduct attempt
+          void (async () => {
+            const supabase = getSupabaseClient()
+            const newAttempts = Math.max(0, forestAttempts - 1)
+            await supabase
+              .from("profiles")
+              .update({ tentativas_floresta: newAttempts })
+              .eq("id", playerBuild.userId)
+            setForestAttempts(newAttempts)
+          })()
+        }
         if (playerBuild.gameMode === "torneio-offline" && outcome.outcome === "lose") {
           setChallengeStage(0)
         }
         setGameOver(outcome.outcome)
         setIsParryingActive(false)
-        if ((outcome.outcome === "win" || outcome.outcome === "lose") && playerBuild.gameMode !== "torneio-offline") {
+        if ((outcome.outcome === "win" || outcome.outcome === "lose") && playerBuild.gameMode !== "torneio-offline" && playerBuild.gameMode !== "floresta") {
           onBattleEnd?.(outcome.outcome, playerBuild.userId)
         } else if (playerBuild.gameMode === "torneio-offline" && outcome.outcome === "win") {
           onBattleEnd?.(outcome.outcome, playerBuild.userId)
@@ -1450,6 +1540,53 @@ const DuelArena = (
       beginRoundSelection(seeded)
       return
     }
+    if (playerBuild.gameMode === "floresta") {
+      // Load forest progress from Supabase
+      void (async () => {
+        const supabase = getSupabaseClient()
+        const { data } = await supabase
+          .from("profiles")
+          .select("floresta, tentativas_floresta")
+          .eq("id", playerBuild.userId)
+          .single()
+        
+        if (data) {
+          const savedFloor = data.floresta ?? 1
+          const attempts = data.tentativas_floresta ?? 3
+          
+          // Check daily reset
+          const today = new Date().toISOString().split('T')[0]
+          const lastReset = typeof window !== "undefined" ? localStorage.getItem(`forest_reset:${playerBuild.userId}`) : null
+          
+          if (lastReset !== today) {
+            const { error: resetError } = await supabase
+              .from("profiles")
+              .update({ tentativas_floresta: 3 })
+              .eq("id", playerBuild.userId)
+            
+            if (!resetError && typeof window !== "undefined") {
+              localStorage.setItem(`forest_reset:${playerBuild.userId}`, today)
+              setForestAttempts(3)
+            } else {
+              setForestAttempts(attempts)
+            }
+          } else {
+            setForestAttempts(attempts)
+          }
+          
+          setForestFloor(savedFloor + 1)
+          setPotionUsed(false)
+          setPendingSpell(null)
+          setPendingActions({})
+          setTurnNumber(1)
+          setGameOver(null)
+          const seeded = applyCentauroBlock(applyRapinomonioBlock(buildForestRound(savedFloor + 1)))
+          setDuelists(seeded)
+          beginRoundSelection(seeded)
+        }
+      })()
+      return
+    }
     if (isOfflineMode) {
       const seeded = applyCentauroBlock(applyRapinomonioBlock(duelists))
       setDuelists(seeded)
@@ -1646,7 +1783,8 @@ const DuelArena = (
   const handleLeaveRoom = async () => {
     try {
       // Desistência voluntária durante batalha online → derrota imediata para ELO
-      if (isOnlineMatch && battleStatus !== "finished" && !isReadOnlySpectator && !gameOver) {
+      // Só aplica derrota se a partida realmente começou (battleStatus != idle)
+      if (isOnlineMatch && battleStatus !== "finished" && battleStatus !== "idle" && !isReadOnlySpectator && !gameOver) {
         onBattleEnd?.("lose", playerBuild.userId)
       }
       // Notifica o servidor socket antes de sair
@@ -1781,6 +1919,8 @@ const DuelArena = (
 
   const renderWand = (duelist: Duelist, side: "top" | "bottom", positionClass: string, mirror = false) => {
     const dead = isDefeated(duelist.hp)
+    // Hide wand in forest mode to not reveal enemy passives
+    if (playerBuild.gameMode === "floresta" && !duelist.isPlayer) return null
     const image = side === "top" ? HAND_TOP : HAND_BOTTOM
     const size = side === "top" ? "h-[230px]" : "h-[285px]"
     return (
@@ -1805,6 +1945,7 @@ const DuelArena = (
               {{ selecting: ui.spells, resolving: ui.awaitingServer, animating: ui.awaitingServer, finished: ui.gameEnded, waiting: ui.waiting, idle: ui.offline }[battleStatus] ?? battleStatus}
             </Badge>
             {playerBuild.gameMode === "torneio-offline" && <Badge className="border-purple-700 bg-purple-950/40 text-purple-200">{TORNEIO_LABELS[Math.min(challengeStage, TORNEIO_LABELS.length - 1)]}</Badge>}
+            {playerBuild.gameMode === "floresta" && <Badge className="border-green-700 bg-green-950/40 text-green-200">🌲 {locale === "en" ? "Floor" : "Andar"} {forestFloor}/20 ({forestAttempts}/3)</Badge>}
             {isReadOnlySpectator && <Badge className="border-blue-700 bg-blue-950/40 text-blue-200">{ui.spectating}</Badge>}
             {isReadOnlySpectator ? (
               <Button onClick={handleLeaveRoom} className="h-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 px-2 text-xs text-amber-200 hover:from-amber-800 hover:to-amber-900" title={ui.leave}>
