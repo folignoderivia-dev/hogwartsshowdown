@@ -19,9 +19,35 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'Wizard Duel - Hogwarts Showdown',
-  description: 'Competitive turn-based PvP game with wizard duel theme',
-  generator: 'v0.app',
+  title: 'Varinhas Cruzadas - Simulador de Duelos Bruxos & PvP Online',
+  description: 'O sucessor espiritual dos jogos de navegador de HP. Duelos táticos, sistema de ranking estilo Pokémon Showdown e combate competitivo em tempo real. Jogue agora o melhor Harry Potter MMO de navegador.',
+  keywords: 'Hogwarts MMO, Harry Potter MMO, Hogwarts Online, Harry Potter Online, Varinhas Cruzadas, Hogwarts PvP, Simulador de Duelo, Duelos Bruxos, Pokémon Showdown, Hogwarts Showdown, Web Browser Game Harry Potter, Jogo de navegador Harry Potter, RPG Hogwarts Online',
+  metadataBase: new URL('https://varinhascruzadas.com.br'),
+  alternates: {
+    canonical: 'https://varinhascruzadas.com.br',
+  },
+  openGraph: {
+    title: 'Varinhas Cruzadas - Simulador de Duelos Bruxos & PvP Online',
+    description: 'O sucessor espiritual dos jogos de navegador de HP. Duelos táticos, sistema de ranking estilo Pokémon Showdown e combate competitivo em tempo real.',
+    url: 'https://varinhascruzadas.com.br',
+    siteName: 'Varinhas Cruzadas',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Varinhas Cruzadas - Duelos Bruxos PvP',
+      },
+    ],
+    locale: 'pt_BR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Varinhas Cruzadas - Simulador de Duelos Bruxos & PvP Online',
+    description: 'O sucessor espiritual dos jogos de navegador de HP. Duelos táticos, sistema de ranking estilo Pokémon Showdown e combate competitivo em tempo real.',
+    images: ['/og-image.png'],
+  },
   icons: {
     icon: '/favicon.png',
     apple: '/apple-icon.png',

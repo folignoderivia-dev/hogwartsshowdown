@@ -2533,7 +2533,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
       <footer className="mt-8 border-t border-amber-900/30 pb-6 pt-4 text-center">
         <p className="mb-3 text-sm font-semibold text-amber-200/90 leading-relaxed">
-          {locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}
+          {locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Varinhas Cruzadas has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Varinhas Cruzadas não tem vínculo com Warner Bros. ou Wizarding World.'}
         </p>
         <p className="text-xl font-bold text-amber-400">
           👥 {locale === 'en' ? 'Visits' : 'Visitas'}: <span className="text-3xl font-extrabold text-amber-300">{visitCount.toLocaleString()}</span>

@@ -1225,7 +1225,7 @@ const DuelArena = (
   useEffect(() => {
     if (!isOnlineMatch || !matchId || !selfDuelistId) return
 
-    const socketUrl = "https://hogwartsshowdown-production.up.railway.app"
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "https://hogwartsshowdown-production.up.railway.app"
     const socket = io(socketUrl, {
       transports: ["polling", "websocket"],
       upgrade: true,

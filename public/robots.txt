@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://varinhascruzadas.com.br/sitemap.xml
