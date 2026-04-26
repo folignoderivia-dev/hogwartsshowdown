@@ -253,6 +253,7 @@ function spellNameFromMatchActionRow(row: { payload?: unknown; action_id?: strin
 
 export async function applyMatchElo(userId: string, outcome: "win" | "lose", mode?: string): Promise<DbUser | null> {
   const isFfa = mode === "ffa" || mode === "ffa3"
+  const isOffline = mode === "torneio-offline"
   const winDelta = isFfa ? ELO_WIN_FFA : ELO_WIN
   const lossDelta = isFfa ? ELO_LOSS_FFA : ELO_LOSS
   const delta = outcome === "win" ? winDelta : -lossDelta
@@ -260,10 +261,11 @@ export async function applyMatchElo(userId: string, outcome: "win" | "lose", mod
   const profile = await getProfileById(userId)
   if (!profile) return null
 
-  const nextElo = Math.max(ELO_START, (profile.elo ?? ELO_START) + delta)
-  const nextWins = (profile.wins ?? 0) + (outcome === "win" ? 1 : 0)
-  const nextLosses = (profile.losses ?? 0) + (outcome === "lose" ? 1 : 0)
-  const nextOfflineWins = (profile.offline_wins ?? 0) + (mode === "torneio-offline" && outcome === "win" ? 1 : 0)
+  // Offline mode doesn't affect ELO, only tracks offline_wins
+  const nextElo = isOffline ? (profile.elo ?? ELO_START) : Math.max(ELO_START, (profile.elo ?? ELO_START) + delta)
+  const nextWins = (profile.wins ?? 0) + (outcome === "win" && !isOffline ? 1 : 0)
+  const nextLosses = (profile.losses ?? 0) + (outcome === "lose" && !isOffline ? 1 : 0)
+  const nextOfflineWins = (profile.offline_wins ?? 0) + (isOffline && outcome === "win" ? 1 : 0)
 
   // Feitiço mais usado: contar a partir do JSON payload (action_id na tabela é eventId único, não é o feitiço).
   const { data: spellRows } = await supabase
