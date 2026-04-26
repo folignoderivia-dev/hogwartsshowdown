@@ -47,7 +47,7 @@ interface ProfileRow {
   tentativas_floresta?: number | null
   modo_historia?: number | null
   tentativas_historia?: number | null
-  march?: number | null
+  marcha?: number | null
   damagewb?: number | null
   last_gacha_pull?: string | null
   unlocked_stickers?: string[] | null
@@ -80,7 +80,7 @@ function mapProfile(profile: ProfileRow, email: string): DbUser {
     tentativasFloresta: profile.tentativas_floresta ?? 3,
     modoHistoria: profile.modo_historia ?? 1,
     tentativasHistoria: profile.tentativas_historia ?? 3,
-    march: profile.march ?? 0,
+    march: profile.marcha ?? 0,
     damagewb: profile.damagewb ?? 0,
     lastGachaPull: profile.last_gacha_pull ?? undefined,
     unlockedStickers: profile.unlocked_stickers ?? undefined,
@@ -136,8 +136,8 @@ export async function getRankingTopMarch(limit = 50): Promise<DbUser[]> {
   const { data, error } = await supabase
     .from("profiles")
     .select(PROFILE_SELECT)
-    .not("march", "is", null)
-    .order("march", { ascending: false })
+    .not("marcha", "is", null)
+    .order("marcha", { ascending: false })
     .limit(limit)
   if (error || !data) return []
   return (data as ProfileRow[]).map((p) => mapProfile(p, ""))
@@ -160,12 +160,12 @@ export async function updateMarchRecord(userId: string, marchWins: number): Prom
   const profile = await getProfileById(userId)
   if (!profile) return false
   
-  const currentMarch = profile.march ?? 0
+  const currentMarch = profile.marcha ?? 0
   const newMarch = Math.max(currentMarch, marchWins)
   
   const { error } = await supabase
     .from("profiles")
-    .update({ march: newMarch })
+    .update({ marcha: newMarch })
     .eq("id", userId)
   return !error
 }
