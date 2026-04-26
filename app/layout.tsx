@@ -19,8 +19,8 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'Duelo de Bruxos',
-  description: 'Jogo competitivo PvP por turnos com temática de duelo de bruxos',
+  title: 'Wizard Duel - Hogwarts Showdown',
+  description: 'Competitive turn-based PvP game with wizard duel theme',
   generator: 'v0.app',
   icons: {
     icon: [

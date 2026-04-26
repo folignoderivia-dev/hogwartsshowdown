@@ -56,7 +56,8 @@ export default function HomeLobbyChat({
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
-    setMessages(loadMessages())
+    // Don't load from localStorage - start empty to get fresh global messages from server
+    setMessages([])
   }, [])
 
   useEffect(() => {
@@ -65,6 +66,9 @@ export default function HomeLobbyChat({
       transports: ["polling", "websocket"],
     })
     socketRef.current = socket
+
+    // Request recent chat history from server on connect
+    socket.emit("get_global_chat_history")
 
     // Recebe mensagens broadcast do servidor
     socket.on("global_chat_message", (data: { author: string; text: string; ts: number }) => {
@@ -79,6 +83,17 @@ export default function HomeLobbyChat({
         saveMessages(next)
         return next
       })
+    })
+
+    // Receive chat history from server
+    socket.on("global_chat_history", (history: Array<{ author: string; text: string; ts: number }>) => {
+      const messages: LobbyChatMessage[] = history.map((msg) => ({
+        id: `${msg.ts}-${Math.random().toString(36).slice(2, 9)}`,
+        author: msg.author,
+        text: msg.text,
+        ts: msg.ts,
+      })).slice(-MAX_MESSAGES)
+      setMessages(messages)
     })
 
     return () => {
