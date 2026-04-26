@@ -1083,6 +1083,15 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
                 {POTION_NAMES[playerBuild.potion] || locale === 'pt' ? "Poção" : "Potion"}
                 {potionUsed && locale === 'pt' ? " (usada)" : " (used)"}
               </Button>
+              <Button
+                disabled={!!gameOver || battleStatus !== "selecting" || isDefeated(player?.hp)}
+                onClick={() => {
+                  setPendingActions((prev) => ({ ...prev, [currentUser.id]: { casterId: currentUser.id, type: "skip", turnId: turnNumber } }))
+                }}
+                className="touch-manipulation select-none border border-red-700 text-red-100 bg-red-900 hover:bg-red-800"
+              >
+                {locale === "en" ? "⏭ Skip Turn" : "⏭ Pular Turno"}
+              </Button>
             </div>
           )}
         </div>

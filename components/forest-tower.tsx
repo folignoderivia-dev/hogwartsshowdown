@@ -974,6 +974,17 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
                       {playerBuild.potion}
                     </Button>
                   )}
+                  <Button
+                    className="bg-red-700 hover:bg-red-600 text-white px-6"
+                    onClick={() => {
+                      setSelectedSpell(null)
+                      addLog(locale === "en" ? "You skipped your turn." : "Você pulou seu turno.", "system")
+                      setIsPlayerTurn(false)
+                      setTimeout(() => handleMonsterAttack(), 1000)
+                    }}
+                  >
+                    {locale === "en" ? "⏭ Skip Turn" : "⏭ Pular Turno"}
+                  </Button>
                 </div>
               )}
               

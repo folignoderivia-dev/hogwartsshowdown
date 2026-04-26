@@ -1431,7 +1431,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 <div className="flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-amber-400" />
                   <div className="flex flex-col">
-                    <span className="font-bold text-amber-100">
+                    <span className="font-bold text-amber-100 text-base">
                       {rankingMode === "elo" ? (locale === 'en' ? '🏆 PVP Ranking' : '🏆 Ranking PVP') : 
                        rankingMode === "offline" ? (locale === 'en' ? '🏆 Tournament Ranking' : '🏆 Ranking de Torneios') : 
                        rankingMode === "forest" ? (locale === 'en' ? '🌲 Forest Ranking' : '🌲 Ranking da Floresta') : 
@@ -1490,9 +1490,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   className={`flex min-w-[170px] items-center justify-between rounded px-2 py-1 ${currentUser?.id === u.id ? "bg-amber-900/40" : "bg-stone-800/50"}`}
                 >
                   <span className="text-amber-200">
-                    {i + 1}. {u.username}
+                    {i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : `${i + 1}. `}{u.username}
                   </span>
-                  <span className="font-mono text-amber-400">{rankingMode === "elo" ? u.elo : rankingMode === "offline" ? u.offlineWins : rankingMode === "forest" ? u.floresta || 0 : rankingMode === "march" ? u.march || 0 : rankingMode === "story" ? u.modoHistoria || 0 : u.damagewb || 0}</span>
+                  <span className="font-mono text-amber-400 font-bold">{rankingMode === "elo" ? u.elo : rankingMode === "offline" ? u.offlineWins : rankingMode === "forest" ? u.floresta || 0 : rankingMode === "march" ? u.march || 0 : rankingMode === "story" ? u.modoHistoria || 0 : u.damagewb || 0}</span>
                 </li>
               ))}
             </ol>
@@ -2354,6 +2354,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         </div>
       </div>
 
+      {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
+      <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-xs text-amber-700/60">
+        <p className="mb-1">{locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}</p>
+        <p className="text-amber-600/80 text-lg font-bold">👥 {locale === 'en' ? 'Visits' : 'Visitas'}: <span className="text-2xl font-bold text-amber-400">{visitCount.toLocaleString()}</span></p>
+      </footer>
+
       {/* ── World Boss Section (Always visible if logged in) ──────────────── */}
       {currentUser && (
         <div className="mt-8 border-t border-amber-900/30 pt-6">
@@ -2376,12 +2382,6 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           />
         </div>
       )}
-
-      {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
-      <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-xs text-amber-700/60">
-        <p className="mb-1">{locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}</p>
-        <p className="text-amber-600/80">👥 {locale === 'en' ? 'Visits' : 'Visitas'}: <span className="text-lg font-bold text-amber-400">{visitCount.toLocaleString()}</span></p>
-      </footer>
       
       {/* ── Gacha Modal ──────────────────────────────────────────────────────────── */}
       {showGacha && (
