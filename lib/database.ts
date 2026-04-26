@@ -47,11 +47,9 @@ interface ProfileRow {
   tentativas_historia?: number | null
   march?: number | null
   damagewb?: number | null
-  unlocked_stickers?: string[] | null
-  last_gacha_pull?: string | null
 }
 
-const PROFILE_SELECT = "id,username,elo,wins,losses,offline_wins,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin,floresta,tentativas_floresta,modo_historia,tentativas_historia,march,damagewb,unlocked_stickers,last_gacha_pull"
+const PROFILE_SELECT = "id,username,elo,wins,losses,offline_wins,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin,floresta,tentativas_floresta,modo_historia,tentativas_historia,march,damagewb"
 
 function isVipActive(row: ProfileRow): boolean {
   if (!row.is_vip) return false
