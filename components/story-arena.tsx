@@ -774,7 +774,20 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     }
   }
   
-  const handleExit = () => {
+  const handleExit = async () => {
+    // Anti-cheat: subtract attempt if exiting during unfinished fight
+    if (!gameOver && attempts > 0) {
+      try {
+        const newAttempts = Math.max(0, attempts - 1)
+        await supabase
+          .from("profiles")
+          .update({ tentativas_historia: newAttempts })
+          .eq("id", currentUser.id)
+        setAttempts(newAttempts)
+      } catch (error) {
+        console.error("Failed to update attempts:", error)
+      }
+    }
     onExit()
   }
   

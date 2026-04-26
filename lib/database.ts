@@ -24,6 +24,8 @@ export interface DbUser {
   tentativasFloresta?: number
   modoHistoria?: number
   tentativasHistoria?: number
+  march?: number
+  damagewb?: number
 }
 
 interface ProfileRow {
@@ -43,9 +45,11 @@ interface ProfileRow {
   tentativas_floresta?: number | null
   modo_historia?: number | null
   tentativas_historia?: number | null
+  march?: number | null
+  damagewb?: number | null
 }
 
-const PROFILE_SELECT = "id,username,elo,wins,losses,offline_wins,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin,floresta,tentativas_floresta,modo_historia,tentativas_historia"
+const PROFILE_SELECT = "id,username,elo,wins,losses,offline_wins,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin,floresta,tentativas_floresta,modo_historia,tentativas_historia,march,damagewb"
 
 function isVipActive(row: ProfileRow): boolean {
   if (!row.is_vip) return false
@@ -72,6 +76,8 @@ function mapProfile(profile: ProfileRow, email: string): DbUser {
     tentativasFloresta: profile.tentativas_floresta ?? 3,
     modoHistoria: profile.modo_historia ?? 1,
     tentativasHistoria: profile.tentativas_historia ?? 3,
+    march: profile.march ?? 0,
+    damagewb: profile.damagewb ?? 0,
   }
 }
 
@@ -114,6 +120,28 @@ export async function getRankingTopForest(limit = 50): Promise<DbUser[]> {
     .from("profiles")
     .select(PROFILE_SELECT)
     .order("floresta", { ascending: false })
+    .limit(limit)
+  if (error || !data) return []
+  return (data as ProfileRow[]).map((p) => mapProfile(p, ""))
+}
+
+export async function getRankingTopMarch(limit = 50): Promise<DbUser[]> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_SELECT)
+    .order("march", { ascending: false })
+    .limit(limit)
+  if (error || !data) return []
+  return (data as ProfileRow[]).map((p) => mapProfile(p, ""))
+}
+
+export async function getRankingTopDamagewb(limit = 50): Promise<DbUser[]> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_SELECT)
+    .order("damagewb", { ascending: false })
     .limit(limit)
   if (error || !data) return []
   return (data as ProfileRow[]).map((p) => mapProfile(p, ""))

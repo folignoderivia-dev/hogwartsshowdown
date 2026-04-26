@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getSupabaseClient } from "@/lib/supabase"
 import { FOREST_MONSTERS, getMonsterByFloor, type ForestMonster } from "@/lib/forest-data"
-import { SPELL_DATABASE, INITIAL_PLAYER_BUILD, WAND_PASSIVES, HOUSE_GDD, rollSpellPower } from "@/lib/data-store"
+import { SPELL_DATABASE, INITIAL_PLAYER_BUILD, WAND_PASSIVES, HOUSE_GDD, HOUSE_MODIFIERS, rollSpellPower } from "@/lib/data-store"
+import { getSpellInfo } from "@/lib/turn-engine"
 import type { PlayerBuild } from "@/lib/types"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
@@ -20,6 +21,19 @@ interface ForestTowerProps {
 interface CombatLog {
   message: string
   type: "player" | "monster" | "system" | "passive"
+}
+
+function buildSpellManaForSpells(spells: string[], house: string): Record<string, { current: number; max: number }> {
+  const out: Record<string, { current: number; max: number }> = {}
+  spells.forEach((sn) => {
+    const info = getSpellInfo(sn, SPELL_DATABASE)
+    if (!info) return
+    let max = info.pp
+    if (house === "gryffindor") max = Math.max(1, max + HOUSE_GDD.gryffindor.manaStartDelta)
+    if (house === "ravenclaw" && !info.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
+    out[sn] = { current: max, max }
+  })
+  return out
 }
 
 export default function ForestTower({ playerBuild, currentUser, onExit, onAuthChange }: ForestTowerProps) {
@@ -63,6 +77,7 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
   const [monsterBurnTurns, setMonsterBurnTurns] = useState(0)
   
   const [attempts, setAttempts] = useState(3)
+  const [spellMana, setSpellMana] = useState<Record<string, { current: number; max: number }>>({})
   
   // Initialize combat
   useEffect(() => {
@@ -145,6 +160,9 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     setPlayerPoisonTurns(0)
     setMonsterPoisonTurns(0)
     
+    // Initialize spell mana
+    setSpellMana(buildSpellManaForSpells(playerBuild.spells || [], playerBuild.house))
+    
     addLog(locale === "en" ? `Floor ${currentFloor}: ${currentMonster.nameEn} appears!` : `Andar ${currentFloor}: ${currentMonster.name} aparece!`, "system")
   }
   
@@ -173,6 +191,13 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
   const handlePlayerAttack = async () => {
     if (!selectedSpell || !monster || !isPlayerTurn || isCombatOver) return
     
+    // Check spell mana
+    const manaInfo = spellMana[selectedSpell]
+    if (!manaInfo || manaInfo.current <= 0) {
+      addLog(locale === "en" ? `${selectedSpell} has no mana left!` : `${selectedSpell} não tem mana restante!`, "system")
+      return
+    }
+    
     setIsPlayerTurn(false)
     
     // Check if player is sleeping
@@ -185,6 +210,12 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     
     const spell = SPELL_DATABASE.find(s => s.name === selectedSpell)
     if (!spell) return
+    
+    // Decrease spell mana
+    setSpellMana(prev => ({
+      ...prev,
+      [selectedSpell]: { ...prev[selectedSpell], current: Math.max(0, prev[selectedSpell].current - 1) }
+    }))
     
     // Calculate player accuracy with monster's reduction
     const accReduction = Math.random() * (monster.opponentAccReduction.max - monster.opponentAccReduction.min) + monster.opponentAccReduction.min
@@ -635,7 +666,20 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     }
   }
   
-  const handleExit = () => {
+  const handleExit = async () => {
+    // Anti-cheat: subtract attempt if exiting during unfinished fight
+    if (!isCombatOver && attempts > 0) {
+      try {
+        const newAttempts = Math.max(0, attempts - 1)
+        await supabase
+          .from("profiles")
+          .update({ tentativas_floresta: newAttempts })
+          .eq("id", currentUser.id)
+        setAttempts(newAttempts)
+      } catch (error) {
+        console.error("Failed to update attempts:", error)
+      }
+    }
     onExit()
   }
   
@@ -777,6 +821,8 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
                   {playerSpells.map((spellName: string) => {
                     const spell = SPELL_DATABASE.find(s => s.name === spellName)
                     if (!spell) return null
+                    const mana = spellMana[spell.name]
+                    const isOutOfMana = mana && mana.current <= 0
                     
                     return (
                       <Button
@@ -785,17 +831,21 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
                         className={`h-auto py-3 px-2 text-xs border-amber-700 ${
                           selectedSpell === spell.name
                             ? "bg-amber-700 text-white"
-                            : "text-amber-100 hover:bg-amber-900/50"
+                            : isOutOfMana
+                              ? "bg-stone-800 text-stone-500 cursor-not-allowed"
+                              : "text-amber-100 hover:bg-amber-900/50"
                         }`}
                         onClick={() => setSelectedSpell(spell.name)}
-                        disabled={playerSleepTurns > 0}
+                        disabled={playerSleepTurns > 0 || isOutOfMana}
                       >
                         <div className="flex flex-col items-center gap-1">
                           <span className="font-bold">{spell.name}</span>
                           <span className="text-[10px] opacity-80">
                             {spell.powerMin || spell.power}-{spell.powerMax || spell.power}
                           </span>
-                          <span className="text-[10px] opacity-60">{spell.cost} pts</span>
+                          <span className="text-[10px] opacity-60">
+                            {mana ? `${mana.current}/${mana.max} MP` : `${spell.cost} pts`}
+                          </span>
                         </div>
                       </Button>
                     )

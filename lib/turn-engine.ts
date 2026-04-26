@@ -1445,7 +1445,7 @@ export function calculateTurnOutcome(params: {
             logs.push(`→ Branquium Remendo! ${attacker.name} curou ${healAttacker} HP (${(multAttacker * 100).toFixed(0)}×) e ${target.name} curou ${healTarget} HP (${(multTarget * 100).toFixed(0)}×)!`)
           }
 
-          // SILÊNCIO: silencia última magia do oponente por 1 turno
+          // SILÊNCIO: silencia última magia do oponente por 1 turno E reduz 1 de mana
           if (spell.special === "silence_spell" && !bloqueado) {
             const freshTarget = state.find((d) => d.id === target.id)
             const lastSpell = freshTarget?.lastSpellUsed
@@ -1453,11 +1453,16 @@ export function calculateTurnOutcome(params: {
               state = state.map((d) => {
                 if (d.id === target.id) {
                   const silenced = [...(d.silencedSpells || []), lastSpell]
-                  return { ...d, silencedSpells: silenced }
+                  // Also reduce 1 mana from the silenced spell
+                  const newSm = { ...(d.spellMana ?? {}) }
+                  if (newSm[lastSpell]) {
+                    newSm[lastSpell] = { ...newSm[lastSpell], current: Math.max(0, newSm[lastSpell].current - 1) }
+                  }
+                  return { ...d, silencedSpells: silenced, spellMana: newSm }
                 }
                 return d
               })
-              logs.push(`→ Silêncio! "${lastSpell}" de ${target.name} foi silenciada por 1 turno!`)
+              logs.push(`→ Silêncio! "${lastSpell}" de ${target.name} foi silenciada por 1 turno e perdeu 1 de mana!`)
             } else {
               logs.push(`→ Silêncio! ${target.name} ainda não usou nenhuma magia. Efeito falhou.`)
             }

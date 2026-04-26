@@ -27,6 +27,8 @@ import {
   getRankingTop,
   getRankingTopOffline,
   getRankingTopForest,
+  getRankingTopMarch,
+  getRankingTopDamagewb,
   getForestAttempts,
   getUserById,
   loginUser,
@@ -42,6 +44,7 @@ import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/sup
 import HomeLobbyChat from "@/components/home-lobby-chat"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
+import WorldBossArena from "@/components/world-boss-arena"
 
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
@@ -142,6 +145,7 @@ const GAME_MODES = [
   { value: "ffa" },
   { value: "quidditch" },
   { value: "floresta" },
+  { value: "worldboss" },
 ] as const
 
 const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"], string>> = {
@@ -155,7 +159,8 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
     quidditch: "🏆 QUADRIBOL 1v1",
-    floresta: "🌲 FLORESTA PROIBIDA",
+    floresta: "🌲 FLORESTA PROIBIDA (OFFLINE)",
+    worldboss: "🐉 WORLD BOSS (OFFLINE)",
   },
   en: {
     teste: "TEST (BOT)",
@@ -167,7 +172,8 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
     quidditch: "🏆 QUIDDITCH 1v1",
-    floresta: "🌲 FORBIDDEN FOREST",
+    floresta: "🌲 FORBIDDEN FOREST (OFFLINE)",
+    worldboss: "🐉 WORLD BOSS (OFFLINE)",
   },
 }
 
@@ -237,7 +243,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [showRankingPanel, setShowRankingPanel] = useState(true)
-  const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest">("elo")
+  const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest" | "march" | "damagewb">("elo")
   const [shareFeedback, setShareFeedback] = useState("")
 
   const [name, setName] = useState("")
@@ -249,7 +255,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
   const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
-  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "historia" | "death-march" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "">("")
+  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "historia" | "death-march" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "worldboss" | "">("")
+  const [showWorldBoss, setShowWorldBoss] = useState(false)
 
   // ── Builds Salvas ────────────────────────────────────────────────────────
   interface SavedBuild {
@@ -527,8 +534,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       list = await getRankingTop(50)
     } else if (rankingMode === "offline") {
       list = await getRankingTopOffline(50)
-    } else {
+    } else if (rankingMode === "forest") {
       list = await getRankingTopForest(50)
+    } else if (rankingMode === "march") {
+      list = await getRankingTopMarch(50)
+    } else if (rankingMode === "damagewb") {
+      list = await getRankingTopDamagewb(50)
+    } else {
+      list = await getRankingTop(50)
     }
     setRanking(list)
   }
@@ -883,6 +896,23 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   {currentUser.username} {currentUser.offlineWins && currentUser.offlineWins > 0 && <span className="ml-1">🥇 ({currentUser.offlineWins})</span>} · ELO {currentUser.elo}
                   {isVip && <span className="ml-1 text-[10px] text-yellow-400">VIP</span>}
                 </Badge>
+                {currentUser && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-purple-700 bg-purple-950/40 px-3 py-1 text-purple-300"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (isReady) {
+                        setShowWorldBoss(true)
+                      }
+                    }}
+                    disabled={!isReady}
+                  >
+                    🐉 {locale === "pt" ? "World Boss" : "World Boss"}
+                  </Button>
+                )}
                 {currentUser && (
                   <Button
                     type="button"
@@ -1329,22 +1359,23 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               {showRankingPanel ? (
                 <div className="flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-amber-400" />
-                  <span>{rankingMode === "elo" ? (locale === 'en' ? 'Global Ranking (Top 50)' : 'Ranking global (Top 50)') : rankingMode === "offline" ? (locale === 'en' ? 'PVE Ranking (Top 50)' : 'Ranking PVE (Top 50)') : (locale === 'en' ? 'Forest Ranking (Top 50)' : 'Ranking da Floresta (Top 50)')}</span>
+                  <span>{rankingMode === "elo" ? (locale === 'en' ? 'PVP Ranking (Top 50)' : 'Ranking PVP (Top 50)') : rankingMode === "offline" ? (locale === 'en' ? 'PVE Ranking (Top 50)' : 'Ranking PVE (Top 50)') : rankingMode === "forest" ? (locale === 'en' ? 'Forest Ranking (Top 50)' : 'Ranking da Floresta (Top 50)') : rankingMode === "march" ? (locale === 'en' ? 'Death March Ranking (Top 50)' : 'Ranking Marcha da Morte (Top 50)') : (locale === 'en' ? 'World Boss Ranking (Top 50)' : 'Ranking World Boss (Top 50)')}</span>
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-6 border-amber-700 px-2 text-xs text-amber-300"
                     onClick={() => {
-                      if (rankingMode === "elo") setRankingMode("offline")
-                      else if (rankingMode === "offline") setRankingMode("forest")
-                      else setRankingMode("elo")
+                      const modes: Array<"elo" | "offline" | "forest" | "march" | "damagewb"> = ["elo", "offline", "forest", "march", "damagewb"]
+                      const currentIdx = modes.indexOf(rankingMode as any)
+                      const nextIdx = (currentIdx + 1) % modes.length
+                      setRankingMode(modes[nextIdx])
                     }}
                   >
-                    {rankingMode === "elo" ? (locale === 'en' ? 'PVE' : 'PVE') : rankingMode === "offline" ? (locale === 'en' ? 'Forest' : 'Floresta') : (locale === 'en' ? 'ELO' : 'ELO')}
+                    {rankingMode === "elo" ? (locale === 'en' ? 'PVE' : 'PVE') : rankingMode === "offline" ? (locale === 'en' ? 'Forest' : 'Floresta') : rankingMode === "forest" ? (locale === 'en' ? 'March' : 'Marcha') : rankingMode === "march" ? (locale === 'en' ? 'WB' : 'WB') : (locale === 'en' ? 'PVP' : 'PVP')}
                   </Button>
                 </div>
               ) : (
-                <span className="sr-only">{locale === 'en' ? 'Global Ranking' : 'Ranking global'}</span>
+                <span className="sr-only">{locale === 'en' ? 'PVP Ranking' : 'Ranking PVP'}</span>
               )}
               <Button
                 size="sm"
@@ -1367,7 +1398,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   <span className="text-amber-200">
                     {i + 1}. {u.username}
                   </span>
-                  <span className="font-mono text-amber-400">{rankingMode === "elo" ? u.elo : rankingMode === "offline" ? u.offlineWins : u.floresta || 0}</span>
+                  <span className="font-mono text-amber-400">{rankingMode === "elo" ? u.elo : rankingMode === "offline" ? u.offlineWins : rankingMode === "forest" ? u.floresta || 0 : rankingMode === "march" ? u.march || 0 : u.damagewb || 0}</span>
                 </li>
               ))}
             </ol>
@@ -2234,6 +2265,27 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <p className="mb-1">{locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}</p>
         <p className="text-amber-600/80">👥 {locale === 'en' ? 'Visits' : 'Visitas'}: {visitCount.toLocaleString()}</p>
       </footer>
+      
+      {/* ── World Boss Arena (Modal) ──────────────────────────────────────────── */}
+      {showWorldBoss && currentUser && isReady && (
+        <WorldBossArena
+          playerBuild={{
+            name: currentUser.username,
+            house,
+            wand,
+            potion,
+            spells: selectedSpells,
+            avatar,
+            gameMode: "worldboss",
+            userId: currentUser.id,
+            username: currentUser.username,
+            elo: currentUser.elo,
+          }}
+          currentUser={currentUser}
+          onExit={() => setShowWorldBoss(false)}
+          onAuthChange={onAuthChange}
+        />
+      )}
     </div>
   )
 }
