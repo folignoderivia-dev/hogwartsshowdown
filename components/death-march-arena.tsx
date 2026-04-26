@@ -21,6 +21,7 @@ import {
   isDefeated,
   isSelfTargetSpell,
   getValidTargetsForSpell,
+  calculateAccuracy,
 } from "@/lib/turn-engine"
 
 const HAND_BOTTOM = "https://i.postimg.cc/hPdCk474/varinhaposicao03.png"
@@ -167,11 +168,12 @@ function buildHpBars(house: string): number[] {
 function buildSpellManaForSpells(spells: string[], house: string, multiplier: number = 1): Record<string, { current: number; max: number }> {
   const out: Record<string, { current: number; max: number }> = {}
   spells.forEach((sn) => {
-    const info = getSpellInfo(sn, SPELL_DATABASE)
-    if (!info) return
-    let max = info.pp
+    const spell = SPELL_DATABASE.find(s => s.name === sn)
+    if (!spell) return
+    // Use standard spell cost (same as regular duel arena)
+    let max = spell.cost || 3
     if (house === "gryffindor") max = Math.max(1, max + HOUSE_GDD.gryffindor.manaStartDelta)
-    if (house === "ravenclaw" && !info.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
+    if (house === "ravenclaw" && !spell.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
     max = Math.round(max * multiplier)
     out[sn] = { current: max, max }
   })
