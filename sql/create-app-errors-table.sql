@@ -33,7 +33,23 @@ WHERE created_at > NOW() - INTERVAL '7 days'
 GROUP BY error_name
 ORDER BY error_count DESC;
 
--- Grant permissions (adjust based on your Supabase setup)
--- GRANT SELECT, INSERT ON app_errors TO authenticated;
--- GRANT SELECT ON error_stats TO authenticated;
--- GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+-- Grant permissions for authenticated users
+GRANT SELECT, INSERT ON app_errors TO authenticated;
+GRANT SELECT ON error_stats TO authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE app_errors ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated users to insert their own errors
+CREATE POLICY "Users can insert their own errors" ON app_errors
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid()::text = user_id);
+
+-- Allow authenticated users to select all errors (for admin panel)
+CREATE POLICY "Users can select all errors" ON app_errors
+  FOR SELECT
+  TO authenticated
+  USING (true);
+

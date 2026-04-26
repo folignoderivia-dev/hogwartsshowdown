@@ -929,7 +929,24 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
       <div className="mx-auto max-w-[1400px]">
         {/* Header with Medieval Style */}
-        <header className="mb-5 text-center">
+        <header className="mb-5 text-center relative">
+          {/* Owl Icon - Bug Report */}
+          <a
+            href="mailto:folignoderivia@gmail.com?subject=Bug Report - Hogwarts Showdown"
+            className="absolute top-0 right-0 flex items-center gap-2 rounded-lg border border-amber-700 bg-amber-950/50 px-3 py-2 text-xs text-amber-300 hover:bg-amber-900/50 transition-colors"
+            title={locale === "pt" ? "Enviar mensagem para o GM" : "Send message to GM"}
+          >
+            <img
+              src="https://i.postimg.cc/4xZxZcQ6/owl-icon.png"
+              alt="Owl"
+              className="h-12 w-12 object-contain"
+              onError={(e) => {
+                e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50' y='50' text-anchor='middle' font-size='40'%3E🦉%3C/text%3E%3C/svg%3E"
+              }}
+            />
+            <span className="hidden sm:inline">{locale === "pt" ? "Achou um Bug? envie mensagem para o GM" : "Found a Bug? Send message to GM"}</span>
+          </a>
+
           <div className="medieval-frame mx-auto mb-3 inline-block rounded-lg bg-gradient-to-b from-amber-900/80 to-amber-950/90 px-6 py-3">
             <h1 className="text-3xl font-bold tracking-tight text-amber-200" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>
               ✦ Hogwarts Showdown ✦

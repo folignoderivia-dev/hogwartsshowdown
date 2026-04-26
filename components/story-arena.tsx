@@ -204,8 +204,8 @@ function buildSpellManaForSpells(spells: string[], house: string): Record<string
   spells.forEach((sn) => {
     const spell = SPELL_DATABASE.find(s => s.name === sn)
     if (!spell) return
-    // Use standard spell cost (same as regular duel arena)
-    let max = spell.cost || 3
+    // Use spell.pp (power points) for mana calculation (same as regular duel arena)
+    let max = spell.pp || 3
     if (house === "gryffindor") max = Math.max(1, max + HOUSE_GDD.gryffindor.manaStartDelta)
     if (house === "ravenclaw" && !spell.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
     out[sn] = { current: max, max }
