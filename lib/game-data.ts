@@ -16,13 +16,13 @@ export const HOUSE_GDD = {
   hufflepuff: { thornsPercent: 0.10, attackPriorityBonus: -3 },
 } as const
 
-export const WAND_PASSIVES: Record<string, { name: string; description: string; effect: string }> = {
+export const WAND_PASSIVES: Record<string, { name: string; namePt?: string; description: string; descriptionPt?: string; effect: string }> = {
   // ── Núcleos Existentes (atualizados) ──────────────────────────────────────
-  unicorn:     { name: "Pelo de Unicórnio",       description: "+10% Acerto (exceto Imperdoáveis)",                      effect: "accuracy_plus10" },
-  dragon:      { name: "Coração de Dragão",        description: "+20% Crit / -15% Acerto",                               effect: "crit20_acc_minus15" },
-  phoenix:     { name: "Pena de Fênix",            description: "Cura 25–75 HP fixo no fim do turno",                    effect: "phoenix_regen" },
-  thestral:    { name: "Pelo de Testrálio",         description: "Dano único máximo: 300",                                effect: "thestral_cap300" },
-  basilisk:    { name: "Presa de Basilisco",        description: "+20% chance de aplicar debuffs",                        effect: "basilisk_debuff_chance" },
+  unicorn:     { name: "Unicorn Hair", namePt: "Pelo de Unicórnio", description: "+10% Accuracy (except Unforgivable)", descriptionPt: "+10% Acerto (exceto Imperdoáveis)", effect: "accuracy_plus10" },
+  dragon:      { name: "Dragon Heartstring", namePt: "Coração de Dragão", description: "+20% Crit / -15% Accuracy", descriptionPt: "+20% Crit / -15% Acerto", effect: "crit20_acc_minus15" },
+  phoenix:     { name: "Phoenix Feather", namePt: "Pena de Fênix", description: "Heals 25–75 fixed HP at end of turn", descriptionPt: "Cura 25–75 HP fixo no fim do turno", effect: "phoenix_regen" },
+  thestral:    { name: "Thestral Hair", namePt: "Pelo de Testrálio", description: "Single damage cap: 300", descriptionPt: "Dano único máximo: 300", effect: "thestral_cap300" },
+  basilisk:    { name: "Basilisk Fang", namePt: "Presa de Basilisco", description: "+20% chance to apply debuffs", descriptionPt: "+20% chance de aplicar debuffs", effect: "basilisk_debuff_chance" },
   thunderbird: { name: "Pena de Pássaro Trovão",   description: "+1 Prioridade global",                                  effect: "thunder_priority" },
   occamy:      { name: "Pena de Occamy",            description: "Espelho ativo: mesmo feitiço que o alvo — −25% dano por repetição (acumula) e −10% acc por camada", effect: "occamy_mirror" },
   kelpie:      { name: "Crina de Kelpie",           description: "Imune a dano de Incêndio, Confringo/Confrigo e Bombarda", effect: "kelpie_fire_immune" },
@@ -62,6 +62,7 @@ export type SpellDebuffType =
 
 export interface SpellInfo {
   name: string
+  namePt?: string
   power?: number
   powerMin?: number
   powerMax?: number
@@ -69,6 +70,7 @@ export interface SpellInfo {
   pp: number
   cost: number
   effect?: string
+  effectPt?: string
   priority?: number
   isUnforgivable?: boolean
   debuff?: { type: SpellDebuffType; chance: number; duration?: number }
@@ -86,7 +88,9 @@ export interface SpellInfo {
 export interface PotionInfo {
   id: string
   name: string
+  namePt?: string
   description: string
+  descriptionPt?: string
   effect: string
 }
 
@@ -104,11 +108,11 @@ export function formatSpellPower(spell: SpellInfo): string {
 }
 
 export const SPELL_DATABASE: SpellInfo[] = [
-  { name: "Estupefaca", power: 50, accuracy: 50, pp: 10, cost: 1, debuff: { type: "stun", chance: 100, duration: 1 }, effect: "STUN: alvo perde o próximo turno" },
-  { name: "Bombarda", powerMin: 50, powerMax: 150, accuracy: 70, pp: 8, cost: 1, effect: "Área: atinge todos os inimigos" },
-  { name: "Incendio", powerMin: 25, powerMax: 80, accuracy: 90, pp: 15, cost: 1, debuff: { type: "burn", chance: 50, duration: 2 }, effect: "50% BURN (25 dano/turno, 2t); combo: +20% dano por uso consecutivo" },
-  { name: "Glacius", powerMin: 30, powerMax: 75, accuracy: 60, pp: 15, cost: 1, debuff: { type: "freeze", chance: 20, duration: 2 }, effect: "Crítico garantido se alvo congelado; 20% FREEZE (2t)" },
-  { name: "Diffindo", power: 50, accuracy: 100, pp: 15, cost: 1, special: "shield_break", effect: "Ignora Protego; 100 dano se alvo tiver Protego ativo" },
+  { name: "Stupefy", namePt: "Estupefaca", power: 50, accuracy: 50, pp: 10, cost: 1, debuff: { type: "stun", chance: 100, duration: 1 }, effect: "STUN: target loses next turn", effectPt: "STUN: alvo perde o próximo turno" },
+  { name: "Bombarda", namePt: "Bombarda", powerMin: 50, powerMax: 150, accuracy: 70, pp: 8, cost: 1, effect: "Area: hits all enemies", effectPt: "Área: atinge todos os inimigos" },
+  { name: "Incendio", namePt: "Incêndio", powerMin: 25, powerMax: 80, accuracy: 90, pp: 15, cost: 1, debuff: { type: "burn", chance: 50, duration: 2 }, effect: "50% BURN (25 damage/turn, 2t); combo: +20% damage per consecutive use", effectPt: "50% BURN (25 dano/turno, 2t); combo: +20% dano por uso consecutivo" },
+  { name: "Glacius", namePt: "Glacius", powerMin: 30, powerMax: 75, accuracy: 60, pp: 15, cost: 1, debuff: { type: "freeze", chance: 20, duration: 2 }, effect: "Critical guaranteed if target frozen; 20% FREEZE (2t)", effectPt: "Crítico garantido se alvo congelado; 20% FREEZE (2t)" },
+  { name: "Diffindo", namePt: "Diffindo", power: 50, accuracy: 100, pp: 15, cost: 1, special: "shield_break", effect: "Ignores Protego; 100 damage if target has active Protego", effectPt: "Ignora Protego; 100 dano se alvo tiver Protego ativo" },
   { name: "Expelliarmus", powerMin: 25, powerMax: 80, accuracy: 80, pp: 10, cost: 1, priority: 2, debuff: { type: "damage_reduce", chance: 100, duration: 1 }, effect: "Prioridade +2; -25% dano causado pelo alvo (1t)" },
   { name: "Depulso", power: 40, accuracy: 100, pp: 15, cost: 1, priority: 2, ignoresDefense: true, effect: "Prioridade +2; nunca erra, dano não reduzido por defesa (respeita Protego)" },
   { name: "Confrigo", powerMin: 70, powerMax: 150, accuracy: 65, pp: 10, cost: 1, debuff: { type: "mark", chance: 40, duration: 2 }, effect: "40% MARCA: crítico garantido no alvo (2t)" },
@@ -163,12 +167,12 @@ export const SPELL_DATABASE: SpellInfo[] = [
 ]
 
 export const POTION_DATABASE: PotionInfo[] = [
-  { id: "wiggenweld", name: "Poção Wiggenweld", description: "Cura HP igual ao último dano recebido", effect: "heal_last_damage" },
-  { id: "edurus", name: "Poção Edurus", description: "Limpa debuffs + 1 turno de imunidade", effect: "immunity_1_turn" },
-  { id: "mortovivo", name: "Poção Morto-Vivo", description: "HP não cai abaixo de 1 por 1 turno", effect: "undead_1_turn" },
-  { id: "maxima", name: "Poção Maxima", description: "+50% dano no próximo turno", effect: "damage_boost_50" },
-  { id: "foco", name: "Poção Foco", description: "+10% Accuracy permanente", effect: "accuracy_plus_10" },
-  { id: "merlin", name: "Poção Merlin", description: "Copia última poção do oponente com +25% eficácia", effect: "copy_potion_boost" },
-  { id: "dragon_tonic", name: "Tônico de Dragão", description: "Aumenta sua prioridade em +4 no próximo turno", effect: "priority_plus_4" },
-  { id: "despair_potion", name: "Poção do Desespero", description: "Reduz 3 de mana do oponente baseado na última magia que ele usou", effect: "mana_drain_3" },
+  { id: "wiggenweld", name: "Wiggenweld Potion", namePt: "Poção Wiggenweld", description: "Heals HP equal to last damage received", descriptionPt: "Cura HP igual ao último dano recebido", effect: "heal_last_damage" },
+  { id: "edurus", name: "Edurus Potion", namePt: "Poção Edurus", description: "Clears debuffs + 1 turn of immunity", descriptionPt: "Limpa debuffs + 1 turno de imunidade", effect: "immunity_1_turn" },
+  { id: "mortovivo", name: "Morto-Vivo Potion", namePt: "Poção Morto-Vivo", description: "HP never drops below 1 for 1 turn", descriptionPt: "HP não cai abaixo de 1 por 1 turno", effect: "undead_1_turn" },
+  { id: "maxima", name: "Maxima Potion", namePt: "Poção Maxima", description: "+50% damage on next turn", descriptionPt: "+50% dano no próximo turno", effect: "damage_boost_50" },
+  { id: "foco", name: "Focus Potion", namePt: "Poção Foco", description: "+10% Accuracy permanent", descriptionPt: "+10% Accuracy permanente", effect: "accuracy_plus_10" },
+  { id: "merlin", name: "Merlin Potion", namePt: "Poção Merlin", description: "Copies opponent's last potion with +25% effectiveness", descriptionPt: "Copia última poção do oponente com +25% eficácia", effect: "copy_potion_boost" },
+  { id: "dragon_tonic", name: "Dragon Tonic", namePt: "Tônico de Dragão", description: "Increases your priority by +4 on next turn", descriptionPt: "Aumenta sua prioridade em +4 no próximo turno", effect: "priority_plus_4" },
+  { id: "despair_potion", name: "Despair Potion", namePt: "Poção do Desespero", description: "Reduces 3 mana from opponent based on last spell they used", descriptionPt: "Reduz 3 de mana do oponente baseado na última magia que ele usou", effect: "mana_drain_3" },
 ]

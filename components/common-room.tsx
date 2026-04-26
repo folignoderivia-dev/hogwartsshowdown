@@ -55,10 +55,10 @@ interface CommonRoomProps {
 }
 
 const HOUSES = [
-  { value: "gryffindor", label: "Grifinória",  color: "bg-red-800",    modifiers: "Age primeiro na maioria das situações, mas começa com menos mana em cada magia", icon: "🦁" },
-  { value: "slytherin",  label: "Sonserina",   color: "bg-green-800",  modifiers: "Alta chance de acertos críticos, porém começa com apenas 4 barras de HP",        icon: "🐍" },
-  { value: "ravenclaw",  label: "Corvinal",    color: "bg-blue-800",   modifiers: "Mana extra em todas as magias comuns, permitindo mais lançamentos por batalha",   icon: "🦅" },
-  { value: "hufflepuff", label: "Lufa-Lufa",   color: "bg-yellow-700", modifiers: "Devolve parte do dano recebido ao atacante, mas age por último na maioria dos turnos", icon: "🦡" },
+  { value: "gryffindor", label: "Grifinória", labelEn: "Gryffindor", color: "bg-red-800", modifiers: "Age primeiro na maioria das situações, mas começa com menos mana em cada magia", modifiersEn: "Acts first in most situations, but starts with less mana per spell", icon: "🦁" },
+  { value: "slytherin",  label: "Sonserina",   labelEn: "Slytherin",  color: "bg-green-800",  modifiers: "Alta chance de acertos críticos, porém começa com apenas 4 barras de HP",        modifiersEn: "High critical hit chance, but starts with only 4 HP bars",        icon: "🐍" },
+  { value: "ravenclaw",  label: "Corvinal",    labelEn: "Ravenclaw",  color: "bg-blue-800",   modifiers: "Mana extra em todas as magias comuns, permitindo mais lançamentos por batalha",   modifiersEn: "Extra mana in all common spells, allowing more casts per battle",   icon: "🦅" },
+  { value: "hufflepuff", label: "Lufa-Lufa",   labelEn: "Hufflepuff", color: "bg-yellow-700", modifiers: "Devolve parte do dano recebido ao atacante, mas age por último na maioria dos turnos", modifiersEn: "Reflects part of received damage to attacker, but acts last in most turns", icon: "🦡" },
 ]
 
 
@@ -804,7 +804,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       {/* ── Banner BETA ─────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-amber-900/95 px-4 py-1.5 text-xs font-medium text-amber-100 shadow-md backdrop-blur-sm">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />
-        <span>⚠️ FASE BETA: Bugs podem ocorrer. O equilíbrio de jogo está em constante ajuste.</span>
+        <span>{locale === "pt" ? "⚠️ FASE BETA: Bugs podem ocorrer. O equilíbrio de jogo está em constante ajuste." : "⚠️ BETA PHASE: Bugs may occur. Game balance is constantly being adjusted."}</span>
       </div>
 
       <HomeLobbyChat
@@ -820,7 +820,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <h1 className="text-3xl font-bold tracking-tight text-amber-200" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>
               ✦ Hogwarts Showdown ✦
             </h1>
-            <p className="mt-1 text-amber-100/90">Monte sua Build e duele! Pvp Multiplayer</p>
+            <p className="mt-1 text-amber-100/90">{locale === "pt" ? "Monte sua Build e duele! PvP Multiplayer" : "Build your deck and duel! PvP Multiplayer"}</p>
           </div>
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2">
             <Button
@@ -829,7 +829,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               size="sm"
               onClick={cycleLocale}
               className="border-sky-800/80 bg-sky-950/40 text-sky-200 hover:bg-sky-900/50"
-              title="Estrutura de idioma (pt / en / es) — conteúdo ainda em PT"
+              title="Language toggle (EN / PT)"
             >
               {ui.translate} <span className="ml-1 text-[10px] opacity-80">→ {locale.toUpperCase()}</span>
             </Button>
@@ -843,7 +843,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               {ui.downloadApk}
             </a>
             <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
-              🟢 {onlineWizards} Bruxos Online
+              🟢 {onlineWizards} {locale === "pt" ? "Bruxos Online" : "Wizards Online"}
             </Badge>
             {currentUser ? (
               <>
@@ -861,7 +861,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     onClick={() => window.location.href = "/admin"}
                   >
                     <Shield className="mr-1 h-3.5 w-3.5" />
-                    Painel Admin
+                    {locale === "pt" ? "Painel Admin" : "Admin Panel"}
                   </Button>
                 )}
                 <Button
