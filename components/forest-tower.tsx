@@ -277,6 +277,22 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         }
       }
       
+      // Apply self-target spells (healing, protection)
+      const spellNorm = spell.name.toLowerCase()
+      if (spellNorm.includes("ferula")) {
+        const healAmt = Math.floor(Math.random() * 126) + 25
+        setPlayerHp(prev => Math.min(maxPlayerHp, prev + healAmt))
+        addLog(locale === "en" ? `Ferula heals ${healAmt} HP!` : `Ferula cura ${healAmt} HP!`, "passive")
+      } else if (spellNorm.includes("episkey")) {
+        setPlayerHp(prev => Math.min(maxPlayerHp, prev + 50))
+        addLog(locale === "en" ? `Episkey heals 50 HP!` : `Episkey cura 50 HP!`, "passive")
+      } else if (spellNorm.includes("vulnera") && spellNorm.includes("sanetur")) {
+        setPlayerHp(prev => Math.min(maxPlayerHp, prev + 100))
+        addLog(locale === "en" ? `Vulnera Sanetur heals 100 HP!` : `Vulnera Sanetur cura 100 HP!`, "passive")
+      } else if (spellNorm.includes("protego") && !spellNorm.includes("maximo") && !spellNorm.includes("diabol")) {
+        addLog(locale === "en" ? `Protego activated!` : `Protego ativado!`, "passive")
+      }
+      
       // Apply spell debuffs
       if (spell.debuff && !monsterImmuneToDebuffs) {
         const debuffChance = spell.debuff.chance || 0
