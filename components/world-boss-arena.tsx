@@ -25,10 +25,10 @@ interface CombatLog {
 }
 
 const BOSS_IMAGES = [
-  "https://i.postimg.cc/4yCRvvB2/boss0.png",
-  "https://i.postimg.cc/4yCRvvB2/boss1.png",
-  "https://i.postimg.cc/4yCRvvB2/boss2.png",
-  "https://i.postimg.cc/4yCRvvB2/boss3.png",
+  "https://i.postimg.cc/26r79YDM/manticore.png",
+  "https://i.postimg.cc/PxTQVHjB/morta.png",
+  "https://i.postimg.cc/bJp9VPh5/nundu.png",
+  "https://i.postimg.cc/fLDfqsN1/sphynx.png",
 ]
 
 function buildSpellManaForSpells(spells: string[], house: string): Record<string, { current: number; max: number }> {
