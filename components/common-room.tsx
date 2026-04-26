@@ -248,6 +248,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest" | "march" | "damagewb" | "story">("elo")
   const [shareFeedback, setShareFeedback] = useState("")
   const [showAdminPanel, setShowAdminPanel] = useState(false)
+  const [isGmModalOpen, setIsGmModalOpen] = useState(false)
+  const [gmMessage, setGmMessage] = useState("")
 
   const [name, setName] = useState("")
   const [house, setHouse] = useState("")
@@ -907,6 +909,34 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     setFriendMessages(rows)
   }
 
+  const sendGmMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!gmMessage.trim()) return
+    
+    try {
+      const playerName = currentUser?.username || "Jogador Desconhecido"
+      
+      await fetch("https://formsubmit.co/ajax/guilhermefoligno@gmail.com", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          Nome: playerName,
+          Mensagem: gmMessage,
+          _subject: `Novo Bug Report de ${playerName}` 
+        })
+      })
+      
+      alert(locale === "pt" ? "Correio Coruja enviado com sucesso!" : "Owl message sent successfully!")
+      setIsGmModalOpen(false)
+      setGmMessage("")
+    } catch (error) {
+      alert(locale === "pt" ? "Erro ao enviar a mensagem. Tente novamente mais tarde." : "Error sending message. Try again later.")
+    }
+  }
+
   const selectedAvatar = AVATARS.find((a) => a.value === avatar)
   const selectedWandCore = WAND_CORES.find((w) => w.value === wand)
   const effectiveName = currentUser?.username || name
@@ -931,8 +961,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         {/* Header with Medieval Style */}
         <header className="mb-5 text-center relative">
           {/* Owl Icon - Bug Report */}
-          <a
-            href="mailto:folignoderivia@gmail.com?subject=Bug Report - Hogwarts Showdown"
+          <button
+            type="button"
+            onClick={() => setIsGmModalOpen(true)}
             className="absolute top-0 right-0 flex items-center gap-2 rounded-lg border border-amber-700 bg-amber-950/50 px-3 py-2 text-xs text-amber-300 hover:bg-amber-900/50 transition-colors"
             title={locale === "pt" ? "Enviar mensagem para o GM" : "Send message to GM"}
           >
@@ -945,7 +976,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               }}
             />
             <span className="hidden sm:inline">{locale === "pt" ? "Achou um Bug? envie mensagem para o GM" : "Found a Bug? Send message to GM"}</span>
-          </a>
+          </button>
 
           <div className="medieval-frame mx-auto mb-3 inline-block rounded-lg bg-gradient-to-b from-amber-900/80 to-amber-950/90 px-6 py-3">
             <h1 className="text-3xl font-bold tracking-tight text-amber-200" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>
@@ -2451,6 +2482,55 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      
+      {/* ── GM Bug Report Modal ──────────────────────────────────────────────── */}
+      {isGmModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+          <Card className="medieval-frame w-full max-w-md border-amber-700 bg-stone-900">
+            <CardHeader className="border-b border-amber-900/50">
+              <CardTitle className="text-center text-amber-200">
+                🦉 {locale === "pt" ? "Enviar Correio Coruja para o GM" : "Send Owl Message to GM"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <form onSubmit={sendGmMessage}>
+                <div className="mb-4">
+                  <label className="mb-2 block text-sm font-medium text-amber-300">
+                    {locale === "pt" ? "Sua mensagem:" : "Your message:"}
+                  </label>
+                  <textarea
+                    value={gmMessage}
+                    onChange={(e) => setGmMessage(e.target.value)}
+                    className="w-full rounded border border-amber-700 bg-stone-800 px-3 py-2 text-amber-100 placeholder-amber-500/50 focus:border-amber-500 focus:outline-none"
+                    rows={5}
+                    placeholder={locale === "pt" ? "Descreva o bug ou sua mensagem aqui..." : "Describe the bug or your message here..."}
+                    required
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-amber-700 hover:bg-amber-600 text-white"
+                  >
+                    {locale === "pt" ? "Enviar" : "Send"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 border-amber-700 text-amber-300 hover:bg-amber-900/50"
+                    onClick={() => {
+                      setIsGmModalOpen(false)
+                      setGmMessage("")
+                    }}
+                  >
+                    {locale === "pt" ? "Cancelar" : "Cancel"}
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </div>
