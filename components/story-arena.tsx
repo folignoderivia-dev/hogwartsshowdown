@@ -22,7 +22,7 @@ import {
   isSelfTargetSpell,
   getValidTargetsForSpell,
 } from "@/lib/turn-engine"
-import { getBossByStage, getNextStage, STORY_BOSSES, type StoryBoss } from "@/lib/story-data"
+import { STORY_BOSSES, type StoryBoss } from "@/lib/story-data"
 
 interface StoryArenaProps {
   playerBuild: PlayerBuild
@@ -253,6 +253,8 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
   const [impactTargetId, setImpactTargetId] = useState<string | null>(null)
   const [currentTargetId, setCurrentTargetId] = useState<string | null>(null)
   const [boss, setBoss] = useState<StoryBoss | null>(null)
+  const [damageMultiplier, setDamageMultiplier] = useState(1)
+  const [priorityBuff, setPriorityBuff] = useState(0)
   
   const duelistsRef = useRef<Duelist[]>([])
   const turnNumberRef = useRef(turnNumber)
@@ -478,10 +480,20 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
   }
   
   const buildStoryRound = useCallback((stage: number): Duelist[] => {
-    const currentBoss = getBossByStage(stage)
-    if (!currentBoss) return []
+    // PASSO 1: A MATEMÁTICA DA INICIALIZAÇÃO
+    const cycle = Math.floor((stage - 1) / 10)
+    const bossIndex = (stage - 1) % 10
+    const baseBoss = STORY_BOSSES[bossIndex]
+    if (!baseBoss) return []
     
-    setBoss(currentBoss)
+    // Calcula os buffs de ciclo
+    const maxHp = baseBoss.hp + (cycle * 200)
+    const damageMultiplier = 1 + (cycle * 0.20)
+    const priorityBuff = cycle * 10
+    
+    setBoss({ ...baseBoss, hp: maxHp })
+    setDamageMultiplier(damageMultiplier)
+    setPriorityBuff(priorityBuff)
     
     const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
     const playerDuelist: Duelist = {
@@ -504,20 +516,24 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       usedPotions: [],
     }
     
-    const bossSpells = currentBoss.spells.length > 0 ? currentBoss.spells : SPELL_DATABASE.filter(s => !s.isVipOnly).map(s => s.name)
+    const bossSpells = baseBoss.spells.length > 0 ? baseBoss.spells : SPELL_DATABASE.filter(s => !s.isVipOnly).map(s => s.name)
+    
+    // PASSO 2: APLICANDO O HP (UI)
+    const bossHpBars = buildHpBars(baseBoss.house).map(bar => bar * (maxHp / 100))
+    
     const bossDuelist: Duelist = {
-      id: `boss-${currentBoss.id}`,
-      name: locale === "en" ? currentBoss.nameEn : currentBoss.name,
-      house: currentBoss.house,
-      wand: currentBoss.wand,
-      potion: currentBoss.potion,
-      avatar: currentBoss.avatar,
+      id: `boss-${baseBoss.id}`,
+      name: locale === "en" ? baseBoss.nameEn : baseBoss.name,
+      house: baseBoss.house,
+      wand: baseBoss.wand,
+      potion: baseBoss.potion,
+      avatar: baseBoss.avatar,
       spells: bossSpells,
-      hp: { bars: buildHpBars(currentBoss.house) },
+      hp: { bars: bossHpBars },
       speed: 95,
       debuffs: [],
       team: "enemy",
-      spellMana: buildSpellManaForSpells(bossSpells, currentBoss.house),
+      spellMana: buildSpellManaForSpells(bossSpells, baseBoss.house),
       turnsInBattle: 0,
       disabledSpells: {},
       missStreakBySpell: {},
@@ -626,10 +642,25 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     const roundTurn = turnNumberRef.current
     const snapshot = [...duelistsRef.current]
     
+    // PASSO 3: APLICANDO BUFFS SEM QUEBRAR O MOTOR
+    // Create a modified SPELL_DATABASE with buffed boss spells
+    const buffedSpellDatabase = SPELL_DATABASE.map(spell => {
+      const isBossSpell = snapshot.some(d => !d.isPlayer && d.spells.includes(spell.name))
+      if (!isBossSpell) return spell
+      
+      return {
+        ...spell,
+        power: spell.power ? Math.floor(spell.power * damageMultiplier) : undefined,
+        powerMin: spell.powerMin ? Math.floor(spell.powerMin * damageMultiplier) : undefined,
+        powerMax: spell.powerMax ? Math.floor(spell.powerMax * damageMultiplier) : undefined,
+        priority: spell.priority ? spell.priority + priorityBuff : undefined,
+      }
+    })
+    
     const outcome = calculateTurnOutcome({
       duelists: snapshot,
       actions: queuedActions,
-      spellDatabase: SPELL_DATABASE,
+      spellDatabase: buffedSpellDatabase,
       turnNumber: roundTurn,
       gameMode: "torneio-offline",
       circumFlames,
@@ -759,51 +790,46 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     setGameOver("win")
     addLog(locale === "en" ? "🎉 Victory!" : "🎉 Vitória!")
     
+    // PASSO 4: PROGRESSÃO DE ESTÁGIO
+    const nextStage = currentStage + 1
+    
     try {
-      const nextStage = getNextStage(currentStage)
-      if (nextStage) {
-        // Only update modo_historia if nextStage is greater than current value
-        const { data: profileData } = await supabase
+      // Always allow progression (infinite)
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("modo_historia")
+        .eq("id", currentUser.id)
+        .single()
+      
+      const currentModeHistoria = profileData?.modo_historia ?? 0
+      
+      if (nextStage > currentModeHistoria) {
+        const { error } = await supabase
           .from("profiles")
-          .select("modo_historia")
+          .update({ modo_historia: nextStage })
           .eq("id", currentUser.id)
-          .single()
         
-        const currentModeHistoria = profileData?.modo_historia ?? 0
-        
-        if (nextStage > currentModeHistoria) {
-          const { error } = await supabase
-            .from("profiles")
-            .update({ modo_historia: nextStage })
-            .eq("id", currentUser.id)
-          
-          if (error) {
-            console.error("Story Mode: Failed to update modo_historia", error)
-            throw error
-          }
-          
-          console.log(`Story Mode: Updated modo_historia for user ${currentUser.id} from ${currentModeHistoria} to ${nextStage}`)
-        } else {
-          console.log(`Story Mode: Skipping modo_historia update for user ${currentUser.id} (current: ${currentModeHistoria}, new: ${nextStage})`)
+        if (error) {
+          console.error("Story Mode: Failed to update modo_historia", error)
+          throw error
         }
         
-        setTimeout(() => {
-          setCurrentStage(nextStage)
-          setGameOver(null)
-          setPotionUsed(false)
-          const round = buildStoryRound(nextStage)
-          setDuelists(round)
-          setTurnNumber(1)
-          turnNumberRef.current = 1
-          setBattleStatus("selecting")
-          beginRoundSelection(round)
-        }, 2000)
+        console.log(`Story Mode: Updated modo_historia for user ${currentUser.id} from ${currentModeHistoria} to ${nextStage}`)
       } else {
-        addLog(locale === "en" ? "🏆 You completed Story Mode!" : "🏆 Você completou o Modo História!")
-        setTimeout(() => {
-          onExit()
-        }, 3000)
+        console.log(`Story Mode: Skipping modo_historia update for user ${currentUser.id} (current: ${currentModeHistoria}, new: ${nextStage})`)
       }
+      
+      setTimeout(() => {
+        setCurrentStage(nextStage)
+        setGameOver(null)
+        setPotionUsed(false)
+        const round = buildStoryRound(nextStage)
+        setDuelists(round)
+        setTurnNumber(1)
+        turnNumberRef.current = 1
+        setBattleStatus("selecting")
+        beginRoundSelection(round)
+      }, 2000)
     } catch (error) {
       console.error("Failed to update progress:", error)
       await logAppError({
@@ -1378,7 +1404,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
               <>
                 <div className="mb-2 text-6xl">🏆</div>
                 <h2 className="text-3xl font-bold text-amber-300">{locale === "en" ? "Victory!" : "Vitória!"}</h2>
-                <p className="mt-2 text-amber-100/80">{getNextStage(currentStage) ? (locale === "en" ? "Advancing to next stage..." : "Avançando para próxima etapa...") : (locale === "en" ? "You completed Story Mode!" : "Você completou o Modo História!")}</p>
+                <p className="mt-2 text-amber-100/80">{locale === "en" ? "Advancing to next stage..." : "Avançando para próxima etapa..."}</p>
               </>
             ) : (
               <>
