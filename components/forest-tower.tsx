@@ -8,7 +8,7 @@ import { SPELL_DATABASE, INITIAL_PLAYER_BUILD } from "@/lib/data-store"
 import type { PlayerBuild } from "@/lib/types"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
-import { Swords, Heart, Shield, Zap, X, Trophy } from "lucide-react"
+import { Swords, Heart, Shield, Zap, X, Trophy, FlaskConical } from "lucide-react"
 
 interface ForestTowerProps {
   playerBuild: PlayerBuild
@@ -537,12 +537,19 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
                 <div className="flex items-center gap-4">
                   {/* Player Avatar */}
                   <div className="w-12 h-12 bg-amber-800 rounded-full flex items-center justify-center overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={playerBuild.avatar}
-                      alt={currentUser.username}
-                      className="w-full h-full object-cover"
-                    />
+                    {playerBuild.avatar ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={playerBuild.avatar}
+                        alt={currentUser.username}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%23f59e0b'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='white' font-size='30'%3E🧙%3C/text%3E%3C/svg%3E"
+                        }}
+                      />
+                    ) : (
+                      <span className="text-2xl">🧙</span>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm font-bold text-amber-100">{currentUser.username}</p>
@@ -627,13 +634,24 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
               
               {/* Attack Button */}
               {!isCombatOver && isPlayerTurn && selectedSpell && (
-                <div className="mt-4 flex justify-center">
+                <div className="mt-4 flex justify-center gap-2">
                   <Button
                     className="bg-amber-700 hover:bg-amber-600 text-white px-8"
                     onClick={handlePlayerAttack}
                   >
                     <Swords className="w-4 h-4 mr-2" />
                     {locale === "en" ? "Cast Spell" : "Lançar Magia"}
+                  </Button>
+                  <Button
+                    className="bg-purple-700 hover:bg-purple-600 text-white px-6"
+                    onClick={() => {
+                      const healAmount = 150
+                      setPlayerHp(prev => Math.min(prev + healAmount, maxPlayerHp))
+                      addLog(locale === "en" ? `Used potion and healed ${healAmount} HP!` : `Usou poção e curou ${healAmount} HP!`, "system")
+                    }}
+                  >
+                    <FlaskConical className="w-4 h-4 mr-2" />
+                    {locale === "en" ? "Potion" : "Poção"}
                   </Button>
                 </div>
               )}
