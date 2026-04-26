@@ -45,6 +45,7 @@ import HomeLobbyChat from "@/components/home-lobby-chat"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
 import WorldBossArena from "@/components/world-boss-arena"
+import { getRandomSticker } from "@/lib/stickers-data"
 
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
@@ -253,6 +254,10 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [spellSearch, setSpellSearch] = useState("")
   const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
   const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "historia" | "death-march" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "worldboss" | "">("")
+  const [showGacha, setShowGacha] = useState(false)
+  const [gachaShaking, setGachaShaking] = useState(false)
+  const [revealedSticker, setRevealedSticker] = useState<string | null>(null)
+  const [canClaimGacha, setCanClaimGacha] = useState(true)
 
   // ── Builds Salvas ────────────────────────────────────────────────────────
   interface SavedBuild {
@@ -279,6 +284,58 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     if (!savedBuildsKey) return
     window.localStorage.setItem(savedBuildsKey, JSON.stringify(builds))
     setSavedBuilds(builds)
+  }
+
+  // ── Gacha Logic ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (currentUser) {
+      const today = new Date().toISOString().split('T')[0]
+      if (currentUser.lastGachaPull && currentUser.lastGachaPull.startsWith(today)) {
+        setCanClaimGacha(false)
+      }
+    }
+  }, [currentUser])
+
+  const handleGachaClick = () => {
+    if (!canClaimGacha) return
+    setGachaShaking(true)
+    setTimeout(() => {
+      setGachaShaking(false)
+      const sticker = getRandomSticker()
+      setRevealedSticker(sticker)
+    }, 2000)
+  }
+
+  const handleClaimSticker = async () => {
+    if (!revealedSticker || !currentUser) return
+    try {
+      const supabase = getSupabaseClient()
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("unlocked_stickers")
+        .eq("id", currentUser.id)
+        .single()
+      
+      const currentStickers = profile?.unlocked_stickers || []
+      const newStickers = currentStickers.includes(revealedSticker) 
+        ? currentStickers 
+        : [...currentStickers, revealedSticker]
+      
+      await supabase
+        .from("profiles")
+        .update({ 
+          last_gacha_pull: new Date().toISOString(),
+          unlocked_stickers: newStickers 
+        })
+        .eq("id", currentUser.id)
+      
+      setCanClaimGacha(false)
+      setRevealedSticker(null)
+      setShowGacha(false)
+      onAuthChange({ ...currentUser, lastGachaPull: new Date().toISOString(), unlockedStickers: newStickers })
+    } catch (error) {
+      console.error("Failed to claim sticker:", error)
+    }
   }
 
   const handleSaveBuild = () => {
@@ -875,13 +932,31 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </Button>
             {/* Link de download do APK — gerado pelo GitHub Actions */}
             <a
-              href="https://github.com/folignoderivia-dev/hogwartsshowdown/releases/latest/download/app-debug.apk"
+              href="https://github.com/folignoderivia-dev/hogwartsshowdown/releases"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-full border border-emerald-700 bg-emerald-950/50 px-3 py-1 text-xs font-medium text-emerald-300 transition-colors hover:bg-emerald-900/60 hover:text-emerald-200"
             >
               {ui.downloadApk}
             </a>
+            {/* Gacha Button */}
+            {currentUser && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={`border-amber-700 bg-amber-950/40 px-3 py-1 text-amber-300 ${!canClaimGacha ? "opacity-50 cursor-not-allowed" : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (canClaimGacha) {
+                    setShowGacha(true)
+                  }
+                }}
+                disabled={!canClaimGacha}
+              >
+                🎩 {canClaimGacha ? (locale === "pt" ? "Presente Diário" : "Daily Gift") : (locale === "pt" ? "Volte Amanhã" : "Come Back Tomorrow")}
+              </Button>
+            )}
             <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
               🟢 {onlineWizards} {locale === "pt" ? "Bruxos Online" : "Wizards Online"}
             </Badge>
@@ -2265,6 +2340,62 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             onExit={() => {}}
             onAuthChange={onAuthChange}
           />
+        </div>
+      )}
+      
+      {/* ── Gacha Modal ──────────────────────────────────────────────────────────── */}
+      {showGacha && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <Card className="medieval-frame w-full max-w-md border-amber-700 bg-stone-900">
+            <CardHeader className="border-b border-amber-900/50">
+              <CardTitle className="text-center text-amber-200">
+                🎩 {locale === "pt" ? "Chapéu Seletor" : "Sorting Hat"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              {!revealedSticker ? (
+                <div className="flex flex-col items-center gap-4">
+                  <div className={`text-8xl ${gachaShaking ? "animate-bounce" : ""}`}>
+                    🎩
+                  </div>
+                  <p className="text-center text-amber-300">
+                    {locale === "pt" ? "Clique no chapéu para sortear um sticker!" : "Click the hat to draw a sticker!"}
+                  </p>
+                  <Button
+                    className="bg-amber-700 hover:bg-amber-600 text-white"
+                    onClick={handleGachaClick}
+                    disabled={gachaShaking}
+                  >
+                    {gachaShaking ? (locale === "pt" ? "Sorteando..." : "Drawing...") : (locale === "pt" ? "Sortear" : "Draw")}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative w-32 h-32">
+                    <img src={revealedSticker} alt="Sticker" className="w-full h-full object-contain" />
+                  </div>
+                  <p className="text-center text-amber-300">
+                    {locale === "pt" ? "Você ganhou um sticker!" : "You won a sticker!"}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      className="bg-green-700 hover:bg-green-600 text-white"
+                      onClick={handleClaimSticker}
+                    >
+                      {locale === "pt" ? "Resgatar" : "Claim"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="border-amber-700 text-amber-300 hover:bg-amber-900/50"
+                      onClick={() => setShowGacha(false)}
+                    >
+                      {locale === "pt" ? "Cancelar" : "Cancel"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

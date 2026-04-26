@@ -26,6 +26,8 @@ export interface DbUser {
   tentativasHistoria?: number
   march?: number
   damagewb?: number
+  lastGachaPull?: string
+  unlockedStickers?: string[]
 }
 
 interface ProfileRow {
@@ -47,6 +49,8 @@ interface ProfileRow {
   tentativas_historia?: number | null
   march?: number | null
   damagewb?: number | null
+  last_gacha_pull?: string | null
+  unlocked_stickers?: string[] | null
 }
 
 const PROFILE_SELECT = "*"
@@ -78,6 +82,8 @@ function mapProfile(profile: ProfileRow, email: string): DbUser {
     tentativasHistoria: profile.tentativas_historia ?? 3,
     march: profile.march ?? 0,
     damagewb: profile.damagewb ?? 0,
+    lastGachaPull: profile.last_gacha_pull ?? undefined,
+    unlockedStickers: profile.unlocked_stickers ?? undefined,
   }
 }
 
