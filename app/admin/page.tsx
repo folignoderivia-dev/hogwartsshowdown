@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Shield, Users, AlertTriangle, RefreshCw } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { updateServerMeta, getServerMeta } from "@/lib/database"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 interface UserProfile {
@@ -104,34 +105,16 @@ export default function AdminPage() {
   }, [supabase])
 
   const fetchServerMeta = useCallback(async () => {
-    if (!supabase) return
-    try {
-      const { data } = await supabase
-        .from("server_meta")
-        .select("arrecadado, meta_objetivo")
-        .eq("id", 1)
-        .maybeSingle()
-
-      if (data) {
-        setArrecadado(data.arrecadado ?? 0)
-        setMetaObjetivo(data.meta_objetivo ?? 60)
-      }
-    } catch {
-      // Keep defaults
-    }
-  }, [supabase])
+    const meta = await getServerMeta()
+    setArrecadado(meta.arrecadado)
+    setMetaObjetivo(meta.meta_objetivo)
+  }, [])
 
   const handleUpdateServerMeta = async () => {
-    if (!supabase) return
-    try {
-      const { error } = await supabase
-        .from("server_meta")
-        .upsert({ id: 1, arrecadado, meta_objetivo: metaObjetivo })
-        .eq("id", 1)
-
-      if (error) throw error
+    const success = await updateServerMeta(arrecadado)
+    if (success) {
       alert("Meta de doações atualizada com sucesso!")
-    } catch {
+    } else {
       setError("Erro ao atualizar meta de doações")
     }
   }
@@ -160,6 +143,7 @@ export default function AdminPage() {
   }
 
   const handleToggleVip = async (userId: string, currentVip: boolean | null) => {
+    if (!supabase) return
     try {
       const { error } = await supabase
         .from("profiles")

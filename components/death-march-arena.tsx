@@ -9,6 +9,7 @@ import type { ArenaVfxState, BattleStatus, Duelist, HPState, DebuffType, Point }
 import type { PlayerBuild } from "@/lib/types"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
+import { updateMarchRecord } from "@/lib/database"
 import { useLanguage } from "@/contexts/language-context"
 import {
   calculateTurnOutcome,
@@ -691,15 +692,7 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     setMarchWins(newMarchWins)
     
     // Save march record to database
-    try {
-      const { data, error } = await supabase.from("profiles").select("march").eq("id", currentUser.id).single()
-      if (!error && newMarchWins > (data?.march || 0)) {
-        await supabase.from("profiles").update({ march: newMarchWins }).eq("id", currentUser.id)
-        addLog(locale === "en" ? `🏆 New record: ${newMarchWins} wins!` : `🏆 Novo recorde: ${newMarchWins} vitórias!`)
-      }
-    } catch (error) {
-      console.error("Failed to save march record:", error)
-    }
+    await updateMarchRecord(currentUser.id, newMarchWins)
     
     setTimeout(() => {
       setGameOver(null)
@@ -719,15 +712,7 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
   
   const handleExit = async () => {
     // Save march record before exiting
-    try {
-      const { data, error } = await supabase.from("profiles").select("march").eq("id", currentUser.id).single()
-      if (!error && marchWins > (data?.march || 0)) {
-        await supabase.from("profiles").update({ march: marchWins }).eq("id", currentUser.id)
-        addLog(locale === "en" ? `🏆 Saved record: ${marchWins} wins!` : `🏆 Recorde salvo: ${marchWins} vitórias!`)
-      }
-    } catch (error) {
-      console.error("Failed to save march record on exit:", error)
-    }
+    await updateMarchRecord(currentUser.id, marchWins)
     onExit()
   }
 
@@ -736,15 +721,7 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     addLog(locale === "en" ? "You were defeated..." : "Você foi derrotado...")
     
     // Save march record on lose
-    try {
-      const { data, error } = await supabase.from("profiles").select("march").eq("id", currentUser.id).single()
-      if (!error && marchWins > (data?.march || 0)) {
-        await supabase.from("profiles").update({ march: marchWins }).eq("id", currentUser.id)
-        addLog(locale === "en" ? `🏆 New record: ${marchWins} wins!` : `🏆 Novo recorde: ${marchWins} vitórias!`)
-      }
-    } catch (error) {
-      console.error("Failed to save march record:", error)
-    }
+    await updateMarchRecord(currentUser.id, marchWins)
     
     setTimeout(() => onExit(), 2000)
   }

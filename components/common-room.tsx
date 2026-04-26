@@ -39,6 +39,8 @@ import {
   searchUsersByUsername,
   sendFriendMessage,
   signOutUser,
+  updateServerMeta,
+  getServerMeta,
 } from "@/lib/database"
 import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/supabase"
 import HomeLobbyChat from "@/components/home-lobby-chat"
@@ -510,20 +512,11 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [metaCurrent, setMetaCurrent] = useState(0)
 
   useEffect(() => {
-    const supabase = getSupabaseClient()
-    
-    // Initial fetch
     const fetchServerMeta = async () => {
       try {
-        const { data } = await supabase
-          .from("server_meta")
-          .select("arrecadado, meta_objetivo")
-          .eq("id", 1)
-          .maybeSingle()
-        if (data) {
-          setArrecadado(data.arrecadado ?? 0)
-          setMetaObjetivo(data.meta_objetivo ?? 60)
-        }
+        const meta = await getServerMeta()
+        setArrecadado(meta.arrecadado)
+        setMetaObjetivo(meta.meta_objetivo)
       } catch {
         // Keep defaults on error
       }
@@ -531,6 +524,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     fetchServerMeta()
 
     // Realtime subscription
+    const supabase = getSupabaseClient()
     const channel = supabase
       .channel("server_meta_changes")
       .on(

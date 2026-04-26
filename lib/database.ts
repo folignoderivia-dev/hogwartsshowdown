@@ -155,6 +155,46 @@ export async function getRankingTopDamagewb(limit = 50): Promise<DbUser[]> {
   return (data as ProfileRow[]).map((p) => mapProfile(p, ""))
 }
 
+export async function updateMarchRecord(userId: string, marchWins: number): Promise<boolean> {
+  const supabase = getSupabaseClient()
+  const profile = await getProfileById(userId)
+  if (!profile) return false
+  
+  const currentMarch = profile.march ?? 0
+  const newMarch = Math.max(currentMarch, marchWins)
+  
+  const { error } = await supabase
+    .from("profiles")
+    .update({ march: newMarch })
+    .eq("id", userId)
+  return !error
+}
+
+export async function updateServerMeta(arrecadado: number): Promise<boolean> {
+  const supabase = getSupabaseClient()
+  const { error } = await supabase
+    .from("server_meta")
+    .update({ arrecadado })
+    .eq("id", 1)
+  return !error
+}
+
+export async function getServerMeta(): Promise<{ arrecadado: number; meta_objetivo: number }> {
+  const supabase = getSupabaseClient()
+  const { data } = await supabase
+    .from("server_meta")
+    .select("arrecadado, meta_objetivo")
+    .eq("id", 1)
+    .single()
+  
+  if (!data) return { arrecadado: 0, meta_objetivo: 60 }
+  
+  return {
+    arrecadado: data.arrecadado ?? 0,
+    meta_objetivo: data.meta_objetivo ?? 60,
+  }
+}
+
 export async function updateForestFloor(userId: string, floor: number): Promise<boolean> {
   const supabase = getSupabaseClient()
   const { error } = await supabase
