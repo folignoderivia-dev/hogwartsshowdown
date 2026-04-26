@@ -168,7 +168,7 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
 
 const UI_LABELS: Record<AppLocale, Record<string, string>> = {
   pt: {
-    translate: "🌍 Translate (EN/ES)",
+    translate: "🇺🇸 EN / 🇧🇷 PT",
     downloadApk: "📲 Baixar APK",
     openRooms: "Salas em Aberto",
     duel1v1: "Duelo 1v1",
@@ -185,7 +185,7 @@ const UI_LABELS: Record<AppLocale, Record<string, string>> = {
     gameMode: "Modo de Jogo:",
   },
   en: {
-    translate: "🌍 Translate (EN/ES)",
+    translate: "🇺🇸 EN / 🇧🇷 PT",
     downloadApk: "📲 Download APK",
     openRooms: "Open Rooms",
     duel1v1: "1v1 Duel",

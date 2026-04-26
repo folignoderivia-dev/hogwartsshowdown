@@ -14,6 +14,8 @@ import { useArenaMatchSync } from "@/hooks/useArenaMatchSync"
 import type { RoundAction } from "@/lib/duelActions"
 import { getSupabaseClient } from "@/lib/supabase"
 import { io, type Socket } from "socket.io-client"
+import { useLanguage } from "@/contexts/language-context"
+import { uiTexts } from "@/lib/dictionary"
 import {
   calculateTurnOutcome,
   type EngineAnimation,
@@ -346,6 +348,8 @@ function Heart({ fillPercent }: { fillPercent: number }) {
 const DuelArena = (
   { playerBuild, onReturn, onBattleEnd, onFfaPlayerEliminated, matchId, isSpectator = false, participantIds = [], participantNames = [], matchStatus }: DuelArenaProps
 ) => {
+  const { locale, cycleLocale } = useLanguage()
+  const ui = uiTexts[locale]
   if (typeof window === "undefined") return null
   const isOfflineMode = playerBuild.gameMode === "teste" || playerBuild.gameMode === "torneio-offline"
   const selfDuelistId = playerBuild.userId ?? null
@@ -355,8 +359,8 @@ const DuelArena = (
       <div className="min-h-screen bg-stone-800 font-serif text-amber-100">
         <main className="mx-auto flex max-w-4xl items-center justify-center p-8">
           <div className="w-full max-w-lg rounded-xl border border-amber-700 bg-stone-900/90 p-6 text-center">
-            <p className="text-lg font-semibold text-amber-200">Identidade inválida para PvP</p>
-            <p className="mt-2 text-sm text-amber-300/90">Faça login novamente para abrir a arena online.</p>
+            <p className="text-lg font-semibold text-amber-200">{ui.invalidCode}</p>
+            <p className="mt-2 text-sm text-amber-300/90">{ui.roomNotFound}</p>
           </div>
         </main>
       </div>
@@ -1770,7 +1774,7 @@ const DuelArena = (
             {statusFloater.text}
           </div>
         )}
-        {dead && <Badge className="mt-2 border border-red-700 bg-red-950 text-[10px] text-red-200">DERROTADO</Badge>}
+        {dead && <Badge className="mt-2 border border-red-700 bg-red-950 text-[10px] text-red-200">{ui.eliminated}</Badge>}
       </button>
     )
   }
@@ -1793,19 +1797,22 @@ const DuelArena = (
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <h1 className="text-2xl font-bold text-amber-300">⚔️ Arena de Duelo</h1>
           <div className="flex items-center gap-2">
+            <Button onClick={cycleLocale} className="border-amber-700 bg-stone-900/80 text-amber-300 hover:bg-amber-800/60">
+              {locale === 'pt' ? '🇺🇸 EN' : '🇧🇷 PT'}
+            </Button>
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">{String(Math.floor(timeLeft / 60)).padStart(2, "0")}:{String(timeLeft % 60).padStart(2, "0")}</Badge>
             <Badge className="border-amber-700 bg-stone-900/80 text-amber-300">
-              {{ selecting: "⚔️ Escolhendo", resolving: "✨ Conjurando...", animating: "✨ Conjurando...", finished: "🏁 Finalizado", waiting: "⏳ Aguardando", idle: "⏸ Parado" }[battleStatus] ?? battleStatus}
+              {{ selecting: ui.spells, resolving: ui.awaitingServer, animating: ui.awaitingServer, finished: ui.gameEnded, waiting: ui.waiting, idle: ui.offline }[battleStatus] ?? battleStatus}
             </Badge>
             {playerBuild.gameMode === "torneio-offline" && <Badge className="border-purple-700 bg-purple-950/40 text-purple-200">{TORNEIO_LABELS[Math.min(challengeStage, TORNEIO_LABELS.length - 1)]}</Badge>}
-            {isReadOnlySpectator && <Badge className="border-blue-700 bg-blue-950/40 text-blue-200">ESPECTADOR</Badge>}
+            {isReadOnlySpectator && <Badge className="border-blue-700 bg-blue-950/40 text-blue-200">{ui.spectating}</Badge>}
             {isReadOnlySpectator ? (
-              <Button onClick={handleLeaveRoom} className="h-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 px-2 text-xs text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Voltar para o Lobby">
+              <Button onClick={handleLeaveRoom} className="h-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 px-2 text-xs text-amber-200 hover:from-amber-800 hover:to-amber-900" title={ui.leave}>
                 <ArrowLeft className="mr-1 h-3.5 w-3.5" />
-                Lobby
+                {ui.leave}
               </Button>
             ) : (
-              <Button onClick={handleLeaveRoom} className="h-8 w-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 p-0 text-amber-200 hover:from-amber-800 hover:to-amber-900" title="Sair">
+              <Button onClick={handleLeaveRoom} className="h-8 w-8 border border-amber-700 bg-gradient-to-b from-amber-900 to-amber-950 p-0 text-amber-200 hover:from-amber-800 hover:to-amber-900" title={ui.leave}>
                 <X className="h-4 w-4" />
               </Button>
             )}
@@ -2030,8 +2037,8 @@ const DuelArena = (
               <div className="rounded-xl border border-red-600 bg-red-900/80 px-6 py-4 text-center shadow-[0_0_30px_rgba(239,68,68,0.45)]">
                 <p className="text-xl font-bold tracking-wide text-red-100">
                   {isReadOnlySpectator
-                    ? "Conectando à partida em andamento…"
-                    : `AGUARDANDO OPONENTE... (${roomPlayerCount}/${expectedOnlinePlayers})`}
+                    ? ui.connecting
+                    : `${ui.waiting} (${roomPlayerCount}/${expectedOnlinePlayers})`}
                 </p>
               </div>
             </div>
@@ -2083,12 +2090,12 @@ const DuelArena = (
         <div className="mt-4 rounded-lg border-2 border-amber-900 bg-stone-900/85 p-3">
           {!isOfflineMode && (
             <div className="mb-2 rounded border border-amber-900/60 bg-stone-950/60 p-2 text-xs">
-              <p className="mb-1 text-amber-300">Jogadores na sala</p>
+              <p className="mb-1 text-amber-300">{ui.waiting}</p>
               <div className="flex flex-wrap gap-1">
                 {Array.from({ length: Math.max(knownBroadcastPlayers.length, roomPlayerCount) }).map((_, idx) => {
                   const isMe = idx === 0 && selfDuelistId
                   const name = roomPlayerNames[idx] || participantNames[idx] || (isMe ? playerBuild.name : `Bruxo ${idx + 1}`)
-                  const label = name === playerBuild.name ? `${name} (você)` : name
+                  const label = name === playerBuild.name ? `${name} (${locale === 'pt' ? 'você' : 'you'})` : name
                   return (
                     <Badge key={idx} className="border-amber-700 bg-stone-800 text-amber-200">
                       {label}
@@ -2101,34 +2108,34 @@ const DuelArena = (
           {!isOfflineMode && !gameStartAcknowledged && (
             <p className="mb-2 text-xs text-amber-300">
               {isReadOnlySpectator
-                ? "Espectador: aguardando estado do servidor (GAME_START / RECONNECT)…"
-                : `Aguardando jogadores na sala (${roomPlayerCount}/${expectedOnlinePlayers})...`}
+                ? `${ui.spectating}: ${ui.awaitingServer}`
+                : `${ui.waiting} (${roomPlayerCount}/${expectedOnlinePlayers})...`}
             </p>
           )}
           {!isOfflineMode && !socketConnected && !gameStartAcknowledged && (
-            <p className="mb-2 text-xs text-amber-300">Conectando ao servidor de batalha...</p>
+            <p className="mb-2 text-xs text-amber-300">{ui.connecting}</p>
           )}
-          {isReadOnlySpectator && <p className="mb-2 text-xs text-blue-300">Modo espectador: comandos de combate desabilitados.</p>}
+          {isReadOnlySpectator && <p className="mb-2 text-xs text-blue-300">{ui.commandsDisabled}</p>}
           {playerDefeated && !gameOver && (
             <div className="mb-3 rounded-lg border border-red-800/60 bg-red-950/50 px-3 py-2 text-center">
-              <p className="text-sm font-bold text-red-300">💀 Você foi eliminado!</p>
-              <p className="text-xs text-red-400/80">Agora é espectador — acompanhe a batalha até o fim.</p>
+              <p className="text-sm font-bold text-red-300">💀 {ui.eliminated}</p>
+              <p className="text-xs text-red-400/80">{locale === 'pt' ? 'Agora é espectador — acompanhe a batalha até o fim.' : 'Now spectating — watch the battle until the end.'}</p>
               {(() => {
                 const survivors = duelists.filter((d) => !isDefeated(d.hp) && d.id !== selfDuelistId)
                 return survivors.length > 0 ? (
-                  <p className="mt-1 text-xs text-amber-300/70">Sobreviventes: {survivors.map((d) => d.name).join(", ")}</p>
+                  <p className="mt-1 text-xs text-amber-300/70">{locale === 'pt' ? 'Sobreviventes:' : 'Survivors:'} {survivors.map((d) => d.name).join(", ")}</p>
                 ) : null
               })()}
             </div>
           )}
           {!playerDefeated && battleStatus === "selecting" && !isOnlineMatch && selfDuelistId && pendingActions[selfDuelistId] && (
-            <p className="mb-2 text-xs text-amber-300">Aguardando outros bruxos...</p>
+            <p className="mb-2 text-xs text-amber-300">{ui.waiting}...</p>
           )}
           {!playerDefeated && awaitingServerAck && (
-            <p className="mb-2 text-xs text-amber-300">Intenção enviada — aguardando resolução do servidor...</p>
+            <p className="mb-2 text-xs text-amber-300">{ui.awaitingServer}</p>
           )}
-          {playerCannotAct && !playerDefeated && selfDuelistId && !pendingActions[selfDuelistId] && <p className="mb-2 text-xs text-red-300">Você está sob Freeze/Stun e não pode agir neste turno.</p>}
-          {pendingSpell && <p className="mb-2 text-xs text-amber-300">Feitiço selecionado: {pendingSpell}. Escolha um alvo.</p>}
+          {playerCannotAct && !playerDefeated && selfDuelistId && !pendingActions[selfDuelistId] && <p className="mb-2 text-xs text-red-300">{ui.stunFreeze}</p>}
+          {pendingSpell && <p className="mb-2 text-xs text-amber-300">{ui.spellSelected} {pendingSpell}. {ui.chooseTarget}</p>}
 
           {!isReadOnlySpectator && !playerDefeated && (isOnlineMatch ? !awaitingServerAck : !selfDuelistId || !pendingActions[selfDuelistId]) && (
             <div className="mb-2 flex flex-wrap gap-2">
@@ -2164,14 +2171,14 @@ const DuelArena = (
                           }
                         }}
                         className={`absolute -top-2 right-0 z-10 p-0.5 rounded text-xs ${isLocked ? "text-amber-300" : "text-stone-500 hover:text-amber-300"} transition-colors`}
-                        title={isLocked ? "Desbloquear magia" : "Bloquear magia (imune a Expulso, Obliviate, Petrificus)"}
+                        title={isLocked ? locale === 'pt' ? "Desbloquear magia" : "Unlock spell" : locale === 'pt' ? "Bloquear magia (imune a Expulso, Obliviate, Petrificus)" : "Lock spell (immune to Expulso, Obliviate, Petrificus)"}
                       >
                         {isLocked ? "🔒" : "🔓"}
                       </button>
                     )}
                     <Button disabled={disabled} onClick={() => onSpellClick(spell)} className={`touch-manipulation select-none border border-amber-700 text-amber-100 ${pendingSpell === spell ? "bg-amber-600" : "bg-gradient-to-b from-amber-800 to-amber-900 hover:from-amber-700 hover:to-amber-800"}`}>
                       <Wand2 className="mr-1 h-3.5 w-3.5" />
-                      {spell} ({mana?.current}/{mana?.max} MANA | {info?.accuracy || 0}%{disabledByDebuff ? ` | 🔒${player?.disabledSpells?.[spell]}t` : ""})
+                      {spell} ({mana?.current}/{mana?.max} {ui.mana} | {info?.accuracy || 0}%{disabledByDebuff ? ` | 🔒${player?.disabledSpells?.[spell]}t` : ""})
                     </Button>
                   </div>
                 )
@@ -2188,12 +2195,12 @@ const DuelArena = (
                   !!(player?.debuffs.some((d) => d.type === "no_potion"))
                 }
                 onClick={usePotion}
-                title={potionUsed ? "Poção já usada nesta batalha" : undefined}
+                title={potionUsed ? ui.potionAlreadyUsed : undefined}
                 className={`touch-manipulation select-none border border-purple-700 text-purple-100 ${potionUsed ? "bg-stone-800 opacity-50 cursor-not-allowed" : "bg-purple-900 hover:bg-purple-800"}`}
               >
                 <FlaskConical className="mr-1 h-3.5 w-3.5" />
-                {POTION_NAMES[playerBuild.potion] || "Poção"}
-                {potionUsed && " (usada)"}
+                {POTION_NAMES[playerBuild.potion] || locale === 'pt' ? "Poção" : "Potion"}
+                {potionUsed && locale === 'pt' ? " (usada)" : " (used)"}
               </Button>
               <Button
                 disabled={
@@ -2207,10 +2214,10 @@ const DuelArena = (
                   (player?.parryUses ?? 0) >= 3
                 }
                 onClick={() => setIsParryingActive(!isParryingActive)}
-                title={`PARRY: Se o oponente usar o mesmo feitiço, você reflete o dobro de dano (custo: 1 mana). Usos restantes: ${3 - (player?.parryUses ?? 0)}/3`}
+                title={`${ui.parry}: ${locale === 'pt' ? "Se o oponente usar o mesmo feitiço, você reflete o dobro de dano" : "If opponent uses same spell, reflect double damage"} (${ui.parryCost}). ${ui.parryUses}: ${3 - (player?.parryUses ?? 0)}/3`}
                 className={`touch-manipulation select-none border border-green-700 text-green-100 ${isParryingActive ? "bg-green-600 animate-pulse shadow-[0_0_20px_rgba(34,197,94,0.8)]" : "bg-gradient-to-b from-green-800 to-green-900 hover:from-green-700 hover:to-green-800"} ${(player?.parryUses ?? 0) >= 3 ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                ⚔️ PARRY ({3 - (player?.parryUses ?? 0)}/3)
+                ⚔️ {ui.parry} ({3 - (player?.parryUses ?? 0)}/3)
               </Button>
             </div>
           )}
@@ -2218,13 +2225,13 @@ const DuelArena = (
           {/* ── Painel de Expressões (Emojis) ─────────────────────────────── */}
           {isOnlineMatch && !isReadOnlySpectator && selfDuelistId && socketRef.current?.connected && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-amber-400/70">Reações:</span>
+              <span className="text-xs text-amber-400/70">{locale === 'pt' ? "Reações:" : "Reactions:"}</span>
               {["😂", "😭", "😲", "😡", "🤫", "👍"].map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
                   className="text-xl transition-transform hover:scale-125 active:scale-95"
-                  title={`Enviar ${emoji}`}
+                  title={`${locale === 'pt' ? "Enviar" : "Send"} ${emoji}`}
                   onClick={() => {
                     socketRef.current?.emit("send_emoji", { matchId, userId: selfDuelistId, emoji })
                   }}
@@ -2257,7 +2264,7 @@ const DuelArena = (
                 className="ml-auto rounded border border-red-800/60 bg-red-950/40 px-2 py-0.5 text-[10px] text-red-400 hover:bg-red-900/50"
                 onClick={() => { setShowReportModal(true); setReportSent(false) }}
               >
-                🚨 Relatar
+                🚨 {locale === 'pt' ? "Relatar" : "Report"}
               </button>
             </div>
           )}
@@ -2280,7 +2287,7 @@ const DuelArena = (
 
       <footer className="grid gap-3 border-t-4 border-amber-900 bg-stone-950/90 p-3 md:grid-cols-2">
         <div className="rounded-lg border-2 border-amber-900 bg-stone-800/90 p-3">
-          <p className="mb-2 text-xs font-bold text-amber-300">Log de Batalha</p>
+          <p className="mb-2 text-xs font-bold text-amber-300">{ui.battleLog}</p>
           <div className="h-32 overflow-y-auto rounded border border-amber-800 bg-stone-900 p-2">
             {battleLog.slice(-40).map((line, i) => (
               <p key={i} className={`mb-1 battle-log-text ${line.startsWith("→") ? (line.includes("CRÍTICO") ? "text-yellow-300" : line.includes("bloqueado") ? "text-blue-300" : line.includes("errou") ? "text-stone-400" : "text-red-300") : "text-amber-100/90"}`}>{line}</p>
@@ -2288,7 +2295,7 @@ const DuelArena = (
           </div>
         </div>
         <div className="rounded-lg border-2 border-amber-900 bg-stone-800/90 p-3">
-          <p className="mb-2 text-xs font-bold text-amber-300">Chat</p>
+          <p className="mb-2 text-xs font-bold text-amber-300">{ui.chat}</p>
           <div className="mb-2 h-24 overflow-y-auto rounded border border-amber-800 bg-stone-900 p-2">
             {chatMessages.map((msg, i) => (
               <p key={i} className="mb-1 text-xs text-amber-100/90"><span className="font-semibold text-amber-300">{msg.sender}:</span> {msg.text}</p>
