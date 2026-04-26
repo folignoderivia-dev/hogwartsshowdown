@@ -335,17 +335,35 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   }, [currentUser?.id, currentUser?.username, currentUser?.elo, house, wand, potion, selectedSpells, avatar, gameMode])
 
   useEffect(() => {
-    // Fetch and increment visit count on mount
+    // Increment visit count using Supabase with sessionStorage to avoid multiple counts per session
     void (async () => {
       try {
-        await fetch("/api/visits", { method: "POST" })
-        const res = await fetch("/api/visits")
-        const data = await res.json()
-        if (data?.count !== undefined) {
-          setVisitCount(data.count)
+        // Check if already counted in this session
+        if (typeof window !== "undefined" && sessionStorage.getItem("visit_counted")) {
+          // Just fetch the count without incrementing
+          const supabase = getSupabaseClient()
+          const { data } = await supabase.from("site_stats").select("visits_count").eq("id", 1).single()
+          if (data?.visits_count !== undefined) {
+            setVisitCount(data.visits_count)
+          }
+          return
+        }
+
+        // Increment visit count
+        const supabase = getSupabaseClient()
+        const { data } = await supabase.from("site_stats").select("visits_count").eq("id", 1).single()
+        const currentCount = data?.visits_count || 0
+        const newCount = currentCount + 1
+        
+        await supabase.from("site_stats").update({ visits_count: newCount }).eq("id", 1)
+        setVisitCount(newCount)
+        
+        // Mark as counted in this session
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("visit_counted", "true")
         }
       } catch (error) {
-        console.error("Failed to fetch visit count:", error)
+        console.error("Failed to update visit count:", error)
       }
     })()
   }, [])
@@ -835,9 +853,6 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </a>
             <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
               🟢 {onlineWizards} {locale === "pt" ? "Bruxos Online" : "Wizards Online"}
-            </Badge>
-            <Badge className="border-purple-700 bg-purple-950/40 px-3 py-1 text-purple-300">
-              👁️ {visitCount.toLocaleString()} {locale === "pt" ? "Visitas" : "Visits"}
             </Badge>
             {currentUser ? (
               <>
@@ -2146,7 +2161,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
       {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
       <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-[10px] text-amber-700/60">
-        {locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}
+        <p className="mb-1">{locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}</p>
+        <p className="text-amber-600/80">👥 {locale === 'en' ? 'Visits' : 'Visitas'}: {visitCount.toLocaleString()}</p>
       </footer>
     </div>
   )
