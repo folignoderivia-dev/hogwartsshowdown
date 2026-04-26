@@ -728,10 +728,17 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     try {
       const nextStage = getNextStage(currentStage)
       if (nextStage) {
-        await supabase
+        const { error } = await supabase
           .from("profiles")
           .update({ modo_historia: nextStage })
           .eq("id", currentUser.id)
+        
+        if (error) {
+          console.error("Story Mode: Failed to update modo_historia", error)
+          throw error
+        }
+        
+        console.log(`Story Mode: Updated modo_historia for user ${currentUser.id} to ${nextStage}`)
         
         setTimeout(() => {
           setCurrentStage(nextStage)
@@ -752,6 +759,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       }
     } catch (error) {
       console.error("Failed to update progress:", error)
+      addLog(locale === "en" ? "Failed to save progress!" : "Falha ao salvar progresso!")
     }
   }
   

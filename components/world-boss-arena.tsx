@@ -285,19 +285,31 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     
     // Update player's damagewb
     try {
-      const { data: profileData } = await supabase
+      const { data: profileData, error: fetchError } = await supabase
         .from("profiles")
         .select("damagewb")
         .eq("id", currentUser.id)
         .single()
       
+      if (fetchError) {
+        console.error("Failed to fetch player damagewb:", fetchError)
+        throw fetchError
+      }
+      
       const currentDamage = profileData?.damagewb || 0
       const newTotalDamage = currentDamage + totalDamage
       
-      await supabase
+      const { error: updateError } = await supabase
         .from("profiles")
         .update({ damagewb: newTotalDamage })
         .eq("id", currentUser.id)
+      
+      if (updateError) {
+        console.error("Failed to update player damagewb:", updateError)
+        throw updateError
+      }
+      
+      console.log(`World Boss: Updated damagewb for user ${currentUser.id} from ${currentDamage} to ${newTotalDamage}`)
       
       // Mark as fought today
       const today = new Date().toISOString().split('T')[0]
@@ -310,6 +322,7 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
       }, 3000)
     } catch (error) {
       console.error("Failed to update player damage:", error)
+      addLog(locale === "en" ? "Failed to save damage to database!" : "Falha ao salvar dano no banco de dados!", "system")
     }
   }
   

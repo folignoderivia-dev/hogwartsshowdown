@@ -623,10 +623,17 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     // Update floor in Supabase
     try {
       const newFloor = currentFloor + 1
-      await supabase
+      const { error } = await supabase
         .from("profiles")
         .update({ floresta: newFloor })
         .eq("id", currentUser.id)
+      
+      if (error) {
+        console.error("Forest Mode: Failed to update floresta", error)
+        throw error
+      }
+      
+      console.log(`Forest Mode: Updated floresta for user ${currentUser.id} to ${newFloor}`)
       
       setCurrentFloor(newFloor)
       
@@ -641,6 +648,7 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       }
     } catch (error) {
       console.error("Failed to update floor:", error)
+      addLog(locale === "en" ? "Failed to save progress!" : "Falha ao salvar progresso!", "system")
     }
   }
   
