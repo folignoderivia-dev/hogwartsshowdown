@@ -386,6 +386,7 @@ export default function PageClient() {
           participantIds={externalMatchState?.participantIds || []}
           participantNames={externalMatchState?.participantNames || []}
           matchStatus={externalMatchState?.status}
+          unlockedStickers={accountUser?.unlockedStickers}
         />
       )}
       {matchPending && screen === "battle" && (
