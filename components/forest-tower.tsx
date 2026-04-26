@@ -27,8 +27,10 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
   const supabase = getSupabaseClient()
   
   const [currentFloor, setCurrentFloor] = useState(1)
-  const [playerHp, setPlayerHp] = useState(6)
-  const [maxPlayerHp] = useState(6)
+  // Calculate player HP based on house: 5 hearts (500 HP) or 4 hearts (400 HP) if Slytherin
+  const playerMaxHp = playerBuild.house === "slytherin" ? 400 : 500
+  const [playerHp, setPlayerHp] = useState(playerMaxHp)
+  const [maxPlayerHp] = useState(playerMaxHp)
   const [monsterHp, setMonsterHp] = useState(0)
   const [maxMonsterHp, setMaxMonsterHp] = useState(0)
   const [selectedSpell, setSelectedSpell] = useState<string | null>(null)
@@ -528,22 +530,30 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
                     className="w-full h-full object-contain animate-bounce"
                   />
                 </div>
-                
-                {/* Monster Passive */}
-                <p className="text-xs text-amber-300/80 text-center max-w-md">
-                  {locale === "en" ? monster.passiveDescriptionEn : monster.passiveDescription}
-                </p>
               </div>
               
               {/* Player HUD */}
               <div className="flex items-center justify-between mb-4 p-4 bg-stone-800/50 rounded-lg border border-amber-900/30">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-amber-800 rounded-full flex items-center justify-center text-2xl">
-                    🧙
+                  {/* Player Avatar */}
+                  <div className="w-12 h-12 bg-amber-800 rounded-full flex items-center justify-center overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={playerBuild.avatar}
+                      alt={currentUser.username}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-amber-100">{currentUser.username}</p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-xs text-amber-300/80">
+                      <span>{playerBuild.house}</span>
+                      <span>•</span>
+                      <span>{playerBuild.wand}</span>
+                      <span>•</span>
+                      <span>{playerBuild.potion}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
                       <Badge className="bg-green-900/80 border-green-700 text-green-100">
                         <Heart className="w-3 h-3 mr-1" />
                         {playerHp}/{maxPlayerHp}
