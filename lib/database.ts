@@ -22,6 +22,8 @@ export interface DbUser {
   isAdmin?: boolean
   floresta?: number
   tentativasFloresta?: number
+  modoHistoria?: number
+  tentativasHistoria?: number
 }
 
 interface ProfileRow {
@@ -39,9 +41,11 @@ interface ProfileRow {
   is_admin?: boolean | null
   floresta?: number | null
   tentativas_floresta?: number | null
+  modo_historia?: number | null
+  tentativas_historia?: number | null
 }
 
-const PROFILE_SELECT = "id,username,elo,wins,losses,offline_wins,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin,floresta,tentativas_floresta"
+const PROFILE_SELECT = "id,username,elo,wins,losses,offline_wins,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin,floresta,tentativas_floresta,modo_historia,tentativas_historia"
 
 function isVipActive(row: ProfileRow): boolean {
   if (!row.is_vip) return false
@@ -66,6 +70,8 @@ function mapProfile(profile: ProfileRow, email: string): DbUser {
     avatarUrl: profile.avatar_url ?? null,
     floresta: profile.floresta ?? 0,
     tentativasFloresta: profile.tentativas_floresta ?? 3,
+    modoHistoria: profile.modo_historia ?? 1,
+    tentativasHistoria: profile.tentativas_historia ?? 3,
   }
 }
 
