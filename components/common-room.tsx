@@ -2233,7 +2233,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 potion,
                 spells: selectedSpells,
                 avatar,
-                gameMode: "teste",
+                gameMode: "" as any,
                 userId: currentUser.id,
                 username: currentUser.username,
                 elo: currentUser.elo,
