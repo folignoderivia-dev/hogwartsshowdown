@@ -204,7 +204,12 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     if (playerSleepTurns > 0) {
       addLog(locale === "en" ? "You are sleeping and skip this turn!" : "Você está dormindo e perde este turno!", "system")
       setPlayerSleepTurns(prev => prev - 1)
-      setTimeout(() => handleMonsterAttack(), 1000)
+      setIsPlayerTurn(false)
+      setTimeout(() => {
+        if (!isCombatOver) {
+          handleMonsterAttack()
+        }
+      }, 1000)
       return
     }
     
@@ -217,11 +222,11 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       [selectedSpell]: { ...prev[selectedSpell], current: Math.max(0, prev[selectedSpell].current - 1) }
     }))
     
-    // Calculate player accuracy with monster's reduction
+    // Calculate player accuracy with monster's reduction using standard grimoire system
     const accReduction = Math.random() * (monster.opponentAccReduction.max - monster.opponentAccReduction.min) + monster.opponentAccReduction.min
-    let playerAccuracy = 100 - accReduction
+    let playerAccuracy = spell.accuracy - accReduction
     
-    // Apply wand core passives to accuracy
+    // Apply wand core passives to accuracy (standard grimoire system)
     const wandEffect = WAND_PASSIVES[playerBuild.wand]?.effect
     if (!spell.isUnforgivable && wandEffect === "accuracy_plus10") {
       playerAccuracy += 10
@@ -229,6 +234,9 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     if (wandEffect === "crit20_acc_minus15") {
       playerAccuracy -= 15
     }
+    
+    // Clamp accuracy between 5 and 100 (standard grimoire system)
+    playerAccuracy = Math.max(5, Math.min(100, playerAccuracy))
     
     // Basilisco immunity to unforgivable curses
     if (monster.passive === "basilisco_immunities" && spell.isUnforgivable) {
@@ -410,7 +418,9 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         addLog(locale === "en" ? `Monster takes ${burnDamage} burn damage!` : `Monstro recebe ${burnDamage} de dano de queima!`, "system")
       }
       
-      setIsPlayerTurn(true)
+      if (!isCombatOver) {
+        setIsPlayerTurn(true)
+      }
       return
     }
     
@@ -432,7 +442,9 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         addLog(locale === "en" ? `Monster takes ${burnDamage} burn damage!` : `Monstro recebe ${burnDamage} de dano de queima!`, "system")
       }
       
-      setIsPlayerTurn(true)
+      if (!isCombatOver) {
+        setIsPlayerTurn(true)
+      }
       return
     }
     
@@ -609,7 +621,9 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       addLog(locale === "en" ? `${monster.name} misses!` : `${monster.name} erra!`, "monster")
     }
     
-    setIsPlayerTurn(true)
+    if (!isCombatOver) {
+      setIsPlayerTurn(true)
+    }
   }
   
   const handleWin = async () => {

@@ -57,6 +57,7 @@ export interface Duelist {
   house: string
   wand: string
   avatar?: string
+  potion?: string
   spells: string[]
   hp: HPState
   speed: number

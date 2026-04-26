@@ -488,11 +488,14 @@ const DuelArena = (
       missStreakBySpell: {},
     }
     const botBase = TORNEIO_BOTS[Math.floor(Math.random() * TORNEIO_BOTS.length)]
+    const POTIONS = ["wiggenweld", "mortovivo", "edurus", "maxima", "foco", "merlin", "felix", "aconito", "amortentia"]
+    const potion = POTIONS[Math.floor(Math.random() * POTIONS.length)]
     const bot: Duelist = {
       id: `torneio-bot-${stage + 1}`,
       name: `${botBase.name} (${TORNEIO_LABELS[Math.min(stage, TORNEIO_LABELS.length - 1)]})`,
       house: botBase.house,
       wand: botBase.wand,
+      potion,
       avatar: DEFAULT_AVATARS[(stage + 1) % DEFAULT_AVATARS.length],
       spells: botBase.spells,
       hp: { bars: buildHpBars(botBase.house) },
@@ -944,6 +947,15 @@ const DuelArena = (
           initialActions[bot.id] = { casterId: bot.id, type: "skip", turnId: rt }
           return
         }
+        
+        // Decide whether to use potion (20% chance if potion available and not used yet)
+        const shouldUsePotion = bot.potion && !(bot.usedPotions?.includes(bot.potion)) && Math.random() < 0.2
+        
+        if (shouldUsePotion && bot.potion) {
+          initialActions[bot.id] = { casterId: bot.id, type: "potion", potionType: bot.potion, turnId: rt }
+          return
+        }
+        
         const availableBotSpells = bot.spells.filter((s) => (bot.disabledSpells?.[s] ?? 0) <= 0)
         const botPool = availableBotSpells.length > 0 ? availableBotSpells : bot.spells
         let spellName = botPool[Math.floor(Math.random() * botPool.length)]

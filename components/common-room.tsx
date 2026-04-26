@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload, X, Save, FolderOpen, Trash2, Lock } from "lucide-react"
+import AdminErrorPanel from "./admin-error-panel"
 import { formatSpellPower, INITIAL_PLAYER_BUILD, SPELL_DATABASE, type SpellInfo } from "@/lib/data-store"
 import type { PlayerBuild, CustomRoomSettings, GameMode } from "@/lib/types"
 import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
@@ -246,6 +247,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [showRankingPanel, setShowRankingPanel] = useState(true)
   const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest" | "march" | "damagewb" | "story">("elo")
   const [shareFeedback, setShareFeedback] = useState("")
+  const [showAdminPanel, setShowAdminPanel] = useState(false)
 
   const [name, setName] = useState("")
   const [house, setHouse] = useState("")
@@ -1428,20 +1430,43 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               {showRankingPanel ? (
                 <div className="flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-amber-400" />
-                  <span>{rankingMode === "elo" ? (locale === 'en' ? 'PVP Ranking (Top 50)' : 'Ranking PVP (Top 50)') : rankingMode === "offline" ? (locale === 'en' ? 'PVE Ranking (Top 50)' : 'Ranking PVE (Top 50)') : rankingMode === "forest" ? (locale === 'en' ? 'Forest Ranking (Top 50)' : 'Ranking da Floresta (Top 50)') : rankingMode === "march" ? (locale === 'en' ? 'Death March Ranking (Top 50)' : 'Ranking Marcha da Morte (Top 50)') : (locale === 'en' ? 'World Boss Ranking (Top 50)' : 'Ranking World Boss (Top 50)')}</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 border-amber-700 px-2 text-xs text-amber-300"
-                    onClick={() => {
-                      const modes: Array<"elo" | "offline" | "forest" | "march" | "damagewb"> = ["elo", "offline", "forest", "march", "damagewb"]
-                      const currentIdx = modes.indexOf(rankingMode as any)
-                      const nextIdx = (currentIdx + 1) % modes.length
-                      setRankingMode(modes[nextIdx])
-                    }}
-                  >
-                    {rankingMode === "elo" ? (locale === 'en' ? 'PVE' : 'PVE') : rankingMode === "offline" ? (locale === 'en' ? 'Forest' : 'Floresta') : rankingMode === "forest" ? (locale === 'en' ? 'March' : 'Marcha') : rankingMode === "march" ? (locale === 'en' ? 'WB' : 'WB') : (locale === 'en' ? 'PVP' : 'PVP')}
-                  </Button>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-amber-100">
+                      {rankingMode === "elo" ? (locale === 'en' ? '🏆 PVP Ranking' : '🏆 Ranking PVP') : 
+                       rankingMode === "offline" ? (locale === 'en' ? '🏆 Tournament Ranking' : '🏆 Ranking de Torneios') : 
+                       rankingMode === "forest" ? (locale === 'en' ? '🌲 Forest Ranking' : '🌲 Ranking da Floresta') : 
+                       rankingMode === "march" ? (locale === 'en' ? '💀 Death March Ranking' : '💀 Ranking Marcha da Morte') : 
+                       rankingMode === "story" ? (locale === 'en' ? '📖 Story Mode Ranking' : '📖 Ranking do Modo História') : 
+                       (locale === 'en' ? '👑 World Boss Ranking' : '👑 Ranking World Boss')}
+                    </span>
+                    <span className="text-xs text-amber-400">(Top 50)</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 border-amber-700 px-2 text-xs text-amber-300"
+                      onClick={() => {
+                        const modes: Array<"elo" | "offline" | "forest" | "march" | "damagewb" | "story"> = ["elo", "offline", "forest", "march", "damagewb", "story"]
+                        const currentIdx = modes.indexOf(rankingMode as any)
+                        const nextIdx = (currentIdx + 1) % modes.length
+                        setRankingMode(modes[nextIdx])
+                      }}
+                    >
+                      {rankingMode === "elo" ? (locale === 'en' ? 'PVE' : 'PVE') : rankingMode === "offline" ? (locale === 'en' ? 'Forest' : 'Floresta') : rankingMode === "forest" ? (locale === 'en' ? 'March' : 'Marcha') : rankingMode === "march" ? (locale === 'en' ? 'WB' : 'WB') : rankingMode === "story" ? (locale === 'en' ? 'Story' : 'História') : (locale === 'en' ? 'PVP' : 'PVP')}
+                    </Button>
+                    {currentUser?.isAdmin && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 border-red-700 px-2 text-xs text-red-300"
+                        onClick={() => setShowAdminPanel(true)}
+                      >
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Admin
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <span className="sr-only">{locale === 'en' ? 'PVP Ranking' : 'Ranking PVP'}</span>
@@ -1467,7 +1492,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   <span className="text-amber-200">
                     {i + 1}. {u.username}
                   </span>
-                  <span className="font-mono text-amber-400">{rankingMode === "elo" ? u.elo : rankingMode === "offline" ? u.offlineWins : rankingMode === "forest" ? u.floresta || 0 : rankingMode === "march" ? u.march || 0 : u.damagewb || 0}</span>
+                  <span className="font-mono text-amber-400">{rankingMode === "elo" ? u.elo : rankingMode === "offline" ? u.offlineWins : rankingMode === "forest" ? u.floresta || 0 : rankingMode === "march" ? u.march || 0 : rankingMode === "story" ? u.modoHistoria || 0 : u.damagewb || 0}</span>
                 </li>
               ))}
             </ol>
@@ -2329,13 +2354,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         </div>
       </div>
 
-      {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
-      <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-[10px] text-amber-700/60">
-        <p className="mb-1">{locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}</p>
-        <p className="text-amber-600/80">👥 {locale === 'en' ? 'Visits' : 'Visitas'}: {visitCount.toLocaleString()}</p>
-      </footer>
-      
-      {/* ── World Boss Section (Always visible at bottom if logged in) ──────────────── */}
+      {/* ── World Boss Section (Always visible if logged in) ──────────────── */}
       {currentUser && (
         <div className="mt-8 border-t border-amber-900/30 pt-6">
           <WorldBossArena
@@ -2357,6 +2376,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           />
         </div>
       )}
+
+      {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
+      <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-xs text-amber-700/60">
+        <p className="mb-1">{locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}</p>
+        <p className="text-amber-600/80">👥 {locale === 'en' ? 'Visits' : 'Visitas'}: <span className="text-lg font-bold text-amber-400">{visitCount.toLocaleString()}</span></p>
+      </footer>
       
       {/* ── Gacha Modal ──────────────────────────────────────────────────────────── */}
       {showGacha && (
@@ -2412,6 +2437,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </CardContent>
           </Card>
         </div>
+      )}
+      
+      {currentUser && (
+        <AdminErrorPanel
+          isOpen={showAdminPanel}
+          onClose={() => setShowAdminPanel(false)}
+          currentUser={currentUser}
+        />
       )}
     </div>
   )

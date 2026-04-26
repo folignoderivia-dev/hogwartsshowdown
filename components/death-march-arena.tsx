@@ -273,11 +273,13 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     const wand = WANDS[Math.floor(Math.random() * WANDS.length)]
     const shuffled = [...ALL_SPELLS].sort(() => Math.random() - 0.5)
     const botSpells = shuffled.slice(0, 6)
+    const POTIONS = ["wiggenweld", "mortovivo", "edurus", "maxima", "foco", "merlin", "felix", "aconito", "amortentia"]
+    const potion = POTIONS[Math.floor(Math.random() * POTIONS.length)]
     
     return {
       id: `death-march-bot-${Date.now()}`,
       name: `Bot ${Math.floor(Math.random() * 1000)}`,
-      house, wand,
+      house, wand, potion,
       avatar: DEFAULT_AVATARS[Math.floor(Math.random() * DEFAULT_AVATARS.length)],
       spells: botSpells,
       hp: { bars: buildHpBars(house) },
@@ -380,6 +382,15 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
         initialActions[bot.id] = { casterId: bot.id, type: "skip", turnId: rt }
         return
       }
+      
+      // Decide whether to use potion (20% chance if potion available and not used yet)
+      const shouldUsePotion = bot.potion && !(bot.usedPotions?.includes(bot.potion)) && Math.random() < 0.2
+      
+      if (shouldUsePotion && bot.potion) {
+        initialActions[bot.id] = { casterId: bot.id, type: "potion", potionType: bot.potion, turnId: rt }
+        return
+      }
+      
       const availableBotSpells = bot.spells.filter((s) => (bot.disabledSpells?.[s] ?? 0) <= 0)
       const spellName = (availableBotSpells.length > 0 ? availableBotSpells : bot.spells)[Math.floor(Math.random() * (availableBotSpells.length > 0 ? availableBotSpells.length : bot.spells.length))]
       

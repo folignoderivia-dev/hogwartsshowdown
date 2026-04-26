@@ -490,6 +490,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       name: locale === "en" ? currentBoss.nameEn : currentBoss.name,
       house: currentBoss.house,
       wand: currentBoss.wand,
+      potion: currentBoss.potion,
       avatar: currentBoss.avatar,
       spells: bossSpells,
       hp: { bars: buildHpBars(currentBoss.house) },
@@ -550,7 +551,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     
     const initialActions: Record<string, RoundAction> = {}
     
-    // Bot AI: select random spell
+    // Bot AI: select random spell or use potion
     state
       .filter((d) => !d.isPlayer && !isDefeated(d.hp))
       .forEach((bot) => {
@@ -558,6 +559,15 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
           initialActions[bot.id] = { casterId: bot.id, type: "skip", turnId: rt }
           return
         }
+        
+        // Decide whether to use potion (20% chance if potion available and not used yet)
+        const shouldUsePotion = bot.potion && !(bot.usedPotions?.includes(bot.potion)) && Math.random() < 0.2
+        
+        if (shouldUsePotion && bot.potion) {
+          initialActions[bot.id] = { casterId: bot.id, type: "potion", potionType: bot.potion, turnId: rt }
+          return
+        }
+        
         const availableBotSpells = bot.spells.filter((s) => (bot.disabledSpells?.[s] ?? 0) <= 0)
         const botPool = availableBotSpells.length > 0 ? availableBotSpells : bot.spells
         const spellName = botPool[Math.floor(Math.random() * botPool.length)]

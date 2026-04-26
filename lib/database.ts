@@ -6,6 +6,19 @@ export const ELO_LOSS = 25     // 1v1 e 2v2 derrota
 export const ELO_WIN_FFA = 25  // FFA sobrevivente
 export const ELO_LOSS_FFA = 0  // FFA morto (sem penalidade)
 
+export interface AppError {
+  id: string
+  userId: string
+  username: string
+  errorName: string
+  errorMessage: string
+  component?: string
+  stackTrace?: string
+  url?: string
+  userAgent?: string
+  timestamp: string
+}
+
 export interface DbUser {
   id: string
   email: string
@@ -674,3 +687,58 @@ export async function getRecentMatchHistory(limit = 5): Promise<
     finishedAt: String(r.finished_at ?? ""),
   }))
 }
+
+/**
+ * Log an error to the app_errors table for admin monitoring
+ */
+export async function logAppError(error: {
+  userId: string
+  username: string
+  errorName: string
+  errorMessage: string
+  component?: string
+  stackTrace?: string
+  url?: string
+  userAgent?: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseClient()
+  const { error: dbError } = await supabase.from("app_errors").insert({
+    user_id: error.userId,
+    username: error.username,
+    error_name: error.errorName,
+    error_message: error.errorMessage,
+    component: error.component,
+    stack_trace: error.stackTrace,
+    url: error.url,
+    user_agent: error.userAgent,
+    created_at: new Date().toISOString(),
+  })
+  if (dbError) return { ok: false, error: dbError.message }
+  return { ok: true }
+}
+
+/**
+ * Get recent errors for admin panel
+ */
+export async function getRecentErrors(limit = 50): Promise<AppError[]> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from("app_errors")
+    .select("id,user_id,username,error_name,error_message,component,stack_trace,url,user_agent,created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit)
+  if (error || !data) return []
+  return (data as any[]).map((e) => ({
+    id: e.id,
+    userId: e.user_id,
+    username: e.username,
+    errorName: e.error_name,
+    errorMessage: e.error_message,
+    component: e.component,
+    stackTrace: e.stack_trace,
+    url: e.url,
+    userAgent: e.user_agent,
+    timestamp: e.created_at,
+  }))
+}
+
