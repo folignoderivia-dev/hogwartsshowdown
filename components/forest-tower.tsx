@@ -97,7 +97,7 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         }
         
         if (data.floresta) {
-          setCurrentFloor(data.floresta + 1)
+          setCurrentFloor(data.floresta)
         }
       }
     } catch (error) {
