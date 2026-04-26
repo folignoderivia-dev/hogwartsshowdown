@@ -2233,11 +2233,10 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 potion,
                 spells: selectedSpells,
                 avatar,
-                gameMode: undefined as any,
                 userId: currentUser.id,
                 username: currentUser.username,
                 elo: currentUser.elo,
-              }}
+              } as any}
               currentUser={currentUser}
               onExit={async () => {
                 setShowForestTower(false)
