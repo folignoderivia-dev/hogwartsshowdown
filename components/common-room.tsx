@@ -2245,8 +2245,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <p className="text-amber-600/80">👥 {locale === 'en' ? 'Visits' : 'Visitas'}: {visitCount.toLocaleString()}</p>
       </footer>
       
-      {/* ── World Boss Section (Always visible at bottom) ────────────────────────── */}
-      {currentUser && isReady && (
+      {/* ── World Boss Section (Always visible at bottom if logged in) ──────────────── */}
+      {currentUser && (
         <div className="mt-8 border-t border-amber-900/30 pt-6">
           <WorldBossArena
             playerBuild={{
