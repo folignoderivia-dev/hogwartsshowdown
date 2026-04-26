@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { AlertTriangle, ArrowLeft, FlaskConical, Send, Wand2, X } from "lucide-react"
+import { AlertTriangle, ArrowLeft, FlaskConical, Send, Wand2, X, Smile } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,7 @@ import { getSupabaseClient } from "@/lib/supabase"
 import { io, type Socket } from "socket.io-client"
 import { useLanguage } from "@/contexts/language-context"
 import { uiTexts } from "@/lib/dictionary"
+import { STICKERS } from "@/lib/stickers-data"
 import {
   calculateTurnOutcome,
   type EngineAnimation,
@@ -42,6 +43,7 @@ interface DuelArenaProps {
   participantIds?: string[]
   participantNames?: string[]
   matchStatus?: "waiting" | "in_progress" | "finished"
+  unlockedStickers?: string[]
 }
 
 const HAND_BOTTOM = "https://i.postimg.cc/hPdCk474/varinhaposicao03.png"
@@ -346,10 +348,12 @@ function Heart({ fillPercent }: { fillPercent: number }) {
 }
 
 const DuelArena = (
-  { playerBuild, onReturn, onBattleEnd, onFfaPlayerEliminated, matchId, isSpectator = false, participantIds = [], participantNames = [], matchStatus }: DuelArenaProps
+  { playerBuild, onReturn, onBattleEnd, onFfaPlayerEliminated, matchId, isSpectator = false, participantIds = [], participantNames = [], matchStatus, unlockedStickers = [] }: DuelArenaProps
 ) => {
   const { locale, cycleLocale } = useLanguage()
   const ui = uiTexts[locale]
+  const [showStickerPopup, setShowStickerPopup] = useState(false)
+  const [floatingStickers, setFloatingStickers] = useState<Array<{ id: number; playerId: string; stickerUrl: string }>>([])
   if (typeof window === "undefined") return null
   const isOfflineMode = playerBuild.gameMode === "teste" || playerBuild.gameMode === "torneio-offline"
   const selfDuelistId = playerBuild.userId ?? null
@@ -1360,6 +1364,13 @@ const DuelArena = (
       setTimeout(() => setFloatingEmojis((prev) => prev.filter((e) => e.id !== id)), 2600)
     })
 
+    socket.on("receive_sticker", ({ stickerUrl, playerId }: { stickerUrl: string; playerId: string }) => {
+      setFloatingStickers((prev) => [...prev, { id: Date.now(), playerId, stickerUrl }])
+      setTimeout(() => {
+        setFloatingStickers((prev) => prev.filter((s) => s.id !== Date.now()))
+      }, 3000)
+    })
+
     socket.on(
       "MATCH_RESULT",
       ({
@@ -1641,6 +1652,12 @@ const DuelArena = (
       socketRef.current.emit("CHAT_MESSAGE", { matchId, sender: playerBuild.name, text })
     }
     setChatInput("")
+  }
+
+  const handleSendSticker = (stickerUrl: string) => {
+    if (!matchId || !selfDuelistId) return
+    socketRef.current?.emit("send_sticker", { matchId, playerId: selfDuelistId, stickerUrl })
+    setShowStickerPopup(false)
   }
 
   const handleLeaveRoom = async () => {
@@ -2033,6 +2050,17 @@ const DuelArena = (
             )
           })}
 
+          {/* ── Floating Stickers ───────────────────────────────────────────── */}
+          {floatingStickers.map((fs) => {
+            const d = duelists.find((x) => x.id === fs.playerId)
+            const isRight = d && !d.isPlayer
+            return (
+              <div key={fs.id} className="absolute z-[30] animate-bounce" style={{ [isRight ? "right" : "left"]: "25%", top: "25%" }}>
+                <img src={fs.stickerUrl} alt="sticker" className="w-[25px] h-[25px] object-contain" />
+              </div>
+            )
+          })}
+
           {!isOfflineMode && !gameStartAcknowledged && (
             <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-red-950/50">
               <div className="rounded-xl border border-red-600 bg-red-900/80 px-6 py-4 text-center shadow-[0_0_30px_rgba(239,68,68,0.45)]">
@@ -2264,6 +2292,36 @@ const DuelArena = (
                       {emoji}
                     </button>
                   ))}
+                </>
+              )}
+              {/* Sticker Button */}
+              {unlockedStickers && unlockedStickers.length > 0 && (
+                <>
+                  <span className="text-[10px] text-amber-400/70">🎨</span>
+                  <button
+                    type="button"
+                    className="relative text-xl transition-transform hover:scale-125 active:scale-95"
+                    title={locale === 'pt' ? "Enviar Sticker" : "Send Sticker"}
+                    onClick={() => setShowStickerPopup(!showStickerPopup)}
+                  >
+                    <Smile className="h-5 w-5" />
+                    {showStickerPopup && (
+                      <div className="absolute bottom-full right-0 mb-2 rounded-lg border border-amber-700 bg-stone-900 p-2 shadow-xl">
+                        <div className="grid max-h-40 grid-cols-5 gap-1 overflow-y-auto">
+                          {unlockedStickers.map((sticker) => (
+                            <button
+                              key={sticker}
+                              type="button"
+                              onClick={() => handleSendSticker(sticker)}
+                              className="h-10 w-10 transition-transform hover:scale-110"
+                            >
+                              <img src={sticker} alt="sticker" className="h-full w-full object-contain" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </button>
                 </>
               )}
               {/* Botão de Denúncia */}
