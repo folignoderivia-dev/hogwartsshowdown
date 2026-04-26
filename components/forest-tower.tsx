@@ -660,10 +660,17 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     // Decrease attempts
     try {
       const newAttempts = Math.max(0, attempts - 1)
-      await supabase
+      const { error } = await supabase
         .from("profiles")
         .update({ tentativas_floresta: newAttempts })
         .eq("id", currentUser.id)
+      
+      if (error) {
+        console.error("Forest Mode: Failed to update tentativas_floresta", error)
+        throw error
+      }
+      
+      console.log(`Forest Mode: Updated tentativas_floresta for user ${currentUser.id} from ${attempts} to ${newAttempts}`)
       setAttempts(newAttempts)
       
       setTimeout(() => {
@@ -679,10 +686,17 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     if (!isCombatOver && attempts > 0) {
       try {
         const newAttempts = Math.max(0, attempts - 1)
-        await supabase
+        const { error } = await supabase
           .from("profiles")
           .update({ tentativas_floresta: newAttempts })
           .eq("id", currentUser.id)
+        
+        if (error) {
+          console.error("Forest Mode: Failed to update tentativas_floresta on exit", error)
+          throw error
+        }
+        
+        console.log(`Forest Mode: Updated tentativas_floresta on exit for user ${currentUser.id} from ${attempts} to ${newAttempts}`)
         setAttempts(newAttempts)
       } catch (error) {
         console.error("Failed to update attempts:", error)

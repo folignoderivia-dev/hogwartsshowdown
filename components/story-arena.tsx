@@ -728,17 +728,30 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     try {
       const nextStage = getNextStage(currentStage)
       if (nextStage) {
-        const { error } = await supabase
+        // Only update modo_historia if nextStage is greater than current value
+        const { data: profileData } = await supabase
           .from("profiles")
-          .update({ modo_historia: nextStage })
+          .select("modo_historia")
           .eq("id", currentUser.id)
+          .single()
         
-        if (error) {
-          console.error("Story Mode: Failed to update modo_historia", error)
-          throw error
+        const currentModeHistoria = profileData?.modo_historia ?? 0
+        
+        if (nextStage > currentModeHistoria) {
+          const { error } = await supabase
+            .from("profiles")
+            .update({ modo_historia: nextStage })
+            .eq("id", currentUser.id)
+          
+          if (error) {
+            console.error("Story Mode: Failed to update modo_historia", error)
+            throw error
+          }
+          
+          console.log(`Story Mode: Updated modo_historia for user ${currentUser.id} from ${currentModeHistoria} to ${nextStage}`)
+        } else {
+          console.log(`Story Mode: Skipping modo_historia update for user ${currentUser.id} (current: ${currentModeHistoria}, new: ${nextStage})`)
         }
-        
-        console.log(`Story Mode: Updated modo_historia for user ${currentUser.id} to ${nextStage}`)
         
         setTimeout(() => {
           setCurrentStage(nextStage)
@@ -769,10 +782,17 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     
     try {
       const newAttempts = Math.max(0, attempts - 1)
-      await supabase
+      const { error } = await supabase
         .from("profiles")
         .update({ tentativas_historia: newAttempts })
         .eq("id", currentUser.id)
+      
+      if (error) {
+        console.error("Story Mode: Failed to update tentativas_historia", error)
+        throw error
+      }
+      
+      console.log(`Story Mode: Updated tentativas_historia for user ${currentUser.id} from ${attempts} to ${newAttempts}`)
       setAttempts(newAttempts)
       
       setTimeout(() => {
@@ -788,10 +808,17 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     if (!gameOver && attempts > 0) {
       try {
         const newAttempts = Math.max(0, attempts - 1)
-        await supabase
+        const { error } = await supabase
           .from("profiles")
           .update({ tentativas_historia: newAttempts })
           .eq("id", currentUser.id)
+        
+        if (error) {
+          console.error("Story Mode: Failed to update tentativas_historia on exit", error)
+          throw error
+        }
+        
+        console.log(`Story Mode: Updated tentativas_historia on exit for user ${currentUser.id} from ${attempts} to ${newAttempts}`)
         setAttempts(newAttempts)
       } catch (error) {
         console.error("Failed to update attempts:", error)

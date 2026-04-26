@@ -125,7 +125,20 @@ export async function getRankingTopForest(limit = 50): Promise<DbUser[]> {
   const { data, error } = await supabase
     .from("profiles")
     .select(PROFILE_SELECT)
+    .not("floresta", "is", null)
     .order("floresta", { ascending: false })
+    .limit(limit)
+  if (error || !data) return []
+  return (data as ProfileRow[]).map((p) => mapProfile(p, ""))
+}
+
+export async function getRankingTopStory(limit = 50): Promise<DbUser[]> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_SELECT)
+    .not("modo_historia", "is", null)
+    .order("modo_historia", { ascending: false })
     .limit(limit)
   if (error || !data) return []
   return (data as ProfileRow[]).map((p) => mapProfile(p, ""))

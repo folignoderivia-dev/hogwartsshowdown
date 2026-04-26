@@ -29,6 +29,7 @@ import {
   getRankingTopForest,
   getRankingTopMarch,
   getRankingTopDamagewb,
+  getRankingTopStory,
   getForestAttempts,
   getUserById,
   loginUser,
@@ -243,7 +244,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [showRankingPanel, setShowRankingPanel] = useState(true)
-  const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest" | "march" | "damagewb">("elo")
+  const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest" | "march" | "damagewb" | "story">("elo")
   const [shareFeedback, setShareFeedback] = useState("")
 
   const [name, setName] = useState("")
@@ -312,31 +313,44 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     if (!revealedSticker || !currentUser) return
     try {
       const supabase = getSupabaseClient()
-      const { data: profile } = await supabase
+      const { data: profile, error: fetchError } = await supabase
         .from("profiles")
         .select("unlocked_stickers")
         .eq("id", currentUser.id)
         .single()
+      
+      if (fetchError) {
+        console.error("Gacha: Failed to fetch profile", fetchError)
+        throw fetchError
+      }
       
       const currentStickers = profile?.unlocked_stickers || []
       const newStickers = currentStickers.includes(revealedSticker) 
         ? currentStickers 
         : [...currentStickers, revealedSticker]
       
-      await supabase
+      const now = new Date().toISOString()
+      const { error: updateError } = await supabase
         .from("profiles")
         .update({ 
-          last_gacha_pull: new Date().toISOString(),
+          last_gacha_pull: now,
           unlocked_stickers: newStickers 
         })
         .eq("id", currentUser.id)
       
+      if (updateError) {
+        console.error("Gacha: Failed to update profile", updateError)
+        throw updateError
+      }
+      
+      console.log(`Gacha: Updated profile for user ${currentUser.id}, stickers: ${newStickers.length}`)
+      
       setCanClaimGacha(false)
       setRevealedSticker(null)
       setShowGacha(false)
-      onAuthChange({ ...currentUser, lastGachaPull: new Date().toISOString(), unlockedStickers: newStickers })
+      onAuthChange({ ...currentUser, lastGachaPull: now, unlockedStickers: newStickers })
     } catch (error) {
-      console.error("Failed to claim sticker:", error)
+      console.error("Gacha: Failed to claim sticker", error)
     }
   }
 
@@ -592,6 +606,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       list = await getRankingTopMarch(50)
     } else if (rankingMode === "damagewb") {
       list = await getRankingTopDamagewb(50)
+    } else if (rankingMode === "story") {
+      list = await getRankingTopStory(50)
     } else {
       list = await getRankingTop(50)
     }
