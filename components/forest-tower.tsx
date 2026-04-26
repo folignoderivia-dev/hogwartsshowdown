@@ -642,17 +642,32 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
                     <Swords className="w-4 h-4 mr-2" />
                     {locale === "en" ? "Cast Spell" : "Lançar Magia"}
                   </Button>
-                  <Button
-                    className="bg-purple-700 hover:bg-purple-600 text-white px-6"
-                    onClick={() => {
-                      const healAmount = 150
-                      setPlayerHp(prev => Math.min(prev + healAmount, maxPlayerHp))
-                      addLog(locale === "en" ? `Used potion and healed ${healAmount} HP!` : `Usou poção e curou ${healAmount} HP!`, "system")
-                    }}
-                  >
-                    <FlaskConical className="w-4 h-4 mr-2" />
-                    {locale === "en" ? "Potion" : "Poção"}
-                  </Button>
+                  {playerBuild.potion && (
+                    <Button
+                      className="bg-purple-700 hover:bg-purple-600 text-white px-6"
+                      onClick={() => {
+                        // Apply potion effect based on potion type
+                        const potion = playerBuild.potion
+                        if (potion === "wiggenweld") {
+                          setPlayerHp(prev => Math.min(prev + 200, maxPlayerHp))
+                          addLog(locale === "en" ? "Used Wiggenweld Potion and healed 200 HP!" : "Usou Poção Wiggenweld e curou 200 HP!", "system")
+                        } else if (potion === "felix") {
+                          setPlayerHp(prev => Math.min(prev + 300, maxPlayerHp))
+                          addLog(locale === "en" ? "Used Felix Felicis and healed 300 HP!" : "Usou Felix Felicis e curou 300 HP!", "system")
+                        } else if (potion === "antidote") {
+                          setPlayerPoisonTurns(0)
+                          setPlayerSleepTurns(0)
+                          addLog(locale === "en" ? "Used Antidote and cleared debuffs!" : "Usou Antídoto e limpou debuffs!", "system")
+                        } else {
+                          setPlayerHp(prev => Math.min(prev + 150, maxPlayerHp))
+                          addLog(locale === "en" ? `Used ${potion} and healed 150 HP!` : `Usou ${potion} e curou 150 HP!`, "system")
+                        }
+                      }}
+                    >
+                      <FlaskConical className="w-4 h-4 mr-2" />
+                      {playerBuild.potion}
+                    </Button>
+                  )}
                 </div>
               )}
               
