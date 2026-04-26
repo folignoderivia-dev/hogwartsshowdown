@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getSupabaseClient } from "@/lib/supabase"
 import { getBossByStage, getNextStage, STORY_BOSSES, type StoryBoss } from "@/lib/story-data"
-import { SPELL_DATABASE, INITIAL_PLAYER_BUILD, WAND_PASSIVES, HOUSE_GDD, rollSpellPower } from "@/lib/data-store"
+import { SPELL_DATABASE, HOUSE_GDD, HOUSE_MODIFIERS } from "@/lib/data-store"
 import type { PlayerBuild } from "@/lib/types"
+import type { Duelist, HPState } from "@/lib/arena-types"
+import type { RoundAction } from "@/lib/duelActions"
+import { calculateTurnOutcome, getSpellInfo, getTotalHP, isDefeated } from "@/lib/turn-engine"
 import { useLanguage } from "@/contexts/language-context"
-import type { AppLocale } from "@/contexts/language-context"
-import { Swords, Heart, Shield, Zap, X, Trophy, FlaskConical, ArrowRight } from "lucide-react"
+import { Swords, Heart, X, Trophy, Zap } from "lucide-react"
 
 interface StoryArenaProps {
   playerBuild: PlayerBuild
@@ -58,6 +60,28 @@ const AVATAR_IMAGES: Record<string, string> = {
   flitwick: "https://i.postimg.cc/J40d7YmZ/flitwich-quiz-image.png",
 }
 
+function buildHpBars(hp: number): number[] {
+  const bars: number[] = []
+  const fullBars = Math.floor(hp / 100)
+  for (let i = 0; i < fullBars; i++) bars.push(100)
+  const remainder = hp % 100
+  if (remainder > 0) bars.push(remainder)
+  return bars
+}
+
+function buildSpellManaForSpells(spells: string[], house: string): Record<string, { current: number; max: number }> {
+  const out: Record<string, { current: number; max: number }> = {}
+  spells.forEach((sn) => {
+    const info = getSpellInfo(sn, SPELL_DATABASE)
+    if (!info) return
+    let max = info.pp
+    if (house === "gryffindor") max = Math.max(1, max + HOUSE_GDD.gryffindor.manaStartDelta)
+    if (house === "ravenclaw" && !info.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
+    out[sn] = { current: max, max }
+  })
+  return out
+}
+
 export default function StoryArena({ playerBuild, currentUser, onExit, onAuthChange }: StoryArenaProps) {
   const { locale } = useLanguage()
   const supabase = getSupabaseClient()
@@ -66,12 +90,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
   const [isLoaded, setIsLoaded] = useState(false)
   const [attempts, setAttempts] = useState(3)
   
-  // Calculate player HP based on house: 5 hearts (500 HP) or 4 hearts (400 HP) if Slytherin
-  const playerMaxHp = playerBuild.house === "slytherin" ? 400 : 500
-  const [playerHp, setPlayerHp] = useState(playerMaxHp)
-  const [maxPlayerHp] = useState(playerMaxHp)
-  const [bossHp, setBossHp] = useState(0)
-  const [maxBossHp, setMaxBossHp] = useState(0)
+  const [duelists, setDuelists] = useState<Duelist[]>([])
   const [selectedSpell, setSelectedSpell] = useState<string | null>(null)
   const [turnNumber, setTurnNumber] = useState(0)
   const [combatLog, setCombatLog] = useState<CombatLog[]>([])
@@ -80,13 +99,13 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
   const [combatResult, setCombatResult] = useState<"win" | "lose" | null>(null)
   const [boss, setBoss] = useState<StoryBoss | null>(null)
   
-  const [playerDebuffs, setPlayerDebuffs] = useState<Set<string>>(new Set())
-  const [bossDebuffs, setBossDebuffs] = useState<Set<string>>(new Set())
-  
-  const [playerSleepTurns, setPlayerSleepTurns] = useState(0)
-  const [bossStunTurns, setBossStunTurns] = useState(0)
-  const [bossFreezeTurns, setBossFreezeTurns] = useState(0)
-  const [bossBurnTurns, setBossBurnTurns] = useState(0)
+  // Calculate duelists for UI display
+  const playerDuelist = duelists.find(d => d.isPlayer)
+  const bossDuelist = duelists.find(d => !d.isPlayer)
+  const playerHpTotal = playerDuelist ? getTotalHP(playerDuelist.hp) : 0
+  const bossHpTotal = bossDuelist ? getTotalHP(bossDuelist.hp) : 0
+  const maxPlayerHp = playerBuild.house === "slytherin" ? 400 : 500
+  const maxBossHp = boss ? boss.hp : 0
   
   // Load attempts and current stage from Supabase
   const loadProgress = async () => {
@@ -146,20 +165,50 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     if (!currentBoss) return
     
     setBoss(currentBoss)
-    setBossHp(currentBoss.hp)
-    setMaxBossHp(currentBoss.hp)
-    setPlayerHp(maxPlayerHp)
+    
+    const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
+    const playerDuelist: Duelist = {
+      id: currentUser.id,
+      name: playerBuild.name,
+      house: playerBuild.house,
+      wand: playerBuild.wand,
+      avatar: playerBuild.avatar,
+      spells: playerBuild.spells,
+      hp: { bars: buildHpBars(playerBuild.house === "slytherin" ? 400 : 500) },
+      speed: Math.round(100 * playerMod.speed),
+      debuffs: [],
+      isPlayer: true,
+      team: "player",
+      spellMana: buildSpellManaForSpells(playerBuild.spells, playerBuild.house),
+      turnsInBattle: 0,
+      disabledSpells: {},
+      missStreakBySpell: {},
+    }
+    
+    const bossSpells = currentBoss.spells.length > 0 ? currentBoss.spells : SPELL_DATABASE.filter(s => !s.isVipOnly).map(s => s.name)
+    const bossDuelist: Duelist = {
+      id: `boss-${currentBoss.id}`,
+      name: locale === "en" ? currentBoss.nameEn : currentBoss.name,
+      house: currentBoss.house,
+      wand: currentBoss.wand,
+      avatar: currentBoss.avatar,
+      spells: bossSpells,
+      hp: { bars: buildHpBars(currentBoss.hp) },
+      speed: 95,
+      debuffs: [],
+      team: "enemy",
+      spellMana: buildSpellManaForSpells(bossSpells, currentBoss.house),
+      turnsInBattle: 0,
+      disabledSpells: {},
+      missStreakBySpell: {},
+    }
+    
+    setDuelists([playerDuelist, bossDuelist])
     setTurnNumber(0)
     setCombatLog([])
     setIsPlayerTurn(true)
     setIsCombatOver(false)
     setCombatResult(null)
-    setPlayerDebuffs(new Set())
-    setBossDebuffs(new Set())
-    setPlayerSleepTurns(0)
-    setBossStunTurns(0)
-    setBossFreezeTurns(0)
-    setBossBurnTurns(0)
     
     addLog(locale === "en" ? `Stage ${currentStage}: ${currentBoss.nameEn} appears!` : `Etapa ${currentStage}: ${currentBoss.name} aparece!`, "system")
   }
@@ -169,87 +218,69 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
   }
   
   const handlePlayerAttack = async () => {
-    if (!selectedSpell || !boss || !isPlayerTurn || isCombatOver) return
+    if (!selectedSpell || !isPlayerTurn || isCombatOver || duelists.length < 2) return
     
     setIsPlayerTurn(false)
     
-    // Check if player is sleeping
-    if (playerSleepTurns > 0) {
-      addLog(locale === "en" ? "You are sleeping and skip this turn!" : "Você está dormindo e perde este turno!", "system")
-      setPlayerSleepTurns(prev => prev - 1)
-      setTimeout(() => handleBossAttack(), 1000)
-      return
+    const playerDuelist = duelists.find(d => d.isPlayer)
+    const bossDuelist = duelists.find(d => !d.isPlayer)
+    
+    if (!playerDuelist || !bossDuelist) return
+    
+    // Create player action
+    const playerAction: RoundAction = {
+      casterId: playerDuelist.id,
+      type: "cast",
+      spellName: selectedSpell,
+      targetId: bossDuelist.id,
     }
     
-    const spell = SPELL_DATABASE.find(s => s.name === selectedSpell)
-    if (!spell) return
+    // Boss AI: select random spell
+    const bossSpells = bossDuelist.spells
+    const randomSpellName = bossSpells[Math.floor(Math.random() * bossSpells.length)]
+    const bossAction: RoundAction = {
+      casterId: bossDuelist.id,
+      type: "cast",
+      spellName: randomSpellName,
+      targetId: playerDuelist.id,
+    }
     
-    // Calculate damage
-    const damage = rollSpellPower(spell)
+    // Use turn-engine to calculate outcome
+    const outcome = calculateTurnOutcome({
+      duelists,
+      actions: [playerAction, bossAction],
+      spellDatabase: SPELL_DATABASE,
+      turnNumber,
+      gameMode: "torneio-offline",
+      circumFlames: {},
+    })
     
-    // Apply damage to boss
-    setBossHp(prev => Math.max(0, prev - damage))
-    addLog(locale === "en" ? `You cast ${spell.name} for ${damage} damage!` : `Você lançou ${spell.name} causando ${damage} de dano!`, "player")
+    // Update duelists with new state
+    setDuelists(outcome.newDuelists)
     
-    // Check if boss is defeated
-    if (bossHp - damage <= 0) {
+    // Add logs
+    outcome.logs.forEach(log => {
+      addLog(log, "system")
+    })
+    
+    setTurnNumber(prev => prev + 1)
+    
+    // Check if combat is over
+    const newPlayer = outcome.newDuelists.find(d => d.isPlayer)
+    const newBoss = outcome.newDuelists.find(d => !d.isPlayer)
+    
+    if (newBoss && isDefeated(newBoss.hp)) {
       handleWin()
       return
     }
     
-    setTimeout(() => handleBossAttack(), 1000)
-  }
-  
-  const handleBossAttack = async () => {
-    if (!boss || isCombatOver) return
-    
-    // Check if boss is stunned/frozen
-    if (bossStunTurns > 0) {
-      addLog(locale === "en" ? `${boss.name} is stunned and skips this turn!` : `${boss.name} está atordoado e perde este turno!`, "system")
-      setBossStunTurns(prev => prev - 1)
-      setIsPlayerTurn(true)
+    if (newPlayer && isDefeated(newPlayer.hp)) {
+      handleLose()
       return
     }
     
-    if (bossFreezeTurns > 0) {
-      addLog(locale === "en" ? `${boss.name} is frozen and skips this turn!` : `${boss.name} está congelado e perde este turno!`, "system")
-      setBossFreezeTurns(prev => prev - 1)
-      setIsPlayerTurn(true)
-      return
-    }
-    
-    // Apply burn damage
-    if (bossBurnTurns > 0) {
-      const burnDamage = 25
-      setBossHp(prev => Math.max(0, prev - burnDamage))
-      addLog(locale === "en" ? `${boss.name} takes ${burnDamage} burn damage!` : `${boss.name} toma ${burnDamage} de dano de queimadura!`, "system")
-      setBossBurnTurns(prev => prev - 1)
-      
-      if (bossHp - burnDamage <= 0) {
-        handleWin()
-        return
-      }
-    }
-    
-    // Boss selects random spell
-    const bossSpells = boss.spells.length > 0 ? boss.spells : SPELL_DATABASE.filter(s => !s.isVipOnly).map(s => s.name)
-    const randomSpellName = bossSpells[Math.floor(Math.random() * bossSpells.length)]
-    const spell = SPELL_DATABASE.find(s => s.name === randomSpellName)
-    
-    if (spell) {
-      const damage = rollSpellPower(spell)
-      setPlayerHp(prev => Math.max(0, prev - damage))
-      addLog(locale === "en" ? `${boss.name} casts ${spell.name} for ${damage} damage!` : `${boss.name} lançou ${spell.name} causando ${damage} de dano!`, "boss")
-      
-      // Check if player is defeated
-      if (playerHp - damage <= 0) {
-        handleLose()
-        return
-      }
-    }
-    
-    setTurnNumber(prev => prev + 1)
     setIsPlayerTurn(true)
+    setSelectedSpell(null)
   }
   
   const handleWin = async () => {
@@ -382,7 +413,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
                   </h2>
                   <Badge className="bg-red-900/80 border-red-700 text-red-100">
                     <Heart className="w-3 h-3 mr-1" />
-                    {bossHp}/{maxBossHp}
+                    {getTotalHP(bossDuelist?.hp || { bars: [] })}/{boss?.hp || 0}
                   </Badge>
                 </div>
                 
@@ -428,7 +459,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
                     <div className="flex items-center gap-2 mt-1">
                       <Badge className="bg-green-900/80 border-green-700 text-green-100">
                         <Heart className="w-3 h-3 mr-1" />
-                        {playerHp}/{maxPlayerHp}
+                        {playerHpTotal}/{maxPlayerHp}
                       </Badge>
                       <Badge className="bg-blue-900/80 border-blue-700 text-blue-100">
                         <Zap className="w-3 h-3 mr-1" />
@@ -470,7 +501,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
                             : "text-amber-100 hover:bg-amber-900/50"
                         }`}
                         onClick={() => setSelectedSpell(spell.name)}
-                        disabled={playerSleepTurns > 0}
+                        disabled={!isPlayerTurn}
                       >
                         <div className="flex flex-col items-center gap-1">
                           <span className="font-bold">{spell.name}</span>
