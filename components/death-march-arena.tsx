@@ -170,9 +170,8 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     }
   }
   
-  const buildDeathMarchRound = useCallback((swapSpells: boolean = false): Duelist[] => {
+  const buildDeathMarchRound = (swapSpells: boolean = false, manaMultiplier: number = 1): Duelist[] => {
     const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
-    const manaMultiplier = currentRule?.id === "exaustao_arcana" ? 2 : 1
     
     const playerDuelist: Duelist = {
       id: currentUser.id,
@@ -203,33 +202,49 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     }
     
     return [playerDuelist, botDuelist]
-  }, [currentUser.id, playerBuild, currentRule, generateRandomBot])
+  }
   
-  const selectRandomRule = useCallback(() => {
+  const selectRandomRule = () => {
     const rule = FIELD_RULES[Math.floor(Math.random() * FIELD_RULES.length)]
     setCurrentRule(rule)
     return rule
-  }, [])
+  }
   
-  useEffect(() => { loadProgress() }, [])
+  const startNewBattle = () => {
+    setBackgroundImage(SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)])
+    const rule = selectRandomRule()
+    const swapSpells = rule.id === "amnesia_arcana"
+    const manaMultiplier = rule.id === "exaustao_arcana" ? 2 : 1
+    const round = buildDeathMarchRound(swapSpells, manaMultiplier)
+    setDuelists(round)
+    setPotionUsed(false)
+    setPendingSpell(null)
+    setPendingActions({})
+    setTurnNumber(1)
+    setGameOver(null)
+    const currentWins = marchWinsRef.current
+    const ruleName = locale === "en" ? rule.nameEn : rule.name
+    addLog(locale === "en" ? `[March ${currentWins + 1}] Battle started! Field Rule: ${ruleName}` : `[Marcha ${currentWins + 1}] Batalha iniciada! Regra de Campo: ${ruleName}`)
+    beginRoundSelection(round)
+  }
+  
+  const marchWinsRef = useRef(0)
+  const battleStartedRef = useRef(false)
   
   useEffect(() => {
-    if (isLoaded) {
-      setBackgroundImage(SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)])
-      const rule = selectRandomRule()
-      const swapSpells = rule.id === "amnesia_arcana"
-      const round = buildDeathMarchRound(swapSpells)
-      setDuelists(round)
-      setPotionUsed(false)
-      setPendingSpell(null)
-      setPendingActions({})
-      setTurnNumber(1)
-      setGameOver(null)
-      const ruleName = locale === "en" ? rule.nameEn : rule.name
-      addLog(locale === "en" ? `[March ${marchWins + 1}] Battle started! Field Rule: ${ruleName}` : `[Marcha ${marchWins + 1}] Batalha iniciada! Regra de Campo: ${ruleName}`)
-      beginRoundSelection(round)
+    marchWinsRef.current = marchWins
+  }, [marchWins])
+  
+  useEffect(() => {
+    loadProgress()
+  }, [])
+  
+  useEffect(() => {
+    if (isLoaded && !battleStartedRef.current) {
+      battleStartedRef.current = true
+      startNewBattle()
     }
-  }, [isLoaded, selectRandomRule, buildDeathMarchRound, locale, addLog])
+  }, [isLoaded])
   
   const beginRoundSelection = (state: Duelist[] = duelists) => {
     if (gameOver) return
