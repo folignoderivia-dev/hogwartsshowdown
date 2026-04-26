@@ -2531,9 +2531,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       </div>
 
       {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
-      <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-xs text-amber-700/60">
-        <p className="mb-1">{locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}</p>
-        <p className="text-amber-600/80 text-lg font-bold">👥 {locale === 'en' ? 'Visits' : 'Visitas'}: <span className="text-2xl font-bold text-amber-400">{visitCount.toLocaleString()}</span></p>
+      <footer className="mt-8 border-t border-amber-900/30 pb-6 pt-4 text-center">
+        <p className="mb-3 text-sm font-semibold text-amber-200/90 leading-relaxed">
+          {locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}
+        </p>
+        <p className="text-xl font-bold text-amber-400">
+          👥 {locale === 'en' ? 'Visits' : 'Visitas'}: <span className="text-3xl font-extrabold text-amber-300">{visitCount.toLocaleString()}</span>
+        </p>
       </footer>
 
       {/* ── World Boss Section (Always visible if logged in) ──────────────── */}
