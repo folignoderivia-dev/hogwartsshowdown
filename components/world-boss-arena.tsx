@@ -83,10 +83,11 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
         setHasFoughtToday(true)
       }
       
-      // Get boss index from world_boss_state table
+      // Get boss index from world_boss_state table (id is always 1)
       const { data: bossData } = await supabase
         .from("world_boss_state")
         .select("boss_index, current_hp")
+        .eq("id", 1)
         .single()
       
       if (bossData) {
@@ -183,16 +184,11 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     
     // Update world_boss_state table
     try {
-      const { data: bossData } = await supabase
-        .from("world_boss_state")
-        .select("current_hp")
-        .single()
-      
-      const newHp = Math.max(0, (bossData?.current_hp || 5000) - damage)
+      const newHp = Math.max(0, bossHp - damage)
       await supabase
         .from("world_boss_state")
         .update({ current_hp: newHp })
-        .single()
+        .eq("id", 1)
     } catch (error) {
       console.error("Failed to update boss HP:", error)
     }

@@ -2266,25 +2266,27 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <p className="text-amber-600/80">👥 {locale === 'en' ? 'Visits' : 'Visitas'}: {visitCount.toLocaleString()}</p>
       </footer>
       
-      {/* ── World Boss Arena (Modal) ──────────────────────────────────────────── */}
+      {/* ── World Boss Section (Inline, not modal) ──────────────────────────────────── */}
       {showWorldBoss && currentUser && isReady && (
-        <WorldBossArena
-          playerBuild={{
-            name: currentUser.username,
-            house,
-            wand,
-            potion,
-            spells: selectedSpells,
-            avatar,
-            gameMode: "worldboss",
-            userId: currentUser.id,
-            username: currentUser.username,
-            elo: currentUser.elo,
-          }}
-          currentUser={currentUser}
-          onExit={() => setShowWorldBoss(false)}
-          onAuthChange={onAuthChange}
-        />
+        <div className="mt-8 border-t border-amber-900/30 pt-6">
+          <WorldBossArena
+            playerBuild={{
+              name: currentUser.username,
+              house,
+              wand,
+              potion,
+              spells: selectedSpells,
+              avatar,
+              gameMode: "worldboss",
+              userId: currentUser.id,
+              username: currentUser.username,
+              elo: currentUser.elo,
+            }}
+            currentUser={currentUser}
+            onExit={() => setShowWorldBoss(false)}
+            onAuthChange={onAuthChange}
+          />
+        </div>
       )}
     </div>
   )
