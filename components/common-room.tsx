@@ -139,6 +139,7 @@ const GAME_MODES = [
   { value: "ffa3" },
   { value: "ffa" },
   { value: "quidditch" },
+  { value: "floresta" },
 ] as const
 
 const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"], string>> = {
@@ -150,6 +151,7 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
     quidditch: "🏆 QUADRIBOL 1v1",
+    floresta: "🌲 FLORESTA PROIBIDA",
   },
   en: {
     teste: "TEST (BOT)",
@@ -159,6 +161,7 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
     quidditch: "🏆 QUIDDITCH 1v1",
+    floresta: "🌲 FORBIDDEN FOREST",
   },
 }
 
@@ -242,7 +245,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
   const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
-  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "">("")
+  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "">("")
 
   // ── Builds Salvas ────────────────────────────────────────────────────────
   interface SavedBuild {
@@ -2029,7 +2032,17 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <Button
               size="lg"
               disabled={!isReady}
-              onClick={gameMode === "teste" || gameMode === "torneio-offline" ? handleStartDuel : handleCreateRoomClick}
+              onClick={() => {
+                if (gameMode === "floresta") {
+                  if (tentativasFloresta > 0 && isReady) {
+                    setShowForestTower(true)
+                  }
+                } else if (gameMode === "teste" || gameMode === "torneio-offline") {
+                  handleStartDuel()
+                } else {
+                  handleCreateRoomClick()
+                }
+              }}
               className={`medieval-frame w-full border-0 px-4 py-3 text-sm sm:px-6 sm:py-4 sm:text-base font-bold transition-all ${
                 isReady
                   ? "bg-gradient-to-b from-red-800 to-red-900 text-amber-100 shadow-lg shadow-red-900/50 hover:from-red-700 hover:to-red-800"
@@ -2037,7 +2050,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               }`}
             >
               <Wand2 className="mr-2 h-5 w-5" />
-              {gameMode === "teste" || gameMode === "torneio-offline" ? ui.startOffline : ui.createRoom}
+              {gameMode === "floresta" ? (locale === "pt" ? "Entrar na Floresta" : "Enter Forest") : (gameMode === "teste" || gameMode === "torneio-offline" ? ui.startOffline : ui.createRoom)}
             </Button>
             {gameMode !== "teste" && gameMode !== "torneio-offline" && (
               <Button
