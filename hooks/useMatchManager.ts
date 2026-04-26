@@ -32,7 +32,7 @@ export function useMatchManager() {
 
   const isOnlineMode = useCallback((build: PlayerBuild | null) => {
     if (!build) return false
-    return build.gameMode !== "teste" && build.gameMode !== "torneio-offline"
+    return build.gameMode !== "teste" && build.gameMode !== "torneio-offline" && build.gameMode !== "floresta"
   }, [])
 
   const logMatch = useCallback((scope: string, payload: Record<string, unknown>) => {
