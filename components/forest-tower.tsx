@@ -193,6 +193,9 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       return
     }
     
+    // Check if monster is immune to debuffs
+    const monsterImmuneToDebuffs = monster.passive === "immune_all_debuffs" || monster.passive === "basilisco_immunities"
+    
     // Hippogrifo doesn't receive critical hits
     const canCrit = monster.passive !== "priority_no_crit" && spell.canCrit !== false
     
@@ -257,7 +260,30 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         addLog(locale === "en" ? `${spell.name} deals ${damage} damage!` : `${spell.name} causa ${damage} de dano!`, "player")
       }
       
-      // Apply poison if spell has it (simplified)
+      // Apply spell effects (burn, stun, freeze, etc)
+      if (spell.effect && !monsterImmuneToDebuffs) {
+        if (spell.effect === "burn") {
+          addLog(locale === "en" ? `${spell.name} burns the monster!` : `${spell.name} queima o monstro!`, "passive")
+          // Simplified: just log for now
+        } else if (spell.effect === "stun") {
+          addLog(locale === "en" ? `${spell.name} stuns the monster!` : `${spell.name} atordoa o monstro!`, "passive")
+          // Simplified: just log for now
+        } else if (spell.effect === "freeze") {
+          addLog(locale === "en" ? `${spell.name} freezes the monster!` : `${spell.name} congela o monstro!`, "passive")
+          // Simplified: just log for now
+        }
+      }
+      
+      // Apply spell debuffs
+      if (spell.debuff && !monsterImmuneToDebuffs) {
+        const debuffChance = spell.debuff.chance || 0
+        if (Math.random() * 100 < debuffChance) {
+          addLog(locale === "en" ? `${spell.name} applies ${spell.debuff.type}!` : `${spell.name} aplica ${spell.debuff.type}!`, "passive")
+          // Simplified: just log for now
+        }
+      }
+      
+      // Apply poison if spell has it
       if (monster.passive !== "poison_on_hit_immune" && spell.effect === "poison") {
         setMonsterPoisonTurns(2)
         addLog(locale === "en" ? "Monster is poisoned for 2 turns!" : "Monstro está envenenado por 2 turnos!", "system")
