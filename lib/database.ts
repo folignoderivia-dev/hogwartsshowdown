@@ -158,7 +158,10 @@ export async function getRankingTopDamagewb(limit = 50): Promise<DbUser[]> {
 export async function updateMarchRecord(userId: string, marchWins: number): Promise<boolean> {
   const supabase = getSupabaseClient()
   const profile = await getProfileById(userId)
-  if (!profile) return false
+  if (!profile) {
+    console.error("updateMarchRecord: Profile not found for user", userId)
+    return false
+  }
   
   const currentMarch = profile.marcha ?? 0
   const newMarch = Math.max(currentMarch, marchWins)
@@ -167,7 +170,14 @@ export async function updateMarchRecord(userId: string, marchWins: number): Prom
     .from("profiles")
     .update({ marcha: newMarch })
     .eq("id", userId)
-  return !error
+  
+  if (error) {
+    console.error("updateMarchRecord: Failed to update march record", error)
+    return false
+  }
+  
+  console.log(`updateMarchRecord: Updated march for user ${userId} from ${currentMarch} to ${newMarch}`)
+  return true
 }
 
 export async function updateServerMeta(arrecadado: number): Promise<boolean> {
