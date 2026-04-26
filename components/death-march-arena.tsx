@@ -717,7 +717,17 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     }, 2000)
   }
   
-  const handleExit = () => {
+  const handleExit = async () => {
+    // Save march record before exiting
+    try {
+      const { data, error } = await supabase.from("profiles").select("march").eq("id", currentUser.id).single()
+      if (!error && marchWins > (data?.march || 0)) {
+        await supabase.from("profiles").update({ march: marchWins }).eq("id", currentUser.id)
+        addLog(locale === "en" ? `🏆 Saved record: ${marchWins} wins!` : `🏆 Recorde salvo: ${marchWins} vitórias!`)
+      }
+    } catch (error) {
+      console.error("Failed to save march record on exit:", error)
+    }
     onExit()
   }
 
@@ -725,9 +735,10 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     setGameOver("lose")
     addLog(locale === "en" ? "You were defeated..." : "Você foi derrotado...")
     
+    // Save march record on lose
     try {
       const { data, error } = await supabase.from("profiles").select("march").eq("id", currentUser.id).single()
-      if (!error && data && marchWins > (data.march || 0)) {
+      if (!error && marchWins > (data?.march || 0)) {
         await supabase.from("profiles").update({ march: marchWins }).eq("id", currentUser.id)
         addLog(locale === "en" ? `🏆 New record: ${marchWins} wins!` : `🏆 Novo recorde: ${marchWins} vitórias!`)
       }
