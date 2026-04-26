@@ -124,15 +124,17 @@ const AVATARS = [
   { value: "avatar17", label: "Avatar 17", labelEn: "Avatar 17", image: "https://i.postimg.cc/gJJPMkRf/pngwing-com-(26).png" },
   { value: "avatar18", label: "Avatar 18", labelEn: "Avatar 18", image: "https://i.postimg.cc/SRYbhTgc/pngwing-com-(5).png" },
   { value: "avatar19", label: "Avatar 19", labelEn: "Avatar 19", image: "https://i.postimg.cc/rsR2knfx/pngwing-com-(6).png" },
-  { value: "avatar20", label: "Avatar 20", labelEn: "Avatar 20", image: "https://i.postimg.cc/vBNwCFt3/pngwing-com-(7).png" },
+  { value: "avatar20", label: "Barty Crouch Jr", labelEn: "Barty Crouch Jr", image: "https://i.postimg.cc/449YCsHz/barty-crouch-jr-1-1800x1248-(1).png" },
   { value: "avatar21", label: "Avatar 21", labelEn: "Avatar 21", image: "https://i.postimg.cc/Y9sBTKzf/pngwing-com-(8).png" },
   { value: "avatar22", label: "Avatar 22", labelEn: "Avatar 22", image: "https://i.postimg.cc/gJTb1FHD/pngwing-com-(9).png" },
+  { value: "flitwick", label: "Filius Flitwick", labelEn: "Filius Flitwick", image: "https://i.postimg.cc/J40d7YmZ/flitwich-quiz-image.png" },
 ]
 const AVATARS_PER_PAGE = 6
 
 const GAME_MODES = [
   { value: "teste" },
   { value: "torneio-offline" },
+  { value: "historia" },
   { value: "1v1" },
   { value: "2v2" },
   { value: "ffa3" },
@@ -145,6 +147,7 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
   pt: {
     teste: "TESTE (BOT)",
     "torneio-offline": "TORNEIO-OFFLINE",
+    historia: "📖 MODO HISTÓRIA (OFFLINE)",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
@@ -155,6 +158,7 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
   en: {
     teste: "TEST (BOT)",
     "torneio-offline": "TOURNAMENT-OFFLINE",
+    historia: "📖 STORY MODE (OFFLINE)",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
@@ -242,7 +246,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
   const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
-  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "">("")
+  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "historia" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "">("")
 
   // ── Builds Salvas ────────────────────────────────────────────────────────
   interface SavedBuild {
@@ -2034,7 +2038,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               size="lg"
               disabled={!isReady}
               onClick={() => {
-                if (gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta") {
+                if (gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta" || gameMode === "historia") {
                   handleStartDuel()
                 } else {
                   handleCreateRoomClick()
