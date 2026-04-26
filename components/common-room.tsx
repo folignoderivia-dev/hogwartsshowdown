@@ -139,43 +139,51 @@ const AVATARS = [
 ]
 const AVATARS_PER_PAGE = 6
 
+const ONLINE_MODES = [
+  { value: "1v1", icon: "⚔️" },
+  { value: "2v2", icon: "👥" },
+  { value: "ffa3", icon: "⚡" },
+  { value: "ffa", icon: "🔥" },
+  { value: "quidditch", icon: "🏆" },
+] as const
+
+const OFFLINE_MODES = [
+  { value: "teste", icon: "🤖" },
+  { value: "torneio-offline", icon: "🏅" },
+  { value: "historia", icon: "📖" },
+  { value: "death-march", icon: "💀" },
+  { value: "floresta", icon: "🌲" },
+] as const
+
 const GAME_MODES = [
-  { value: "teste" },
-  { value: "torneio-offline" },
-  { value: "historia" },
-  { value: "death-march" },
-  { value: "1v1" },
-  { value: "2v2" },
-  { value: "ffa3" },
-  { value: "ffa" },
-  { value: "quidditch" },
-  { value: "floresta" },
+  ...ONLINE_MODES,
+  ...OFFLINE_MODES,
 ] as const
 
 const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"], string>> = {
   pt: {
     teste: "TESTE (BOT)",
     "torneio-offline": "TORNEIO-OFFLINE",
-    historia: "📖 MODO HISTÓRIA (OFFLINE)",
-    "death-march": "💀 MARCHA DA MORTE (OFFLINE)",
+    historia: "MODO HISTÓRIA",
+    "death-march": "MARCHA DA MORTE",
+    floresta: "FLORESTA PROIBIDA",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
-    quidditch: "🏆 QUADRIBOL 1v1",
-    floresta: "🌲 FLORESTA PROIBIDA (OFFLINE)",
+    quidditch: "QUADRIBOL 1v1",
   },
   en: {
     teste: "TEST (BOT)",
     "torneio-offline": "TOURNAMENT-OFFLINE",
-    historia: "📖 STORY MODE (OFFLINE)",
-    "death-march": "💀 DEATH MARCH (OFFLINE)",
+    historia: "STORY MODE",
+    "death-march": "DEATH MARCH",
+    floresta: "FORBIDDEN FOREST",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
-    quidditch: "🏆 QUIDDITCH 1v1",
-    floresta: "🌲 FORBIDDEN FOREST (OFFLINE)",
+    quidditch: "QUIDDITCH 1v1",
   },
 }
 
@@ -2188,25 +2196,64 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         {/* Game Mode & Start Duel Button */}
         <div className="order-4 mt-2 flex flex-col items-center gap-3 lg:order-none lg:col-start-2 lg:row-start-4">
           {/* Game Mode Selector */}
-          <div className="medieval-frame flex w-full max-w-full flex-col items-stretch gap-2 rounded-lg bg-stone-800/90 px-3 py-2.5 sm:px-4 lg:px-5">
-            <Swords className="h-5 w-5 text-amber-400" />
-            <span className="text-center text-sm text-amber-200">{ui.gameMode}</span>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {GAME_MODES.map((mode) => (
-                <Button
-                  key={mode.value}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setGameMode(mode.value as GameMode)}
-                  className={`h-9 w-full justify-center px-2 text-xs sm:text-sm transition-all ${
-                    gameMode === mode.value
-                      ? "border-amber-500 bg-amber-700/50 text-amber-200"
-                      : "border-amber-800 bg-stone-800 text-amber-300 hover:border-amber-600 hover:bg-amber-900/30"
-                  }`}
-                >
-                  {MODE_LABELS[locale][mode.value]}
-                </Button>
-              ))}
+          <div className="medieval-frame flex w-full max-w-full flex-col items-stretch gap-3 rounded-lg bg-stone-800/90 px-3 py-2.5 sm:px-4 lg:px-5">
+            <div className="flex items-center gap-2">
+              <Swords className="h-5 w-5 text-amber-400" />
+              <span className="text-center text-sm text-amber-200">{ui.gameMode}</span>
+            </div>
+            
+            {/* ONLINE MODES */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-green-400 uppercase tracking-wider">
+                🌐 {locale === 'pt' ? 'ONLINE' : 'ONLINE'}
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {ONLINE_MODES.map((mode) => (
+                  <Button
+                    key={mode.value}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setGameMode(mode.value as GameMode)}
+                    className={`h-10 w-full justify-center px-2 text-xs sm:text-sm transition-all ${
+                      gameMode === mode.value
+                        ? "border-green-500 bg-green-900/50 text-green-200 shadow-lg shadow-green-900/30 scale-105"
+                        : "border-green-800/50 bg-stone-800 text-green-300/70 hover:border-green-600 hover:bg-green-900/30"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-lg">{mode.icon}</span>
+                      <span>{MODE_LABELS[locale][mode.value]}</span>
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+            
+            {/* OFFLINE MODES */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
+                📴 {locale === 'pt' ? 'OFFLINE' : 'OFFLINE'}
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {OFFLINE_MODES.map((mode) => (
+                  <Button
+                    key={mode.value}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setGameMode(mode.value as GameMode)}
+                    className={`h-10 w-full justify-center px-2 text-xs sm:text-sm transition-all ${
+                      gameMode === mode.value
+                        ? "border-amber-500 bg-amber-700/50 text-amber-200 shadow-lg shadow-amber-900/30 scale-105"
+                        : "border-amber-800/50 bg-stone-800 text-amber-300/70 hover:border-amber-600 hover:bg-amber-900/30"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-lg">{mode.icon}</span>
+                      <span>{MODE_LABELS[locale][mode.value]}</span>
+                    </span>
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
 
