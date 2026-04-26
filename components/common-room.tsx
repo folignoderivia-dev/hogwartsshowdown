@@ -64,65 +64,65 @@ const HOUSES = [
 
 const WAND_CORES = [
   // Núcleos clássicos (atualizados)
-  { value: "unicorn",     label: "Pelo de Unicórnio",     desc: "+10% acerto (não-Imperdoáveis)",                  icon: Shield },
-  { value: "dragon",      label: "Coração de Dragão",      desc: "+20% crit / -15% acerto",                        icon: Zap },
-  { value: "phoenix",     label: "Pena de Fênix",          desc: "Cura 25-75 HP fixo fim do turno",                icon: Heart },
-  { value: "thestral",    label: "Pelo de Testrálio",       desc: "Dano único máximo 300",                          icon: Wind },
-  { value: "basilisk",    label: "Presa de Basilisco",      desc: "+20% chance de aplicar debuffs",                 icon: AlertTriangle },
-  { value: "thunderbird", label: "Pena de Pássaro Trovão", desc: "+1 prioridade global",                           icon: Zap },
-  { value: "occamy",      label: "Pena de Occamy",          desc: "Espelho: mesmo feitiço do alvo — dano e acc penalizados por repetição", icon: Shield },
-  { value: "kelpie",      label: "Crina de Kelpie",         desc: "Imune a Incêndio, Confringo e Bombarda",         icon: Wind },
-  { value: "acromantula", label: "Pelo de Acromântula",     desc: "+25 dano por turno completo (empilhável)",       icon: Bug },
-  { value: "rapinomonio", label: "Pele de Rapinomônio",     desc: "Início: 1 spell de cada duelista começa com 0 mana", icon: AlertTriangle },
+  { value: "unicorn",     label: "Pelo de Unicórnio",     labelEn: "Unicorn Hair",          desc: "+10% acerto (não-Imperdoáveis)",                  descEn: "+10% accuracy (non-Unforgivables)",                  icon: Shield },
+  { value: "dragon",      label: "Coração de Dragão",      labelEn: "Dragon Heart",           desc: "+20% crit / -15% acerto",                        descEn: "+20% crit / -15% accuracy",                        icon: Zap },
+  { value: "phoenix",     label: "Pena de Fênix",          labelEn: "Phoenix Feather",        desc: "Cura 25-75 HP fixo fim do turno",                descEn: "Heals 25-75 HP fixed end of turn",                icon: Heart },
+  { value: "thestral",    label: "Pelo de Testrálio",       labelEn: "Thestral Hair",          desc: "Dano único máximo 300",                          descEn: "Max single damage 300",                          icon: Wind },
+  { value: "basilisk",    label: "Presa de Basilisco",      labelEn: "Basilisk Fang",          desc: "+20% chance de aplicar debuffs",                 descEn: "+20% chance to apply debuffs",                 icon: AlertTriangle },
+  { value: "thunderbird", label: "Pena de Pássaro Trovão", labelEn: "Thunderbird Feather",     desc: "+1 prioridade global",                           descEn: "+1 global priority",                           icon: Zap },
+  { value: "occamy",      label: "Pena de Occamy",          labelEn: "Occamy Feather",         desc: "Espelho: mesmo feitiço do alvo — dano e acc penalizados por repetição", descEn: "Mirror: same spell as target — damage and acc penalized by repetition", icon: Shield },
+  { value: "kelpie",      label: "Crina de Kelpie",         labelEn: "Kelpie Hair",            desc: "Imune a Incêndio, Confringo e Bombarda",         descEn: "Immune to Incendio, Confringo and Bombarda",         icon: Wind },
+  { value: "acromantula", label: "Pelo de Acromântula",     labelEn: "Acromantula Hair",       desc: "+25 dano por turno completo (empilhável)",       descEn: "+25 damage per full turn (stackable)",       icon: Bug },
+  { value: "rapinomonio", label: "Pele de Rapinomônio",     labelEn: "Rapinomonio Skin",       desc: "Início: 1 spell de cada duelista começa com 0 mana", descEn: "Start: 1 spell from each duelist starts with 0 mana", icon: AlertTriangle },
   // Núcleos novos
-  { value: "veela",       label: "Cabelo de Veela",         desc: "Acc do atacante reduzida 0-25% aleatório; imune a críticos", icon: Shield },
-  { value: "crupe",       label: "Pelo de Crupe",           desc: "Feitiços sem debuff: 25% chance dano ×3",         icon: Zap },
-  { value: "cinzal",      label: "Presa de Cinzal",         desc: "Cada 100+ dmg recebido: atacante acumula −15% dano", icon: AlertTriangle },
-  { value: "centauro",    label: "Pelo de Centauro",         desc: "No campo: Ferula/Episkey/Vulnera com mana 0 para todos", icon: Wind },
-  { value: "hippogriff",  label: "Pena de Hipogrifo",       desc: "Imunidade total a MARCA e BOMBA",               icon: Shield },
-  { value: "troll",       label: "Pele de Trasgo",          desc: "Estabiliza o dano recebido no valor médio (não permite dano máximo)", icon: AlertTriangle },
-  { value: "oraq_orala",  label: "Pena de Oraqui Orala",    desc: "Ao receber Crítico: 30% chance de invulnerabilidade no próximo turno", icon: Shield },
-  { value: "seminviso",   label: "Pelo de Seminviso",       desc: "Permite trancar 1 magia: imune a Expulso, Obliviate e Petrificus", icon: Lock },
+  { value: "veela",       label: "Cabelo de Veela",         labelEn: "Veela Hair",             desc: "Acc do atacante reduzida 0-25% aleatório; imune a críticos", descEn: "Attacker accuracy reduced 0-25% random; immune to crits", icon: Shield },
+  { value: "crupe",       label: "Pelo de Crupe",           labelEn: "Crup Hair",               desc: "Feitiços sem debuff: 25% chance dano ×3",         descEn: "Spells without debuff: 25% chance damage ×3",         icon: Zap },
+  { value: "cinzal",      label: "Presa de Cinzal",         labelEn: "Cinzal Fang",            desc: "Cada 100+ dmg recebido: atacante acumula −15% dano", descEn: "Each 100+ dmg received: attacker accumulates −15% damage", icon: AlertTriangle },
+  { value: "centauro",    label: "Pelo de Centauro",         labelEn: "Centaur Hair",           desc: "No campo: Ferula/Episkey/Vulnera com mana 0 para todos", descEn: "On field: Ferula/Episkey/Vulnera with 0 mana for all", icon: Wind },
+  { value: "hippogriff",  label: "Pena de Hipogrifo",       labelEn: "Hippogriff Feather",     desc: "Imunidade total a MARCA e BOMBA",               descEn: "Total immunity to MARK and BOMB",               icon: Shield },
+  { value: "troll",       label: "Pele de Trasgo",          labelEn: "Troll Skin",             desc: "Estabiliza o dano recebido no valor médio (não permite dano máximo)", descEn: "Stabilizes received damage at average value (no max damage)", icon: AlertTriangle },
+  { value: "oraq_orala",  label: "Pena de Oraqui Orala",    labelEn: "Oraqui Orala Feather",   desc: "Ao receber Crítico: 30% chance de invulnerabilidade no próximo turno", descEn: "When receiving Crit: 30% chance of invulnerability next turn", icon: Shield },
+  { value: "seminviso",   label: "Pelo de Seminviso",       labelEn: "Seminviso Hair",          desc: "Permite trancar 1 magia: imune a Expulso, Obliviate e Petrificus", descEn: "Allows locking 1 spell: immune to Expulso, Obliviate and Petrificus", icon: Lock },
 ]
 
 const POTIONS = [
-  { value: "wiggenweld",  label: "Wiggenweld",       effect: "Cura HP = último dano recebido" },
-  { value: "mortovivo",  label: "Morto Vivo",        effect: "Imortalidade: HP não cai abaixo de 1 no turno de ativação" },
-  { value: "edurus",     label: "Edurus",             effect: "Limpa debuffs + Imunidade por 1 turno" },
-  { value: "maxima",     label: "Maxima",             effect: "+50% dano final no próximo turno" },
-  { value: "foco",       label: "Foco",               effect: "+10% Accuracy permanente" },
-  { value: "merlin",      label: "Poção de Merlin",   effect: "Copia a última poção do oponente com +25% de efetividade" },
-  { value: "felix",       label: "Felix Felicis",     effect: "Recupera 100% mana da spell com menor mana atual" },
-  { value: "aconito",     label: "Acônito",            effect: "Aplica POISON no oponente por 4 turnos" },
-  { value: "amortentia",  label: "Amortentia",         effect: "Substitui aleatoriamente uma poção não usada do oponente" },
-  { value: "dragon_tonic", label: "Tônico de Dragão", effect: "Aumenta sua prioridade em +4 no próximo turno" },
-  { value: "despair_potion", label: "Poção do Desespero", effect: "Reduz 3 de mana do oponente baseado na última magia que ele usou" },
+  { value: "wiggenweld",  label: "Wiggenweld",       labelEn: "Wiggenweld",       effect: "Cura HP = último dano recebido",               effectEn: "Heals HP = last damage received" },
+  { value: "mortovivo",  label: "Morto Vivo",        labelEn: "Morto-Vivo",        effect: "Imortalidade: HP não cai abaixo de 1 no turno de ativação", effectEn: "Immortality: HP never drops below 1 on activation turn" },
+  { value: "edurus",     label: "Edurus",             labelEn: "Edurus",             effect: "Limpa debuffs + Imunidade por 1 turno",       effectEn: "Clears debuffs + Immunity for 1 turn" },
+  { value: "maxima",     label: "Maxima",             labelEn: "Maxima",             effect: "+50% dano final no próximo turno",               effectEn: "+50% final damage next turn" },
+  { value: "foco",       label: "Foco",               labelEn: "Focus",             effect: "+10% Accuracy permanente",                    effectEn: "+10% Accuracy permanent" },
+  { value: "merlin",      label: "Poção de Merlin",   labelEn: "Merlin Potion",     effect: "Copia a última poção do oponente com +25% de efetividade", effectEn: "Copies opponent's last potion with +25% effectiveness" },
+  { value: "felix",       label: "Felix Felicis",     labelEn: "Felix Felicis",     effect: "Recupera 100% mana da spell com menor mana atual", effectEn: "Recovers 100% mana of spell with lowest current mana" },
+  { value: "aconito",     label: "Acônito",            labelEn: "Aconite",            effect: "Aplica POISON no oponente por 4 turnos",       effectEn: "Applies POISON to opponent for 4 turns" },
+  { value: "amortentia",  label: "Amortentia",         labelEn: "Amortentia",         effect: "Substitui aleatoriamente uma poção não usada do oponente", effectEn: "Randomly replaces an unused opponent potion" },
+  { value: "dragon_tonic", label: "Tônico de Dragão", labelEn: "Dragon Tonic",      effect: "Aumenta sua prioridade em +4 no próximo turno", effectEn: "Increases your priority by +4 next turn" },
+  { value: "despair_potion", label: "Poção do Desespero", labelEn: "Despair Potion",    effect: "Reduz 3 de mana do oponente baseado na última magia que ele usou", effectEn: "Reduces 3 mana from opponent based on last spell they used" },
 ]
 
 
 const AVATARS = [
-  { value: "avatar1",  label: "Avatar 1",  image: "https://i.postimg.cc/LXbFGK31/pngwing-com-(10).png" },
-  { value: "avatar2",  label: "Avatar 2",  image: "https://i.postimg.cc/zBcY4ZFb/pngwing-com-(11).png" },
-  { value: "avatar3",  label: "Avatar 3",  image: "https://i.postimg.cc/XJz6tSkp/pngwing-com-(12).png" },
-  { value: "avatar4",  label: "Avatar 4",  image: "https://i.postimg.cc/bJBf4c9Z/pngwing-com-(13).png" },
-  { value: "avatar5",  label: "Avatar 5",  image: "https://i.postimg.cc/k4pPL3vD/pngwing-com-(14).png" },
-  { value: "avatar6",  label: "Avatar 6",  image: "https://i.postimg.cc/C1Qp9TsK/pngwing-com-(15).png" },
-  { value: "avatar7",  label: "Avatar 7",  image: "https://i.postimg.cc/SsvbHFfS/pngwing-com-(16).png" },
-  { value: "avatar8",  label: "Avatar 8",  image: "https://i.postimg.cc/LXbFGK3m/pngwing-com-(17).png" },
-  { value: "avatar9",  label: "Avatar 9",  image: "https://i.postimg.cc/RFFzPVKN/pngwing-com-(18).png" },
-  { value: "avatar10", label: "Avatar 10", image: "https://i.postimg.cc/B66GhQHZ/pngwing-com-(19).png" },
-  { value: "avatar11", label: "Avatar 11", image: "https://i.postimg.cc/j55r8dPK/pngwing-com-(20).png" },
-  { value: "avatar12", label: "Avatar 12", image: "https://i.postimg.cc/yddzfYcH/pngwing-com-(21).png" },
-  { value: "avatar13", label: "Avatar 13", image: "https://i.postimg.cc/9MMjxFZ2/pngwing-com-(22).png" },
-  { value: "avatar14", label: "Avatar 14", image: "https://i.postimg.cc/d11KWtdg/pngwing-com-(23).png" },
-  { value: "avatar15", label: "Avatar 15", image: "https://i.postimg.cc/xCCSsTHh/pngwing-com-(24).png" },
-  { value: "avatar16", label: "Avatar 16", image: "https://i.postimg.cc/C11VvLD6/pngwing-com-(25).png" },
-  { value: "avatar17", label: "Avatar 17", image: "https://i.postimg.cc/gJJPMkRf/pngwing-com-(26).png" },
-  { value: "avatar18", label: "Avatar 18", image: "https://i.postimg.cc/SRYbhTgc/pngwing-com-(5).png" },
-  { value: "avatar19", label: "Avatar 19", image: "https://i.postimg.cc/rsR2knfx/pngwing-com-(6).png" },
-  { value: "avatar20", label: "Avatar 20", image: "https://i.postimg.cc/vBNwCFt3/pngwing-com-(7).png" },
-  { value: "avatar21", label: "Avatar 21", image: "https://i.postimg.cc/Y9sBTKzf/pngwing-com-(8).png" },
-  { value: "avatar22", label: "Avatar 22", image: "https://i.postimg.cc/gJTb1FHD/pngwing-com-(9).png" },
+  { value: "avatar1",  label: "Avatar 1",  labelEn: "Avatar 1",  image: "https://i.postimg.cc/LXbFGK31/pngwing-com-(10).png" },
+  { value: "avatar2",  label: "Avatar 2",  labelEn: "Avatar 2",  image: "https://i.postimg.cc/zBcY4ZFb/pngwing-com-(11).png" },
+  { value: "avatar3",  label: "Avatar 3",  labelEn: "Avatar 3",  image: "https://i.postimg.cc/XJz6tSkp/pngwing-com-(12).png" },
+  { value: "avatar4",  label: "Avatar 4",  labelEn: "Avatar 4",  image: "https://i.postimg.cc/bJBf4c9Z/pngwing-com-(13).png" },
+  { value: "avatar5",  label: "Avatar 5",  labelEn: "Avatar 5",  image: "https://i.postimg.cc/k4pPL3vD/pngwing-com-(14).png" },
+  { value: "avatar6",  label: "Avatar 6",  labelEn: "Avatar 6",  image: "https://i.postimg.cc/C1Qp9TsK/pngwing-com-(15).png" },
+  { value: "avatar7",  label: "Avatar 7",  labelEn: "Avatar 7",  image: "https://i.postimg.cc/SsvbHFfS/pngwing-com-(16).png" },
+  { value: "avatar8",  label: "Avatar 8",  labelEn: "Avatar 8",  image: "https://i.postimg.cc/LXbFGK3m/pngwing-com-(17).png" },
+  { value: "avatar9",  label: "Avatar 9",  labelEn: "Avatar 9",  image: "https://i.postimg.cc/RFFzPVKN/pngwing-com-(18).png" },
+  { value: "avatar10", label: "Avatar 10", labelEn: "Avatar 10", image: "https://i.postimg.cc/B66GhQHZ/pngwing-com-(19).png" },
+  { value: "avatar11", label: "Avatar 11", labelEn: "Avatar 11", image: "https://i.postimg.cc/j55r8dPK/pngwing-com-(20).png" },
+  { value: "avatar12", label: "Avatar 12", labelEn: "Avatar 12", image: "https://i.postimg.cc/yddzfYcH/pngwing-com-(21).png" },
+  { value: "avatar13", label: "Avatar 13", labelEn: "Avatar 13", image: "https://i.postimg.cc/9MMjxFZ2/pngwing-com-(22).png" },
+  { value: "avatar14", label: "Avatar 14", labelEn: "Avatar 14", image: "https://i.postimg.cc/d11KWtdg/pngwing-com-(23).png" },
+  { value: "avatar15", label: "Avatar 15", labelEn: "Avatar 15", image: "https://i.postimg.cc/xCCSsTHh/pngwing-com-(24).png" },
+  { value: "avatar16", label: "Avatar 16", labelEn: "Avatar 16", image: "https://i.postimg.cc/C11VvLD6/pngwing-com-(25).png" },
+  { value: "avatar17", label: "Avatar 17", labelEn: "Avatar 17", image: "https://i.postimg.cc/gJJPMkRf/pngwing-com-(26).png" },
+  { value: "avatar18", label: "Avatar 18", labelEn: "Avatar 18", image: "https://i.postimg.cc/SRYbhTgc/pngwing-com-(5).png" },
+  { value: "avatar19", label: "Avatar 19", labelEn: "Avatar 19", image: "https://i.postimg.cc/rsR2knfx/pngwing-com-(6).png" },
+  { value: "avatar20", label: "Avatar 20", labelEn: "Avatar 20", image: "https://i.postimg.cc/vBNwCFt3/pngwing-com-(7).png" },
+  { value: "avatar21", label: "Avatar 21", labelEn: "Avatar 21", image: "https://i.postimg.cc/Y9sBTKzf/pngwing-com-(8).png" },
+  { value: "avatar22", label: "Avatar 22", labelEn: "Avatar 22", image: "https://i.postimg.cc/gJTb1FHD/pngwing-com-(9).png" },
 ]
 const AVATARS_PER_PAGE = 6
 
@@ -149,15 +149,6 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
   en: {
     teste: "TEST (BOT)",
     "torneio-offline": "TOURNAMENT-OFFLINE",
-    "1v1": "1 VS 1",
-    "2v2": "2 VS 2",
-    ffa3: "ALL IN ONE (3 FFA)",
-    ffa: "ALL IN ONE (4 FFA)",
-    quidditch: "🏆 QUIDDITCH 1v1",
-  },
-  es: {
-    teste: "PRUEBA (BOT)",
-    "torneio-offline": "TORNEO-OFFLINE",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
@@ -200,23 +191,6 @@ const UI_LABELS: Record<AppLocale, Record<string, string>> = {
     createRoom: "Create Room",
     joinRoom: "Join Room",
     gameMode: "Game Mode:",
-  },
-  es: {
-    translate: "🌍 Traducir (EN/ES)",
-    downloadApk: "📲 Descargar APK",
-    openRooms: "Salas Abiertas",
-    duel1v1: "Duelo 1v1",
-    battle2v2: "Batalla 2v2",
-    ffa4: "Todos contra Todos (4)",
-    ffa3: "Todos contra Todos (3)",
-    updateRooms: "↻ Actualizar",
-    hide: "Ocultar",
-    show: "Mostrar",
-    join: "Entrar",
-    startOffline: "Iniciar Offline",
-    createRoom: "Crear Sala",
-    joinRoom: "Entrar a Sala",
-    gameMode: "Modo de Juego:",
   },
 }
 
@@ -711,8 +685,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     }
     
     // Check if selected mode matches room mode
-    if (gameMode && gameMode !== "" && room.mode !== gameMode) {
-      setAuthError(`Modo selecionado (${gameMode}) não corresponde ao modo da sala (${room.mode}). Selecione o modo correto ou resete sua seleção.`)
+    if (gameMode && room.mode !== gameMode) {
+      setAuthError(locale === 'en' ? `Selected mode (${gameMode}) does not match room mode (${room.mode}). Select the correct mode or reset your selection.` : `Modo selecionado (${gameMode}) não corresponde ao modo da sala (${room.mode}). Selecione o modo correto ou resete sua seleção.`)
       // Reset mode selection to match the room
       setGameMode(room.mode)
       return
@@ -750,7 +724,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       return
     }
     setFriendSearch("")
-    setFriendFeedback("Amigo adicionado com sucesso.")
+    setFriendFeedback(locale === 'en' ? 'Friend added successfully.' : 'Amigo adicionado com sucesso.')
     await refreshFriends()
   }
 
@@ -771,7 +745,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       setFriendMessages([])
     }
     await refreshFriends()
-    setFriendFeedback("Amigo removido.")
+    setFriendFeedback(locale === 'en' ? 'Friend removed.' : 'Amigo removido.')
   }
 
   const handleOpenFriendChat = async (friendId: string) => {
@@ -963,12 +937,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           <DialogContent className="max-h-[92vh] overflow-y-auto border-amber-700/50 bg-stone-900 text-amber-100">
             <DialogHeader>
               <div className="flex items-center justify-between">
-                <DialogTitle className="text-amber-300">💛 Apoie o Projeto</DialogTitle>
+                <DialogTitle className="text-amber-300">💛 {locale === 'en' ? 'Support the Project' : 'Apoie o Projeto'}</DialogTitle>
                 <button
                   type="button"
                   onClick={() => setPixModal(false)}
                   className="rounded-full p-1 text-amber-500 hover:bg-stone-700 hover:text-amber-200 transition-colors"
-                  aria-label="Fechar"
+                  aria-label={locale === 'en' ? 'Close' : 'Fechar'}
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -976,16 +950,15 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-amber-200/80">
-                Este jogo é um projeto de fã, feito com amor e sem fins lucrativos.<br/>
-                Qualquer contribuição ajuda a manter o servidor no ar!
+                {locale === 'en' ? 'This game is a fan project, made with love and without profit.<br/>Any contribution helps keep the server running!' : 'Este jogo é um projeto de fã, feito com amor e sem fins lucrativos.<br/>Qualquer contribuição ajuda a manter o servidor no ar!'}
               </p>
               {/* QR Code Nubank */}
               <div className="flex flex-col items-center gap-2 rounded-lg border border-purple-700/50 bg-stone-800 p-4">
-                <p className="text-xs font-semibold text-purple-300">Pagar via Nubank (QR Code)</p>
+                <p className="text-xs font-semibold text-purple-300">{locale === 'en' ? 'Pay via Nubank (QR Code)' : 'Pagar via Nubank (QR Code)'}</p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent("https://nubank.com.br/cobrar/nxdtl/69ebd870-ceda-4047-bb7d-98aff93278a5")}&size=180x180&margin=8&color=6d28d9&bgcolor=ffffff`}
-                  alt="QR Code Nubank"
+                  alt={locale === 'en' ? 'Nubank QR Code' : 'QR Code Nubank'}
                   width={180}
                   height={180}
                   className="rounded-lg border-4 border-purple-700"
@@ -996,36 +969,36 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   rel="noopener noreferrer"
                   className="text-xs text-purple-400 underline"
                 >
-                  Abrir link de cobrança Nubank
+                  {locale === 'en' ? 'Open Nubank payment link' : 'Abrir link de cobrança Nubank'}
                 </a>
                 <p className="text-center text-[11px] text-amber-400">
-                  Após o pagamento, anexe o código/comprovante abaixo para ativação manual pelo Admin.
+                  {locale === 'en' ? 'After payment, attach the code/receipt below for manual activation by Admin.' : 'Após o pagamento, anexe o código/comprovante abaixo para ativação manual pelo Admin.'}
                 </p>
               </div>
               <div className="rounded-lg border border-amber-700/50 bg-stone-800 p-4 text-center">
-                <p className="mb-1 text-xs text-amber-400">Ou pague com a Chave PIX (e-mail)</p>
+                <p className="mb-1 text-xs text-amber-400">{locale === 'en' ? 'Or pay with PIX Key (email)' : 'Ou pague com a Chave PIX (e-mail)'}</p>
                 <p className="text-lg font-bold text-amber-200">{PIX_KEY}</p>
                 <Button size="sm" variant="outline" onClick={handlePixCopy} className="mt-2 border-amber-700 text-amber-300">
                   <Copy className="mr-1 h-3.5 w-3.5" />
-                  {pixCopied ? "Copiado! ✓" : "Copiar Chave"}
+                  {pixCopied ? (locale === 'en' ? 'Copied! ✓' : 'Copiado! ✓') : (locale === 'en' ? 'Copy Key' : 'Copiar Chave')}
                 </Button>
               </div>
               <p className="text-center text-xs text-amber-500">
-                Valor sugerido: <strong>R$ 10,00</strong> = 30 dias de VIP 👑
+                {locale === 'en' ? 'Suggested value:' : 'Valor sugerido:'} <strong>R$ 10,00</strong> = {locale === 'en' ? '30 days of VIP' : '30 dias de VIP'} 👑
               </p>
               <div className="border-t border-amber-800/40 pt-3">
-                <p className="mb-2 text-xs text-amber-400">Já pagou? Envie o comprovante para ativação:</p>
+                <p className="mb-2 text-xs text-amber-400">{locale === 'en' ? 'Already paid? Send receipt for activation:' : 'Já pagou? Envie o comprovante para ativação:'}</p>
                 <textarea
                   className="w-full rounded border border-amber-700/50 bg-stone-800 px-3 py-2 text-sm text-amber-100 placeholder:text-amber-600"
                   rows={3}
-                  placeholder="Cole aqui seu ID de transação ou comprovante..."
+                  placeholder={locale === 'en' ? 'Paste your transaction ID or receipt here...' : 'Cole aqui seu ID de transação ou comprovante...'}
                   value={vipProof}
                   onChange={(e) => setVipProof(e.target.value)}
                 />
                 {vipProofSent
-                  ? <p className="mt-2 text-center text-xs text-green-400">✓ Enviado! Ativação em até 24h.</p>
+                  ? <p className="mt-2 text-center text-xs text-green-400">✓ {locale === 'en' ? 'Sent! Activation within 24h.' : 'Enviado! Ativação em até 24h.'}</p>
                   : <Button className="mt-2 w-full bg-amber-700 text-white hover:bg-amber-600" onClick={handleVipProofSubmit} disabled={!vipProof.trim() || !currentUser}>
-                      Já Paguei — Enviar Comprovante
+                      {locale === 'en' ? 'Already Paid — Send Receipt' : 'Já Paguei — Enviar Comprovante'}
                     </Button>
                 }
               </div>
@@ -1037,7 +1010,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 onClick={() => setPixModal(false)}
               >
                 <X className="mr-2 h-4 w-4" />
-                Fechar
+                {locale === 'en' ? 'Close' : 'Fechar'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1048,13 +1021,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <Card className={`order-7 min-w-0 border-0 lg:order-none lg:col-start-1 lg:row-start-2 ${showSpectatePanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "mx-auto w-9 bg-transparent shadow-none"}`}>
           <CardHeader className={showSpectatePanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
             <CardTitle className={`flex items-center text-sm text-amber-200 ${showSpectatePanel ? "justify-between" : "justify-center"}`}>
-              {showSpectatePanel ? <span>Duelos em Andamento</span> : <span className="sr-only">Duelos em Andamento</span>}
+              {showSpectatePanel ? <span>{locale === 'en' ? 'Duels in Progress' : 'Duelos em Andamento'}</span> : <span className="sr-only">{locale === 'en' ? 'Duels in Progress' : 'Duelos em Andamento'}</span>}
               <Button
                 size="sm"
                 variant="outline"
                 className="h-7 w-7 border-amber-700 p-0 text-base font-bold leading-none text-amber-300"
                 onClick={() => setShowSpectatePanel((v) => !v)}
-                aria-label={showSpectatePanel ? "Recolher duelos em andamento" : "Expandir duelos em andamento"}
+                aria-label={showSpectatePanel ? (locale === 'en' ? 'Collapse duels in progress' : 'Recolher duelos em andamento') : (locale === 'en' ? 'Expand duels in progress' : 'Expandir duelos em andamento')}
               >
                 {showSpectatePanel ? "-" : "+"}
               </Button>
@@ -1062,7 +1035,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </CardHeader>
           {showSpectatePanel && (
           <CardContent className="max-h-[36vh] min-h-[220px] overflow-y-auto pt-2 lg:max-h-[34vh]">
-              {duelsInProgress.length === 0 && <p className="text-xs text-amber-200/95">Nenhum duelo em andamento no momento.</p>}
+              {duelsInProgress.length === 0 && <p className="text-xs text-amber-200/95">{locale === 'en' ? 'No duels in progress at the moment.' : 'Nenhum duelo em andamento no momento.'}</p>}
               <div className="space-y-2">
                 {duelsInProgress.map((d) => (
                   <div key={d.matchId} className="flex flex-col items-start justify-between gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs sm:flex-row sm:items-center">
@@ -1073,7 +1046,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                         className="h-7 border border-amber-700 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50"
                         onClick={() => onSpectateMatch(d.matchId, d.mode)}
                       >
-                        Assistir
+                        {locale === 'en' ? 'Watch' : 'Assistir'}
                       </Button>
                       <Button
                         size="sm"
@@ -1083,11 +1056,11 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           const origin = typeof window !== "undefined" ? window.location.origin : ""
                           const shareUrl = `${origin}/?spectate=${encodeURIComponent(d.matchId)}&mode=${encodeURIComponent(d.mode)}`
                           await navigator.clipboard.writeText(shareUrl)
-                          setShareFeedback("Link de espectador copiado.")
+                          setShareFeedback(locale === 'en' ? 'Spectator link copied.' : 'Link de espectador copiado.')
                           window.setTimeout(() => setShareFeedback(""), 1800)
                         }}
                       >
-                        Compartilhar
+                        {locale === 'en' ? 'Share' : 'Compartilhar'}
                       </Button>
                     </div>
                   </div>
@@ -1102,13 +1075,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <Card className={`order-8 min-w-0 border-0 lg:order-none lg:col-start-1 ${showRecentPanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "mx-auto w-9 bg-transparent shadow-none"}`}>
           <CardHeader className={showRecentPanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
             <CardTitle className={`flex items-center text-sm text-amber-200 ${showRecentPanel ? "justify-between" : "justify-center"}`}>
-              {showRecentPanel ? <span>🏆 Resultados Recentes</span> : <span className="sr-only">Resultados Recentes</span>}
+              {showRecentPanel ? <span>🏆 {locale === 'en' ? 'Recent Results' : 'Resultados Recentes'}</span> : <span className="sr-only">{locale === 'en' ? 'Recent Results' : 'Resultados Recentes'}</span>}
               <Button
                 size="sm"
                 variant="outline"
                 className="h-7 w-7 border-amber-700 p-0 text-base font-bold leading-none text-amber-300"
                 onClick={() => setShowRecentPanel((v) => !v)}
-                aria-label={showRecentPanel ? "Recolher resultados recentes" : "Expandir resultados recentes"}
+                aria-label={showRecentPanel ? (locale === 'en' ? 'Collapse recent results' : 'Recolher resultados recentes') : (locale === 'en' ? 'Expand recent results' : 'Expandir resultados recentes')}
               >
                 {showRecentPanel ? "-" : "🏆"}
               </Button>
@@ -1116,16 +1089,16 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </CardHeader>
           {showRecentPanel && (
             <CardContent className="pt-2">
-              {recentResults.length === 0 && <p className="text-xs text-amber-200/95">Nenhum duelo finalizado ainda.</p>}
+              {recentResults.length === 0 && <p className="text-xs text-amber-200/95">{locale === 'en' ? 'No duels finished yet.' : 'Nenhum duelo finalizado ainda.'}</p>}
               <ol className="space-y-2">
                 {recentResults.slice(0, 5).map((r, i) => (
                   <li key={r.matchId + r.finishedAt} className="rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-amber-300">#{i + 1} · {r.gameMode === "1v1" ? "Duelo 1v1" : r.gameMode === "2v2" ? "Batalha 2v2" : r.gameMode === "ffa" ? "Todos contra Todos (4)" : r.gameMode === "ffa3" ? "Todos contra Todos (3)" : r.gameMode.toUpperCase()}</span>
+                      <span className="font-semibold text-amber-300">#{i + 1} · {r.gameMode === "1v1" ? (locale === 'en' ? '1v1 Duel' : 'Duelo 1v1') : r.gameMode === "2v2" ? (locale === 'en' ? '2v2 Battle' : 'Batalha 2v2') : r.gameMode === "ffa" ? (locale === 'en' ? 'Free For All (4)' : 'Todos contra Todos (4)') : r.gameMode === "ffa3" ? (locale === 'en' ? 'Free For All (3)' : 'Todos contra Todos (3)') : r.gameMode.toUpperCase()}</span>
                       <span className="text-amber-200/60">{new Date(r.finishedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
                     </div>
-                    <p className="mt-0.5 text-green-400">🏆 {r.winnerNames.join(" & ") || "?"} venceu</p>
-                    {r.loserNames.length > 0 && <p className="text-red-400/80">💀 {r.loserNames.join(" & ")} perdeu</p>}
+                    <p className="mt-0.5 text-green-400">🏆 {r.winnerNames.join(" & ") || "?"} {locale === 'en' ? 'won' : 'venceu'}</p>
+                    {r.loserNames.length > 0 && <p className="text-red-400/80">💀 {r.loserNames.join(" & ")} {locale === 'en' ? 'lost' : 'perdeu'}</p>}
                   </li>
                 ))}
               </ol>
@@ -1151,7 +1124,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           {showOpenRoomsPanel && (
           <CardContent className="max-h-60 overflow-y-auto pt-2">
               {openRooms.length === 0 ? (
-                <p className="text-xs text-amber-200/95">Nenhuma sala esperando jogadores.</p>
+                <p className="text-xs text-amber-200/95">{locale === 'en' ? 'No rooms waiting for players.' : 'Nenhuma sala esperando jogadores.'}</p>
               ) : (
                 <div className="space-y-2">
                   {openRooms.map((r) => {
@@ -1160,7 +1133,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     <div key={r.matchId} className="flex flex-col gap-2 rounded border border-amber-900/60 bg-stone-900/60 px-2 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-amber-100">
                         {modeLabel} · Host: {r.host} · {r.playersJoined}/{r.playersExpected}
-                        {r.isVipRoom && <span className="ml-2 text-yellow-400 font-bold">[SALA VIP]</span>}
+                        {r.isVipRoom && <span className="ml-2 text-yellow-400 font-bold">[{locale === 'en' ? 'VIP ROOM' : 'SALA VIP'}]</span>}
                       </span>
                       <Button
                         size="sm"
@@ -1182,11 +1155,11 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <Dialog open={authOpen} onOpenChange={setAuthOpen}>
           <DialogContent className="border-amber-800 bg-stone-900 text-amber-100 sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-amber-200">{authMode === "login" ? "Login" : "Registro"}</DialogTitle>
+              <DialogTitle className="text-amber-200">{authMode === "login" ? (locale === 'en' ? 'Login' : 'Login') : (locale === 'en' ? 'Register' : 'Registro')}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAuthSubmit} className="space-y-3">
               <div>
-                <Label className="text-amber-300">E-mail ou Usuário</Label>
+                <Label className="text-amber-300">{locale === 'en' ? 'Email or Username' : 'E-mail ou Usuário'}</Label>
                 <Input
                   type="email"
                   value={authEmail}
@@ -1196,7 +1169,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 />
               </div>
               <div>
-                <Label className="text-amber-300">Senha</Label>
+                <Label className="text-amber-300">{locale === 'en' ? 'Password' : 'Senha'}</Label>
                 <Input
                   type="password"
                   value={authPassword}
@@ -1207,7 +1180,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               </div>
               {authMode === "register" && (
                 <div>
-                  <Label className="text-amber-300">Nome de usuário</Label>
+                  <Label className="text-amber-300">{locale === 'en' ? 'Username' : 'Nome de usuário'}</Label>
                   <Input
                     value={authUsername}
                     onChange={(e) => setAuthUsername(e.target.value)}
@@ -1219,7 +1192,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               {authError && <p className="text-sm text-red-400">{authError}</p>}
               <DialogFooter className="flex-col gap-2 sm:flex-col">
                 <Button type="submit" className="w-full border-amber-700 bg-amber-800 text-amber-50">
-                  {authMode === "login" ? "Entrar" : "Criar conta"}
+                  {authMode === "login" ? (locale === 'en' ? 'Sign In' : 'Entrar') : (locale === 'en' ? 'Create account' : 'Criar conta')}
                 </Button>
                 {authMode === "login" && (
                   <button
@@ -1229,7 +1202,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                       try {
                         const email = authEmail.trim().toLowerCase()
                         if (!email) {
-                          setAuthError("Informe seu e-mail para recuperar a senha.")
+                          setAuthError(locale === 'en' ? 'Enter your email to recover password.' : 'Informe seu e-mail para recuperar a senha.')
                           return
                         }
                         const supabase = getSupabaseClient()
@@ -1239,13 +1212,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           setAuthError(error.message)
                           return
                         }
-                        setAuthError("Enviamos um link de recuperação para seu e-mail.")
+                        setAuthError(locale === 'en' ? 'We sent a recovery link to your email.' : 'Enviamos um link de recuperação para seu e-mail.')
                       } catch {
-                        setAuthError("Não foi possível enviar recuperação de senha agora.")
+                        setAuthError(locale === 'en' ? 'Could not send password recovery now.' : 'Não foi possível enviar recuperação de senha agora.')
                       }
                     }}
                   >
-                    Esqueci minha senha
+                    {locale === 'en' ? 'Forgot my password' : 'Esqueci minha senha'}
                   </button>
                 )}
                 <button
@@ -1256,7 +1229,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     setAuthError("")
                   }}
                 >
-                  {authMode === "login" ? "Não tem conta? Registre-se" : "Já tem conta? Login"}
+                  {authMode === "login" ? (locale === 'en' ? "Don't have an account? Register" : "Não tem conta? Registre-se") : (locale === 'en' ? "Already have an account? Login" : "Já tem conta? Login")}
                 </button>
               </DialogFooter>
             </form>
@@ -1269,17 +1242,17 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               {showRankingPanel ? (
                 <span className="flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-amber-400" />
-                  Ranking global (Top 50)
+                  {locale === 'en' ? 'Global Ranking (Top 50)' : 'Ranking global (Top 50)'}
                 </span>
               ) : (
-                <span className="sr-only">Ranking global</span>
+                <span className="sr-only">{locale === 'en' ? 'Global Ranking' : 'Ranking global'}</span>
               )}
               <Button
                 size="sm"
                 variant="outline"
                 className="h-7 w-7 border-amber-700 p-0 text-base font-bold leading-none text-amber-300"
                 onClick={() => setShowRankingPanel((v) => !v)}
-                aria-label={showRankingPanel ? "Recolher ranking global" : "Expandir ranking global"}
+                aria-label={showRankingPanel ? (locale === 'en' ? 'Collapse global ranking' : 'Recolher ranking global') : (locale === 'en' ? 'Expand global ranking' : 'Expandir ranking global')}
               >
                 {showRankingPanel ? "-" : "+"}
               </Button>
@@ -1305,14 +1278,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           <Card className="order-3 w-full min-w-0 medieval-frame border-0 bg-gradient-to-b from-stone-800 to-stone-900 lg:order-none lg:col-start-2 lg:row-start-3">
             <CardContent className="flex items-center justify-between gap-3 pt-4">
               <p className="text-xs text-amber-100">
-                Você possui uma sala ativa: <span className="font-mono text-amber-300">{resumableMatch.matchId}</span> ({resumableMatch.mode} · {resumableMatch.status})
+                {locale === 'en' ? 'You have an active room:' : 'Você possui uma sala ativa:'} <span className="font-mono text-amber-300">{resumableMatch.matchId}</span> ({resumableMatch.mode} · {resumableMatch.status})
               </p>
               <Button
                 type="button"
                 onClick={onResumeMatch}
                 className="border border-amber-700 bg-amber-900/50 text-amber-100 hover:bg-amber-800/60"
               >
-                Voltar para sala
+                {locale === 'en' ? 'Return to room' : 'Voltar para sala'}
               </Button>
             </CardContent>
           </Card>
@@ -1321,13 +1294,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <Card className={`order-6 min-w-0 border-0 lg:order-none lg:col-start-1 lg:row-start-1 ${showFriendsPanel ? "w-full medieval-frame bg-gradient-to-b from-stone-800 to-stone-900" : "mx-auto w-9 bg-transparent shadow-none"}`}>
           <CardHeader className={showFriendsPanel ? "border-b border-amber-900/50 py-2" : "p-0"}>
             <CardTitle className={`flex items-center text-sm text-amber-200 ${showFriendsPanel ? "justify-between" : "justify-center"}`}>
-              {showFriendsPanel ? <span>Modo Amigos</span> : <span className="sr-only">Modo Amigos</span>}
+              {showFriendsPanel ? <span>{locale === 'en' ? 'Friends Mode' : 'Modo Amigos'}</span> : <span className="sr-only">{locale === 'en' ? 'Friends Mode' : 'Modo Amigos'}</span>}
               <Button
                 size="sm"
                 variant="outline"
                 className="h-7 w-7 border-amber-700 p-0 text-base font-bold leading-none text-amber-300"
                 onClick={() => setShowFriendsPanel((v) => !v)}
-                aria-label={showFriendsPanel ? "Recolher modo amigos" : "Expandir modo amigos"}
+                aria-label={showFriendsPanel ? (locale === 'en' ? 'Collapse friends mode' : 'Recolher modo amigos') : (locale === 'en' ? 'Expand friends mode' : 'Expandir modo amigos')}
               >
                 {showFriendsPanel ? "-" : "+"}
               </Button>
@@ -1335,21 +1308,21 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           </CardHeader>
           {showFriendsPanel && <CardContent className="max-h-[42vh] min-h-[260px] overflow-y-auto pt-3 lg:max-h-[36vh]">
             {!currentUser ? (
-              <p className="text-xs text-amber-200/95">Entre na sua conta para adicionar amigos.</p>
+              <p className="text-xs text-amber-200/95">{locale === 'en' ? 'Log in to your account to add friends.' : 'Entre na sua conta para adicionar amigos.'}</p>
             ) : (
               <>
                 <div className="mb-3 flex gap-2">
                   <Input
                     value={friendSearch}
                     onChange={(e) => setFriendSearch(e.target.value)}
-                    placeholder="Buscar usuário (mín. 2 letras)"
+                    placeholder={locale === 'en' ? 'Search user (min. 2 letters)' : 'Buscar usuário (mín. 2 letras)'}
                     className="h-9 border-amber-800 bg-stone-800 text-amber-100 placeholder:text-stone-500"
                   />
                   <Button type="button" onClick={handleAddFriend} className="border border-amber-700 bg-amber-900/50 text-amber-100 hover:bg-amber-800/60">
                     Adicionar
                   </Button>
                   <Button type="button" variant="outline" onClick={handleSearchUsers} className="border-amber-700 text-amber-200">
-                    Buscar
+                    {locale === 'en' ? 'Search' : 'Buscar'}
                   </Button>
                 </div>
                 {friendSearchResults.length > 0 && (
@@ -1364,11 +1337,11 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           onClick={async () => {
                             if (!currentUser?.id) return
                             const result = await addFriendByUsername(currentUser.id, u.username)
-                            setFriendFeedback(result.ok ? "Amigo adicionado com sucesso." : result.error)
+                            setFriendFeedback(result.ok ? (locale === 'en' ? 'Friend added successfully.' : 'Amigo adicionado com sucesso.') : result.error)
                             if (result.ok) await refreshFriends()
                           }}
                         >
-                          Adicionar
+                          {locale === 'en' ? 'Add' : 'Adicionar'}
                         </Button>
                       </div>
                     ))}
@@ -1376,7 +1349,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 )}
                 {friendFeedback && <p className="mb-2 text-xs text-amber-300">{friendFeedback}</p>}
                 {friends.length === 0 ? (
-                  <p className="text-xs text-amber-200/95">Você ainda não adicionou amigos.</p>
+                  <p className="text-xs text-amber-200/95">{locale === 'en' ? 'You have not added friends yet.' : 'Você ainda não adicionou amigos.'}</p>
                 ) : (
                   <div className="space-y-2">
                     {friends.map((friend) => (
@@ -1385,7 +1358,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           <div className="flex items-center gap-1.5">
                             <span
                               className={`inline-block h-2 w-2 rounded-full ${onlineUserIds.has(friend.id) ? "bg-green-400 shadow-[0_0_4px_#4ade80]" : "bg-stone-500"}`}
-                              title={onlineUserIds.has(friend.id) ? "Online" : "Offline"}
+                              title={onlineUserIds.has(friend.id) ? 'Online' : 'Offline'}
                             />
                             <p className="font-semibold text-amber-200">{friend.username}</p>
                           </div>
@@ -1396,7 +1369,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                               className="h-6 border border-amber-700 bg-amber-900/40 px-2 text-[11px] text-amber-100 hover:bg-amber-800/50"
                               onClick={() => void handleOpenFriendChat(friend.id)}
                             >
-                              Mensagem
+                              {locale === 'en' ? 'Message' : 'Mensagem'}
                             </Button>
                             <Button
                               type="button"
@@ -1404,26 +1377,26 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                               className="h-6 border border-red-700 bg-red-900/50 px-2 text-[11px] text-red-100 hover:bg-red-800/60"
                               onClick={() => void handleRemoveFriend(friend.id)}
                             >
-                              Remover
+                              {locale === 'en' ? 'Remove' : 'Remover'}
                             </Button>
                           </div>
                         </div>
-                        <p className="text-amber-300/90">Vitórias: {friend.wins} · Derrotas: {friend.losses}</p>
-                        <p className="text-amber-300/80">Feitiço mais usado: {friend.favoriteSpell || "Sem dados"}</p>
+                        <p className="text-amber-300/90">{locale === 'en' ? 'Wins:' : 'Vitórias:'} {friend.wins} · {locale === 'en' ? 'Losses:' : 'Derrotas:'} {friend.losses}</p>
+                        <p className="text-amber-300/80">{locale === 'en' ? 'Most used spell:' : 'Feitiço mais usado:'} {friend.favoriteSpell || (locale === 'en' ? 'No data' : 'Sem dados')}</p>
                       </div>
                     ))}
                   </div>
                 )}
                 {activeFriendId && (
                   <div className="mt-3 rounded border border-amber-900/60 bg-stone-900/70 p-2">
-                    <p className="mb-2 text-xs text-amber-300">Mensagens</p>
+                    <p className="mb-2 text-xs text-amber-300">{locale === 'en' ? 'Messages' : 'Mensagens'}</p>
                     <div className="mb-2 max-h-28 overflow-y-auto rounded border border-amber-900/50 bg-stone-950/60 p-2 text-xs">
                       {friendMessages.length === 0 ? (
-                        <p className="text-amber-200/90">Sem mensagens ainda.</p>
+                        <p className="text-amber-200/90">{locale === 'en' ? 'No messages yet.' : 'Sem mensagens ainda.'}</p>
                       ) : (
                         friendMessages.map((m) => (
                           <p key={m.id} className="mb-1 text-amber-100/90">
-                            <span className="text-amber-400">{m.senderId === currentUser.id ? "Você" : "Amigo"}:</span> {m.content}
+                            <span className="text-amber-400">{m.senderId === currentUser.id ? (locale === 'en' ? 'You' : 'Você') : (locale === 'en' ? 'Friend' : 'Amigo')}:</span> {m.content}
                           </p>
                         ))
                       )}
@@ -1433,11 +1406,11 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                         value={friendMessageInput}
                         onChange={(e) => setFriendMessageInput(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && void handleSendFriendMessage()}
-                        placeholder="Escreva para seu amigo..."
+                        placeholder={locale === 'en' ? 'Write to your friend...' : 'Escreva para seu amigo...'}
                         className="h-8 border-amber-800 bg-stone-800 text-amber-100 placeholder:text-stone-500"
                       />
                       <Button type="button" onClick={handleSendFriendMessage} className="h-8 border border-amber-700 bg-amber-900/50 text-amber-100 hover:bg-amber-800/60">
-                        Enviar
+                        {locale === 'en' ? 'Send' : 'Enviar'}
                       </Button>
                     </div>
                   </div>
@@ -1453,17 +1426,17 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <CardHeader className="border-b border-amber-900/50">
               <CardTitle className="flex items-center gap-2 text-amber-200">
                 <User className="h-5 w-5 text-amber-400" />
-                Identidade
+                {locale === 'en' ? 'Identity' : 'Identidade'}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 pt-3">
               <div className="flex-1">
                 <Label htmlFor="wizard-name" className="text-amber-200">
-                  Nome do Bruxo
+                  {locale === 'en' ? 'Wizard Name' : 'Nome do Bruxo'}
                 </Label>
                 <Input
                   id="wizard-name"
-                  placeholder={currentUser ? "Nome vinculado à conta" : "Digite seu nome..."}
+                  placeholder={currentUser ? (locale === 'en' ? 'Name linked to account' : 'Nome vinculado à conta') : (locale === 'en' ? 'Enter your name...' : 'Digite seu nome...')}
                   value={effectiveName}
                   onChange={(e) => setName(e.target.value)}
                   disabled={!!currentUser}
@@ -1471,7 +1444,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 />
               </div>
               <div>
-                <p className="mb-2 text-sm text-amber-300">Escolha seu avatar</p>
+                <p className="mb-2 text-sm text-amber-300">{locale === 'en' ? 'Choose your avatar' : 'Escolha seu avatar'}</p>
                 {/* Galeria paginada — 6 por página */}
                 <div className="grid grid-cols-3 gap-2">
                   {AVATARS.slice(avatarPage * AVATARS_PER_PAGE, avatarPage * AVATARS_PER_PAGE + AVATARS_PER_PAGE).map((av) => (
@@ -1497,7 +1470,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                         }}
                         className="h-24 w-full object-contain bg-stone-950/60"
                       />
-                      <div className="bg-stone-900/90 px-1 py-0.5 text-center text-[10px] text-amber-200">{av.label}</div>
+                      <div className="bg-stone-900/90 px-1 py-0.5 text-center text-[10px] text-amber-200">{locale === 'en' ? av.labelEn : av.label}</div>
                     </button>
                   ))}
                 </div>
@@ -1509,10 +1482,10 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     onClick={() => setAvatarPage((p) => Math.max(0, p - 1))}
                     className="rounded border border-amber-800 bg-stone-800 px-3 py-1 text-sm text-amber-300 hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                    ← Anterior
+                    ← {locale === 'en' ? 'Previous' : 'Anterior'}
                   </button>
                   <span className="text-xs text-amber-400">
-                    {avatarPage * AVATARS_PER_PAGE + 1}–{Math.min((avatarPage + 1) * AVATARS_PER_PAGE, AVATARS.length)} de {AVATARS.length}
+                    {avatarPage * AVATARS_PER_PAGE + 1}–{Math.min((avatarPage + 1) * AVATARS_PER_PAGE, AVATARS.length)} {locale === 'en' ? 'of' : 'de'} {AVATARS.length}
                   </span>
                   <button
                     type="button"
@@ -1520,17 +1493,17 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     onClick={() => setAvatarPage((p) => p + 1)}
                     className="rounded border border-amber-800 bg-stone-800 px-3 py-1 text-sm text-amber-300 hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                    Próximo →
+                    {locale === 'en' ? 'Next →' : 'Próximo →'}
                   </button>
                 </div>
                 {selectedAvatar && (
-                  <p className="mt-2 text-xs text-amber-300">Selecionado: {selectedAvatar.label}</p>
+                  <p className="mt-2 text-xs text-amber-300">{locale === 'en' ? 'Selected:' : 'Selecionado:'} {locale === 'en' ? selectedAvatar.labelEn : selectedAvatar.label}</p>
                 )}
                 {/* Upload VIP dentro do container Identidade */}
                 {isVip ? (
                   <label className="mt-3 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-yellow-700/50 bg-yellow-900/20 py-2 text-xs text-yellow-300 hover:bg-yellow-900/40 transition-colors">
                     <Upload className="h-3.5 w-3.5" />
-                    👑 Trocar Avatar (foto personalizada)
+                    👑 {locale === 'en' ? 'Change Avatar (custom photo)' : 'Trocar Avatar (foto personalizada)'}
                     <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
                   </label>
                 ) : (
@@ -1540,7 +1513,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-stone-700 bg-stone-800/50 py-1.5 text-[10px] text-stone-500 hover:border-yellow-800/60 hover:text-yellow-600/70 transition-colors"
                   >
                     <Crown className="h-3 w-3" />
-                    VIP: foto personalizada
+                    VIP: {locale === 'en' ? 'custom photo' : 'foto personalizada'}
                   </button>
                 )}
               </div>
@@ -1552,13 +1525,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <CardHeader className="border-b border-amber-900/50">
               <CardTitle className="flex items-center gap-2 text-amber-200">
                 <Sparkles className="h-5 w-5 text-amber-400" />
-                Casa de Hogwarts
+                {locale === 'en' ? 'Hogwarts House' : 'Casa de Hogwarts'}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
               <Select value={house} onValueChange={setHouse}>
                 <SelectTrigger className="border-amber-800 bg-stone-800 text-amber-100">
-                  <SelectValue placeholder="Selecione sua casa..." />
+                  <SelectValue placeholder={locale === 'en' ? 'Select your house...' : 'Selecione sua casa...'} />
                 </SelectTrigger>
                 <SelectContent className="medieval-frame border-0 bg-stone-800">
                   {HOUSES.map((h) => (
@@ -1571,7 +1544,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                         <span className={`flex h-6 w-6 items-center justify-center rounded ${h.color} text-sm`}>
                           {h.icon}
                         </span>
-                        <span>{h.label}</span>
+                        <span>{locale === 'en' ? h.labelEn : h.label}</span>
                       </span>
                     </SelectItem>
                   ))}
@@ -1579,10 +1552,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               </Select>
               <div className="mt-3 min-h-[2.75rem] rounded border border-amber-800/50 bg-amber-950/30 p-2">
                 <p className="text-xs text-amber-300">
-                  {house
-                    ? <><strong>Passiva:</strong> {HOUSES.find(h => h.value === house)?.modifiers}</>
-                    : <span className="text-amber-600 italic">Selecione uma casa para ver a passiva</span>
-                  }
+                  {(() => {
+                    const selectedHouse = HOUSES.find(h => h.value === house)
+                    return house
+                      ? <><strong>{locale === 'en' ? 'Passive:' : 'Passiva:'}</strong> {locale === 'en' ? selectedHouse?.modifiersEn : selectedHouse?.modifiers}</>
+                      : <span className="text-amber-600 italic">{locale === 'en' ? 'Select a house to see passive' : 'Selecione uma casa para ver a passiva'}</span>
+                  })()}
                 </p>
               </div>
             </CardContent>
@@ -1593,13 +1568,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <CardHeader className="border-b border-amber-900/50">
               <CardTitle className="flex items-center gap-2 text-amber-200">
                 <Wand2 className="h-5 w-5 text-amber-400" />
-                Nucleo da Varinha
+                {locale === 'en' ? 'Wand Core' : 'Nucleo da Varinha'}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
               <Select value={wand} onValueChange={setWand}>
                 <SelectTrigger className="border-amber-800 bg-stone-800 text-amber-100">
-                  <SelectValue placeholder="Selecione o nucleo..." />
+                  <SelectValue placeholder={locale === 'en' ? 'Select the core...' : 'Selecione o nucleo...'} />
                 </SelectTrigger>
                 <SelectContent className="medieval-frame border-0 bg-stone-800">
                   {WAND_CORES.map((w) => {
@@ -1612,7 +1587,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                       >
                         <span className="flex items-center gap-2">
                           <Icon className="h-4 w-4 text-amber-400" />
-                          {w.label}
+                          {locale === 'en' ? w.labelEn : w.label}
                         </span>
                       </SelectItem>
                     )
@@ -1623,8 +1598,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               <div className="mt-3 min-h-[2.75rem] rounded border border-amber-800/50 bg-amber-950/30 p-2">
                 <p className="text-xs text-amber-300">
                   {selectedWandCore
-                    ? <><strong>Passiva:</strong> {selectedWandCore.desc}</>
-                    : <span className="text-amber-600 italic">Selecione um núcleo para ver a passiva</span>
+                    ? <><strong>{locale === 'en' ? 'Passive:' : 'Passiva:'}</strong> {locale === 'en' ? selectedWandCore.descEn : selectedWandCore.desc}</>
+                    : <span className="text-amber-600 italic">{locale === 'en' ? 'Select a core to see passive' : 'Selecione um núcleo para ver a passiva'}</span>
                   }
                 </p>
               </div>
@@ -1636,13 +1611,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <CardHeader className="border-b border-amber-900/50">
               <CardTitle className="flex items-center gap-2 text-amber-200">
                 <FlaskConical className="h-5 w-5 text-amber-400" />
-                Pocao
+                {locale === 'en' ? 'Potion' : 'Pocao'}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
               <Select value={potion} onValueChange={setPotion}>
                 <SelectTrigger className="w-full border-amber-800 bg-stone-800 text-amber-100">
-                  <SelectValue placeholder="Selecione sua pocao..." />
+                  <SelectValue placeholder={locale === 'en' ? 'Select your potion...' : 'Selecione sua pocao...'} />
                 </SelectTrigger>
                 <SelectContent className="medieval-frame w-[var(--radix-select-trigger-width)] max-w-[92vw] border-0 bg-stone-800">
                   {POTIONS.map((p) => (
@@ -1652,8 +1627,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                       className="text-amber-100 focus:bg-amber-900/50 focus:text-amber-200"
                     >
                       <div className="flex flex-col whitespace-normal break-words">
-                        <span className="font-medium">{p.label}</span>
-                        <span className="text-xs text-amber-400/70">{p.effect}</span>
+                        <span className="font-medium">{locale === 'en' ? p.labelEn : p.label}</span>
+                        <span className="text-xs text-amber-400/70">{locale === 'en' ? p.effectEn : p.effect}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -1668,7 +1643,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               <CardTitle className="flex items-center justify-between text-amber-200">
                 <span className="flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-amber-400" />
-                  Grimorio
+                  {locale === 'en' ? 'Grimoire' : 'Grimorio'}
                 </span>
                 <div className="flex items-center gap-3">
                   <Badge
@@ -1678,12 +1653,12 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                         : "border-amber-700 bg-amber-900/30 text-amber-300"
                     }
                   >
-                    {totalCost}/{MAX_SPELL_POINTS} pontos
+                    {totalCost}/{MAX_SPELL_POINTS} {locale === 'en' ? 'points' : 'pontos'}
                   </Badge>
                   {unforgivableCount > 0 && (
                     <Badge className="border-red-600 bg-red-900/30 text-red-300">
                       <AlertTriangle className="mr-1 h-3 w-3" />
-                      {unforgivableCount}/{MAX_UNFORGIVABLE} maldicao
+                      {unforgivableCount}/{MAX_UNFORGIVABLE} {locale === 'en' ? 'curse' : 'maldicao'}
                     </Badge>
                   )}
                 </div>
@@ -1692,10 +1667,10 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             <CardContent className="pt-3">
               <div className="mb-2 rounded border border-red-800/50 bg-red-950/30 p-2.5">
                 <p className="text-sm text-red-300">
-                  <strong>Sistema de Pontos:</strong> Feiticos comuns = 1 ponto | Maldicoes Imperdoaveis = 3 pontos
+                  <strong>{locale === 'en' ? 'Point System:' : 'Sistema de Pontos:'}</strong> {locale === 'en' ? 'Common spells = 1 point | Unforgivable Curses = 3 points' : 'Feiticos comuns = 1 ponto | Maldicoes Imperdoaveis = 3 pontos'}
                 </p>
                 <p className="mt-1 text-xs text-amber-400/70">
-                  Maximo de 1 Maldicao Imperdoavel por build. Use exatamente 6 pontos. Regra: 100 Power = 1 Barra HP.
+                  {locale === 'en' ? 'Max 1 Unforgivable Curse per build. Use exactly 6 points. Rule: 100 Power = 1 HP Bar.' : 'Maximo de 1 Maldicao Imperdoavel por build. Use exatamente 6 pontos. Regra: 100 Power = 1 Barra HP.'}
                 </p>
               </div>
               
@@ -1704,7 +1679,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 <div className="mb-3">
                   <p className="mb-1.5 flex items-center gap-1 text-xs text-amber-400">
                     <FolderOpen className="h-3.5 w-3.5" />
-                    Builds Salvas — clique para carregar
+                    {locale === 'en' ? 'Saved Builds — click to load' : 'Builds Salvas — clique para carregar'}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {savedBuilds.map((b) => (
@@ -1736,14 +1711,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
                   <Input
-                    placeholder="Pesquisar feitico..."
+                    placeholder={locale === 'en' ? 'Search spell...' : 'Pesquisar feitico...'}
                     value={spellSearch}
                     onChange={(e) => setSpellSearch(e.target.value)}
                     className="border-amber-800 bg-stone-800 pl-10 text-amber-100 placeholder:text-stone-500"
                   />
                 </div>
                 <div className="flex gap-1">
-                  <span className="self-center text-xs text-amber-400/70 mr-1">Ordenar:</span>
+                  <span className="self-center text-xs text-amber-400/70 mr-1">{locale === 'en' ? 'Sort:' : 'Ordenar:'}</span>
                   {(["name", "power", "cost"] as const).map((s) => (
                     <button
                       key={s}
@@ -1754,7 +1729,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           : "bg-stone-700 text-stone-300 hover:bg-stone-600"
                       }`}
                     >
-                      {s === "name" ? "A–Z" : s === "power" ? "⚔️ Poder" : "💰 Custo"}
+                      {s === "name" ? "A–Z" : s === "power" ? "⚔️ " + (locale === 'en' ? 'Power' : 'Poder') : "💰 " + (locale === 'en' ? 'Cost' : 'Custo')}
                     </button>
                   ))}
                 </div>
@@ -1793,7 +1768,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className={`font-medium ${isSelected ? (spell.isUnforgivable ? "text-red-300" : "text-amber-300") : isBanned ? "text-stone-500 line-through" : "text-stone-900"}`}>
-                              {spell.name}
+                              {locale === 'pt' ? (spell.namePt || spell.name) : spell.name}
                             </span>
                             <Badge
                               className={`text-xs ${spell.isUnforgivable ? "border-red-600 bg-red-900/50 text-red-300" : "border-stone-500 bg-stone-600 text-stone-200"}`}
@@ -1807,27 +1782,27 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                             )}
                             {spell.isUnforgivable && (
                               <Badge className="border-red-600 bg-red-900/50 text-xs text-red-300">
-                                Imperdoavel
+                                {locale === 'en' ? 'Unforgivable' : 'Imperdoavel'}
                               </Badge>
                             )}
                             {isBanned && (
                               <Badge className="border-stone-600 bg-stone-700 text-xs text-stone-400">
-                                🚫 Banida
+                                🚫 {locale === 'en' ? 'Banned' : 'Banida'}
                               </Badge>
                             )}
                           </div>
                           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-amber-100/90">
                             {(spell.power ?? 0) > 0 || (spell.powerMin != null && spell.powerMax != null) ? (
-                              <span>Poder: {formatSpellPower(spell)}</span>
+                              <span>{locale === 'en' ? 'Power:' : 'Poder:'} {formatSpellPower(spell)}</span>
                             ) : null}
-                            <span>Acerto: {spell.accuracy}%</span>
+                            <span>{locale === 'en' ? 'Accuracy:' : 'Acerto:'} {spell.accuracy}%</span>
                             <span>MANA: {spell.pp}</span>
                             {spell.priority != null && spell.priority !== 0 && (
                               <span className="text-purple-300">Prio: {spell.priority > 0 ? "+" : ""}{spell.priority}</span>
                             )}
                           </div>
-                          {spell.effect && (
-                            <p className="mt-1 text-xs text-amber-300">{spell.effect}</p>
+                          {(locale === 'pt' ? spell.effectPt : spell.effect) && (
+                            <p className="mt-1 text-xs text-amber-300">{locale === 'pt' ? spell.effectPt : spell.effect}</p>
                           )}
                         </div>
                         <div className={`ml-3 flex h-6 w-6 items-center justify-center rounded-full border-2 ${
@@ -1845,7 +1820,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 </div>
                 {filteredSpells.length === 0 && (
                   <p className="py-4 text-center text-sm text-amber-200/90">
-                    Nenhum feitico encontrado
+                    {locale === 'en' ? 'No spell found' : 'Nenhum feitico encontrado'}
                   </p>
                 )}
               </div>
@@ -1853,7 +1828,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               {/* Selected Spells Preview */}
               {selectedSpells.length > 0 && (
                 <div className="mt-4">
-                  <p className="mb-2 text-xs text-amber-300/95">Feiticos selecionados ({selectedSpells.length}):</p>
+                  <p className="mb-2 text-xs text-amber-300/95">{locale === 'en' ? 'Selected spells' : 'Feiticos selecionados'} ({selectedSpells.length}):</p>
                   <div className="flex flex-wrap gap-2">
                     {selectedSpells.map((spellName) => {
                       const spell = SPELL_DATABASE.find((s) => s.name === spellName)
@@ -1863,7 +1838,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           className={`cursor-pointer ${spell?.isUnforgivable ? "bg-red-700 hover:bg-red-600" : "bg-amber-700 hover:bg-amber-600"} text-white`}
                           onClick={() => toggleSpell(spellName)}
                         >
-                          {spellName} ({spell?.cost}pt) x
+                          {(locale === 'pt' ? (spell?.namePt || spellName) : spellName)} ({spell?.cost}pt) x
                         </Badge>
                       )
                     })}
@@ -1880,10 +1855,10 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                     : "border-amber-700/40 bg-stone-800/60 text-amber-400"
               }`}>
                 {totalCost === MAX_SPELL_POINTS
-                  ? `✓ Grimório completo! (${totalCost}/${MAX_SPELL_POINTS} pontos)`
+                  ? `✓ ${locale === 'en' ? 'Grimoire complete!' : 'Grimório completo!'} (${totalCost}/${MAX_SPELL_POINTS} ${locale === 'en' ? 'points' : 'pontos'})`
                   : totalCost > MAX_SPELL_POINTS
-                    ? `⚠ Excedeu! ${totalCost}/${MAX_SPELL_POINTS} pontos (remova ${totalCost - MAX_SPELL_POINTS}pt)`
-                    : `Use exatamente ${MAX_SPELL_POINTS} pontos de feitiço (atual: ${totalCost}/${MAX_SPELL_POINTS})`
+                    ? `⚠ ${locale === 'en' ? 'Exceeded!' : 'Excedeu!'} ${totalCost}/${MAX_SPELL_POINTS} ${locale === 'en' ? 'points' : 'pontos'} (${locale === 'en' ? 'remove' : 'remova'} ${totalCost - MAX_SPELL_POINTS}pt)`
+                    : `${locale === 'en' ? 'Use exactly' : 'Use exatamente'} ${MAX_SPELL_POINTS} ${locale === 'en' ? 'spell points' : 'pontos de feitiço'} (${locale === 'en' ? 'current:' : 'atual:'} ${totalCost}/${MAX_SPELL_POINTS})`
                 }
               </div>
 
@@ -1897,13 +1872,13 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                       className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-amber-700/50 bg-stone-800/40 py-2 text-xs text-amber-400 hover:border-amber-500 hover:bg-amber-900/20 hover:text-amber-200 transition-colors"
                     >
                       <Save className="h-3.5 w-3.5" />
-                      Salvar esta Build
+                      {locale === 'en' ? 'Save this Build' : 'Salvar esta Build'}
                     </button>
                   ) : (
                     <div className="rounded-lg border border-amber-700/40 bg-stone-800/60 p-3">
                       <p className="mb-2 text-xs font-semibold text-amber-300">
                         <Save className="mr-1 inline h-3.5 w-3.5" />
-                        Nome da Build
+                        {locale === 'en' ? 'Build Name' : 'Nome da Build'}
                       </p>
                       <div className="flex gap-2">
                         <input
@@ -1911,7 +1886,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           value={saveBuildName}
                           onChange={(e) => setSaveBuildName(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter") handleSaveBuild() }}
-                          placeholder={`Build ${savedBuilds.length + 1}`}
+                          placeholder={locale === 'en' ? `Build ${savedBuilds.length + 1}` : `Build ${savedBuilds.length + 1}`}
                           maxLength={24}
                           className="flex-1 rounded border border-amber-800/50 bg-stone-900 px-2 py-1 text-xs text-amber-100 placeholder:text-stone-500 focus:outline-none focus:ring-1 focus:ring-amber-600"
                         />
@@ -1920,7 +1895,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                           onClick={handleSaveBuild}
                           className="rounded border border-green-700/60 bg-green-900/30 px-3 py-1 text-xs text-green-300 hover:bg-green-900/60 transition-colors"
                         >
-                          Salvar
+                          {locale === 'en' ? 'Save' : 'Salvar'}
                         </button>
                         <button
                           type="button"
@@ -2013,7 +1988,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               disabled={!isReady}
             >
               <Crown className="mr-1.5 h-3.5 w-3.5" />
-              Criar Sala VIP
+              {locale === 'en' ? 'Create VIP Room' : 'Criar Sala VIP'}
             </Button>
             <Button
               variant="outline"
@@ -2022,7 +1997,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               onClick={() => setShowCustomRoom((v) => !v)}
             >
               <Crown className="mr-1.5 h-3.5 w-3.5" />
-              {showCustomRoom ? "Ocultar Regras" : "Sala Personalizada"}
+              {showCustomRoom ? (locale === 'en' ? 'Hide Rules' : 'Ocultar Regras') : (locale === 'en' ? 'Custom Room' : 'Sala Personalizada')}
             </Button>
           </div>
         )}
@@ -2030,11 +2005,11 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         {/* ── Regras da Sala Personalizada (VIP) ─────────────────────────────── */}
         {isVip && showCustomRoom && gameMode !== "teste" && gameMode !== "torneio-offline" && (
               <div className="mt-2 rounded-lg border border-yellow-700/40 bg-stone-900/90 p-4 text-sm">
-                <p className="mb-3 font-semibold text-yellow-300">👑 Regras da Sala Personalizada</p>
+                <p className="mb-3 font-semibold text-yellow-300">👑 {locale === 'en' ? 'Custom Room Rules' : 'Regras da Sala Personalizada'}</p>
 
                 {/* Timeout de turno */}
                 <div className="mb-3">
-                  <p className="mb-1 text-xs text-amber-400">⏱ Timeout de Turno</p>
+                  <p className="mb-1 text-xs text-amber-400">⏱ {locale === 'en' ? 'Turn Timeout' : 'Timeout de Turno'}</p>
                   <div className="flex gap-2">
                     {([30, 60, 120, 0] as const).map((t) => (
                       <Button key={t} size="sm" variant="outline"
@@ -2049,14 +2024,14 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
                 {/* Limite de poções */}
                 <div className="mb-3">
-                  <p className="mb-1 text-xs text-amber-400">🧪 Limite de Poções por Duelo</p>
+                  <p className="mb-1 text-xs text-amber-400">🧪 {locale === 'en' ? 'Potion Limit per Duel' : 'Limite de Poções por Duelo'}</p>
                   <div className="flex gap-2">
                     {[0, 1, 2, 3, 5].map((n) => (
                       <Button key={n} size="sm" variant="outline"
                         onClick={() => setCustomSettings((s) => ({ ...s, potionLimit: n }))}
                         className={`text-xs ${customSettings.potionLimit === n ? "border-yellow-500 bg-yellow-900/40 text-yellow-200" : "border-amber-800 text-amber-400"}`}
                       >
-                        {n === 0 ? "Nenhuma" : n}
+                        {n === 0 ? (locale === 'en' ? 'None' : 'Nenhuma') : n}
                       </Button>
                     ))}
                   </div>
@@ -2064,9 +2039,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
                 {/* Feitiços banidos */}
                 <div className="mb-3">
-                  <p className="mb-1 text-xs text-amber-400">🚫 Banir Feitiços <span className="text-stone-500">(clique para alternar)</span></p>
+                  <p className="mb-1 text-xs text-amber-400">🚫 {locale === 'en' ? 'Ban Spells' : 'Banir Feitiços'} <span className="text-stone-500">({locale === 'en' ? 'click to toggle' : 'clique para alternar'})</span></p>
                   <div className="mb-1 text-[10px] text-stone-500">
-                    Maldições: <span className="text-red-400">vermelho</span> · Controle: <span className="text-purple-400">roxo</span> · Dano alto: <span className="text-orange-400">laranja</span>
+                    {locale === 'en' ? 'Curses:' : 'Maldições:'} <span className="text-red-400">{locale === 'en' ? 'red' : 'vermelho'}</span> · {locale === 'en' ? 'Control:' : 'Controle:'} <span className="text-purple-400">{locale === 'en' ? 'purple' : 'roxo'}</span> · {locale === 'en' ? 'High damage:' : 'Dano alto:'} <span className="text-orange-400">{locale === 'en' ? 'orange' : 'laranja'}</span>
                   </div>
                   <div className="flex max-h-36 flex-wrap gap-1 overflow-y-auto">
                     {([
@@ -2122,28 +2097,28 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   </div>
                   {customSettings.bannedSpells.length > 0 && (
                     <p className="mt-1 text-[10px] text-red-400">
-                      Banidos ({customSettings.bannedSpells.length}): {customSettings.bannedSpells.join(", ")}
+                      {locale === 'en' ? 'Banned' : 'Banidos'} ({customSettings.bannedSpells.length}): {customSettings.bannedSpells.join(", ")}
                     </p>
                   )}
                 </div>
 
-                <p className="text-[10px] text-amber-600">As regras serão compartilhadas com o oponente ao entrar na sala.</p>
+                <p className="text-[10px] text-amber-600">{locale === 'en' ? 'Rules will be shared with opponent when entering the room.' : 'As regras serão compartilhadas com o oponente ao entrar na sala.'}</p>
               </div>
             )}
         {!isVip && isReady && gameMode && gameMode !== "teste" && gameMode !== "torneio-offline" && (
           <p className="mt-1 text-center text-[10px] text-amber-600/70">
-            👑 <button type="button" className="underline hover:text-amber-400" onClick={() => setPixModal(true)}>Torne-se VIP</button> para criar salas personalizadas
+            👑 <button type="button" className="underline hover:text-amber-400" onClick={() => setPixModal(true)}>{locale === 'en' ? 'Become VIP' : 'Torne-se VIP'}</button> {locale === 'en' ? 'to create custom rooms' : 'para criar salas personalizadas'}
           </p>
         )}
 
         {isQuidditchMode && isReady && (
           <p className="mt-2 text-center text-xs text-amber-400/80">
-            Quadribol não precisa de build. Clique em Criar Sala e compartilhe o código com seu adversário.
+            {locale === 'en' ? 'Quidditch does not need a build. Click Create Room and share the code with your opponent.' : 'Quadribol não precisa de build. Clique em Criar Sala e compartilhe o código com seu adversário.'}
           </p>
         )}
         {!isReady && !currentUser && (
           <p className="mt-4 text-center text-sm text-amber-200/95">
-            Entre ou registre-se para poder ir à Arena.
+            {locale === 'en' ? 'Log in or register to go to the Arena.' : 'Entre ou registre-se para poder ir à Arena.'}
           </p>
         )}
         </div>
@@ -2151,8 +2126,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
       {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
       <footer className="mt-8 border-t border-amber-900/30 pb-4 pt-3 text-center text-[10px] text-amber-700/60">
-        Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling.
-        Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.
+        {locale === 'en' ? 'Fan project, non-profit. Inspired by the Harry Potter universe by J.K. Rowling. Hogwarts Showdown has no affiliation with Warner Bros. or Wizarding World.' : 'Projeto feito por fã, sem fins lucrativos. Inspirado no universo de Harry Potter de J.K. Rowling. Hogwarts Showdown não tem vínculo com Warner Bros. ou Wizarding World.'}
       </footer>
     </div>
   )

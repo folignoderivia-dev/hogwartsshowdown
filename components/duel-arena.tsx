@@ -1739,7 +1739,7 @@ const DuelArena = (
               style={{ fontSize: "0.85rem", textShadow: "0 1px 3px #000, 0 0 8px rgba(0,0,0,0.8)" }}
             >
               {duelist.id === selfDuelistId && playerBuild.isVip && (
-                <span className="mr-1 text-yellow-400" title="Jogador VIP">👑</span>
+                <span className="mr-1 text-yellow-400" title={locale === 'en' ? 'VIP Player' : 'Jogador VIP'}>👑</span>
               )}
               {duelist.name}
               {((duelist.circumAura ?? 0) > 0 || (circumFlames[duelist.id] ?? 0) > 0) && (
@@ -1784,7 +1784,7 @@ const DuelArena = (
     const image = side === "top" ? HAND_TOP : HAND_BOTTOM
     const size = side === "top" ? "h-[230px]" : "h-[285px]"
     return (
-      <img src={image} alt={`Varinha de ${duelist.name}`} className={`pointer-events-none absolute z-10 ${positionClass} ${size} w-auto object-contain ${mirror ? "-scale-x-100" : ""} ${dead ? "grayscale opacity-50" : "opacity-95"}`} />
+      <img src={image} alt={`${duelist.name}'s Wand`} className={`pointer-events-none absolute z-10 ${positionClass} ${size} w-auto object-contain ${mirror ? "-scale-x-100" : ""} ${dead ? "grayscale opacity-50" : "opacity-95"}`} />
     )
   }
 
@@ -1795,7 +1795,7 @@ const DuelArena = (
     <div className="min-h-screen bg-stone-800 font-serif text-amber-100">
       <header className="border-b-4 border-amber-900 bg-stone-950/90 px-4 py-3">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <h1 className="text-2xl font-bold text-amber-300">⚔️ Arena de Duelo</h1>
+          <h1 className="text-2xl font-bold text-amber-300">⚔️ {locale === 'en' ? 'Duel Arena' : 'Arena de Duelo'}</h1>
           <div className="flex items-center gap-2">
             <Button onClick={cycleLocale} className="border-amber-700 bg-stone-900/80 text-amber-300 hover:bg-amber-800/60">
               {locale === 'pt' ? '🇺🇸 EN' : '🇧🇷 PT'}
@@ -2135,7 +2135,10 @@ const DuelArena = (
             <p className="mb-2 text-xs text-amber-300">{ui.awaitingServer}</p>
           )}
           {playerCannotAct && !playerDefeated && selfDuelistId && !pendingActions[selfDuelistId] && <p className="mb-2 text-xs text-red-300">{ui.stunFreeze}</p>}
-          {pendingSpell && <p className="mb-2 text-xs text-amber-300">{ui.spellSelected} {pendingSpell}. {ui.chooseTarget}</p>}
+          {pendingSpell && <p className="mb-2 text-xs text-amber-300">{ui.spellSelected} {(() => {
+            const spell = SPELL_DATABASE.find(s => s.name === pendingSpell)
+            return spell ? (locale === 'pt' ? (spell.namePt || spell.name) : spell.name) : pendingSpell
+          })()}. {ui.chooseTarget}</p>}
 
           {!isReadOnlySpectator && !playerDefeated && (isOnlineMatch ? !awaitingServerAck : !selfDuelistId || !pendingActions[selfDuelistId]) && (
             <div className="mb-2 flex flex-wrap gap-2">
@@ -2178,7 +2181,11 @@ const DuelArena = (
                     )}
                     <Button disabled={disabled} onClick={() => onSpellClick(spell)} className={`touch-manipulation select-none border border-amber-700 text-amber-100 ${pendingSpell === spell ? "bg-amber-600" : "bg-gradient-to-b from-amber-800 to-amber-900 hover:from-amber-700 hover:to-amber-800"}`}>
                       <Wand2 className="mr-1 h-3.5 w-3.5" />
-                      {spell} ({mana?.current}/{mana?.max} {ui.mana} | {info?.accuracy || 0}%{disabledByDebuff ? ` | 🔒${player?.disabledSpells?.[spell]}t` : ""})
+                      {(() => {
+                        const spellInfo = SPELL_DATABASE.find(s => s.name === spell)
+                        const displayName = spellInfo ? (locale === 'pt' ? (spellInfo.namePt || spellInfo.name) : spellInfo.name) : spell
+                        return displayName
+                      })()} ({mana?.current}/{mana?.max} {ui.mana} | {info?.accuracy || 0}%{disabledByDebuff ? ` | 🔒${player?.disabledSpells?.[spell]}t` : ""})
                     </Button>
                   </div>
                 )
