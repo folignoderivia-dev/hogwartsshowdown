@@ -27,6 +27,7 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
   const supabase = getSupabaseClient()
   
   const [currentFloor, setCurrentFloor] = useState(1)
+  const [isLoaded, setIsLoaded] = useState(false)
   // Calculate player HP based on house: 5 hearts (500 HP) or 4 hearts (400 HP) if Slytherin
   const playerMaxHp = playerBuild.house === "slytherin" ? 400 : 500
   const [playerHp, setPlayerHp] = useState(playerMaxHp)
@@ -70,8 +71,10 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
   
   // Initialize combat after loading attempts
   useEffect(() => {
-    initializeCombat()
-  }, [currentFloor])
+    if (isLoaded) {
+      initializeCombat()
+    }
+  }, [isLoaded])
   
   const loadAttempts = async () => {
     try {
@@ -106,9 +109,12 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         if (data.floresta) {
           setCurrentFloor(data.floresta)
         }
+        
+        setIsLoaded(true)
       }
     } catch (error) {
       console.error("Failed to load attempts:", error)
+      setIsLoaded(true)
     }
   }
   
