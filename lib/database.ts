@@ -191,13 +191,23 @@ export async function updateServerMeta(arrecadado: number): Promise<boolean> {
 
 export async function getServerMeta(): Promise<{ arrecadado: number; meta_objetivo: number }> {
   const supabase = getSupabaseClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("server_meta")
     .select("arrecadado, meta_objetivo")
     .eq("id", 1)
     .single()
   
-  if (!data) return { arrecadado: 0, meta_objetivo: 60 }
+  if (error) {
+    console.error("getServerMeta: Failed to fetch server_meta", error)
+    return { arrecadado: 0, meta_objetivo: 60 }
+  }
+  
+  if (!data) {
+    console.warn("getServerMeta: No data found for server_meta")
+    return { arrecadado: 0, meta_objetivo: 60 }
+  }
+  
+  console.log("getServerMeta: Fetched", { arrecadado: data.arrecadado, meta_objetivo: data.meta_objetivo })
   
   return {
     arrecadado: data.arrecadado ?? 0,

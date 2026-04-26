@@ -517,7 +517,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         const meta = await getServerMeta()
         setArrecadado(meta.arrecadado)
         setMetaObjetivo(meta.meta_objetivo)
-      } catch {
+        console.log("CommonRoom: Fetched server meta", meta)
+      } catch (err) {
+        console.error("CommonRoom: Failed to fetch server meta", err)
         // Keep defaults on error
       }
     }
@@ -536,12 +538,15 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
           filter: "id=eq.1"
         },
         (payload) => {
+          console.log("CommonRoom: Received server_meta update", payload)
           const newRecord = payload.new as { arrecadado?: number; meta_objetivo?: number }
           if (newRecord.arrecadado !== undefined) setArrecadado(newRecord.arrecadado)
           if (newRecord.meta_objetivo !== undefined) setMetaObjetivo(newRecord.meta_objetivo)
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log("CommonRoom: Server meta subscription status", status)
+      })
 
     return () => {
       supabase.removeChannel(channel)
