@@ -79,34 +79,120 @@ const AVATAR_IMAGES: Record<string, string> = {
 }
 const DEFAULT_AVATARS = ["avatar1","avatar2","avatar3","avatar4","avatar5","avatar6","avatar7","avatar8"]
 const HOUSE_CREST: Record<string, string> = {
-  gryffindor: "https://i.postimg.cc/ZYv9Qz3K/gryffindor.png",
-  slytherin: "https://i.postimg.cc/NFf3p2YV/slytherin.png",
-  ravenclaw: "https://i.postimg.cc/7YQhZxX7/ravenclaw.png",
-  hufflepuff: "https://i.postimg.cc/8ZdQvZjF/hufflepuff.png",
+  gryffindor: "https://i.postimg.cc/596PnFYQ/pngwing-com-(2).png",
+  slytherin:  "https://i.postimg.cc/66yHYG2L/pngwing-com-(3).png",
+  ravenclaw:  "https://i.postimg.cc/nVCd0Qj4/pngwing-com-(4).png",
+  hufflepuff: "https://i.postimg.cc/bYs632DQ/pngwing-com-(1).png",
 }
 const DEBUFF_LABEL: Record<string, string> = {
-  burn: "🔥",
-  freeze: "❄️",
-  stun: "💫",
-  poison: "☠️",
-  paralysis: "⚡",
-  confusion: "😵",
-  damage_reduce: "🛡",
-  crit_down: "⬇",
-  silence_defense: "🔇",
-  no_potion: "🚫",
-  arestum_penalty: "⛓",
-  lumus_acc_down: "👁",
-  mark: "🎯",
-  taunt: "😠",
-  provoke: "👉",
+  burn: "🔥 BURN",
+  freeze: "❄️ FREEZE",
+  stun: "⚡ STUN",
+  taunt: "🧠 TAUNT",
+  disarm: "🪄 DISARM",
+  protego: "�️ PROTEGO",
+  slow: "⏳ LENTO",
+  mark: "◎ MARCA",
+  confusion: "😵 CONFUSÃO",
+  poison: "☠️ VENENO",
+  paralysis: "⚡ PARALISIA",
+  provoke: "👊 PROVOCAÇÃO",
+  no_potion: "� SEM POÇÃO",
+  silence_defense: "🔇 SILÊNCIO DEF.",
+  damage_amp: "⬆️ DANO+",
+  arestum_penalty: "⬇️ ATK/ACC",
+  lumus_acc_down: "💡 ACC-20%",
+  spell_disable: "🔒 DISABLE",
+  salvio_reflect: "🪞 REFLECT",
+  anti_debuff: "✨ ANTI-DEBUFF",
+  crit_boost: "🎯 CRIT+",
+  unforgivable_acc_down: "🜏 IMPERDOÁVEIS ACC-15%",
+  protego_maximo: "🛡️ MAXIMO",
+  bomba: "💣 BOMBA",
+  bloqueio_cura: "🚫 SEM CURA",
+  damage_reduce: "⬇️ DANO-25%",
+  protego_diabol: "🛡️ DIABÓLICO",
+  crit_down: "⬇️ CRIT-10%",
+  undead: "� IMORTAL(1t)",
+  immunity: "🛡️ IMUNIDADE",
+  charm: "💖 ENCANTO",
+  unforgivable_block: "🜏 BLOQUEIO MALDIÇÕES",
+  invulnerable: "🪶 INVULNERÁVEL",
+  invisibility: "👻 INVISÍVEL",
 }
 const POTION_NAMES: Record<string, string> = {
   wiggenweld: "Wiggenweld",
+  mortovivo: "Morto Vivo",
+  edurus: "Edurus",
+  maxima: "Maxima",
   foco: "Foco",
-  felix: "Felix",
+  merlin: "Poção de Merlin",
+  felix: "Felix Felicis",
+  aconito: "Acônito",
   amortentia: "Amortentia",
 }
+const DEBUFF_FLASH: Record<string, string> = {
+  burn: "QUEIMOU!",
+  freeze: "CONGELOU!",
+  stun: "ATORDOOU!",
+  taunt: "DOMINOU!",
+  disarm: "DESARMOU!",
+  mark: "MARCOU!",
+  confusion: "CONFUNDIU!",
+  poison: "ENVENENOU!",
+  paralysis: "PARALISOU!",
+  provoke: "PROVOCOU!",
+  no_potion: "IMPEDIU POÇÕES!",
+  silence_defense: "SILENCIOU!",
+  damage_amp: "AMPLIFICOU DANO!",
+  arestum_penalty: "FREOU!",
+  lumus_acc_down: "CEGOU!",
+  invisibility: "INVISIBILIZOU!",
+  spell_disable: "DESABILITOU!",
+  salvio_reflect: "REFLEXO!",
+  anti_debuff: "IMUNIZOU!",
+  crit_boost: "CRÍTICO+!",
+  unforgivable_acc_down: "IMPERDOÁVEIS -15% ACC!",
+  protego_maximo: "PROTEGO MAXIMO!",
+  undead: "IMORTAL!",
+  immunity: "IMUNE!",
+  charm: "ENCANTOU!",
+  unforgivable_block: "PATRONUM! SEM MALDIÇÕES!",
+  damage_reduce: "DANO −25%!",
+  crit_down: "CRÍTICO −!",
+  bomba: "BOMBA!",
+  bloqueio_cura: "SEM CURA!",
+}
+const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
+
+function getSpellVfx(spellName: string): Omit<NonNullable<ArenaVfxState>, "key" | "active"> & { mode: NonNullable<ArenaVfxState>["mode"] } {
+  const n = normSpell(spellName)
+  if (n.includes("estupefa") || n.includes("glacius")) return { mode: "beam", color: "#38bdf8", color2: "#60a5fa" }
+  if (n.includes("scarlatum")) return { mode: "beam", color: "#ef4444", color2: "#f87171" }
+  if (n.includes("expelliarmus")) return { mode: "beam", color: "#a855f7", color2: "#c084fc" }
+  if (n.includes("confundos")) return { mode: "beam", color: "#171717", color2: "#404040" }
+  if (n.includes("bombarda")) return { mode: "explosion", color: "#f97316", color2: "#fb923c" }
+  if (n.includes("arestum") && n.includes("momentum")) return { mode: "beam-thick", color: "#64748b", color2: "#94a3b8" }
+  if (n.includes("desumo") && n.includes("tempestas")) return { mode: "lightning", color: "#facc15", color2: "#fef08a" }
+  if (n.includes("diffindo")) return { mode: "beam-thin", color: "#facc15", color2: "#fde047" }
+  if (n.includes("subito")) return { mode: "x", color: "#059669", color2: "#10b981", xSize: "sm" }
+  if (n.includes("reducto")) return { mode: "x", color: "#0a0a0a", color2: "#171717", xSize: "lg" }
+  if (n.includes("confrigo")) return { mode: "x", color: "#ea580c", color2: "#f97316", xSize: "md" }
+  if (n.includes("incendio")) return { mode: "fireball", color: "#f97316", color2: "#ef4444" }
+  if (n.includes("depulso")) return { mode: "shockwave", color: "#ffffff", color2: "#e5e7eb" }
+  if (n.includes("crucius")) return { mode: "beam-pulse", color: "#dc2626", color2: "#991b1b" }
+  if (n.includes("imperio")) return { mode: "beam-pulse", color: "#eab308", color2: "#ca8a04" }
+  if (n.includes("avada")) return { mode: "beam-huge", color: "#14532d", color2: "#166534" }
+  if (n.includes("protego")) return { mode: "shield", color: "#3b82f6", color2: "#60a5fa" }
+  if (n.includes("ferula") || n.includes("episkey") || n.includes("vulnera")) return { mode: "heal-rise", color: "#22c55e", color2: "#4ade80" }
+  if (n.includes("circum") && n.includes("inflamare")) return { mode: "flames-hud", color: "#ef4444", color2: "#f97316" }
+  if (n.includes("lumus")) return { mode: "mist", color: "#fbbf24", color2: "#f59e0b" }
+  if (n.includes("sectumsempra")) return { mode: "marker-bang", color: "#dc2626", color2: "#ef4444" }
+  if (n.includes("expecto") && n.includes("patronum")) return { mode: "marker-question", color: "#facc15", color2: "#fef08a" }
+  return { mode: "beam", color: "#fbbf24", color2: "#f59e0b" }
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 function buildHpBars(house: string): number[] {
   return house === "slytherin" ? [100, 100, 100, 100] : [100, 100, 100, 100, 100]
@@ -170,6 +256,8 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
   const turnNumberRef = useRef(turnNumber)
   const hudRefs = useRef<Record<string, HTMLElement>>({})
   const arenaRef = useRef<HTMLDivElement>(null)
+  const arenaVfxKeyRef = useRef(0)
+  const fctCounterRef = useRef(0)
   
   useEffect(() => {
     duelistsRef.current = duelists
@@ -181,6 +269,155 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
   const addLog = useCallback((line: string) => {
     setBattleLog((prev) => [...prev, line])
   }, [])
+  
+  const playSpellVfx = async (spellName: string, attacker: Duelist, targets: Duelist[]) => {
+    const arena = arenaRef.current
+    const rect = arena?.getBoundingClientRect()
+    if (!arena || !rect) {
+      await sleep(1000)
+      return
+    }
+
+    const hudPoint = (id: string): { x: number; y: number } => {
+      const el = hudRefs.current[id]
+      if (!el) return { x: rect.width / 2, y: rect.height / 2 }
+      const r = el.getBoundingClientRect()
+      return { x: r.left - rect.left + r.width / 2, y: r.top - rect.top + r.height / 2 }
+    }
+
+    const center: { x: number; y: number } = { x: rect.width / 2, y: rect.height / 2 }
+    const from = hudPoint(attacker.id)
+    const to0 = targets[0] ? hudPoint(targets[0].id) : center
+    const targetIds = targets.map((t) => t.id)
+    const cfg = getSpellVfx(spellName)
+    arenaVfxKeyRef.current += 1
+    const key = arenaVfxKeyRef.current
+
+    const common = { key, active: false, color: cfg.color, color2: cfg.color2, casterId: attacker.id, xSize: cfg.xSize }
+
+    let payload: Exclude<ArenaVfxState, null>
+    switch (cfg.mode) {
+      case "explosion":
+      case "mist":
+        payload = { ...common, mode: cfg.mode, center }
+        break
+      case "lightning": {
+        const bolts = targetIds.map((id, i) => {
+          const p = hudPoint(id)
+          const spread = rect.width * 0.7
+          const x1 = rect.width * 0.15 + (i / Math.max(1, targetIds.length - 1 || 1)) * spread * (targetIds.length > 1 ? 1 : 0.5) + (targetIds.length === 1 ? spread * 0.25 : 0)
+          return { x1: Math.min(rect.width - 8, x1), y1: 0, x2: p.x, y2: p.y }
+        })
+        payload = { ...common, mode: "lightning", targetIds, lightningBolts: bolts }
+        break
+      }
+      case "shield":
+      case "heal-rise":
+      case "flames-hud":
+        payload = { ...common, mode: cfg.mode, casterId: attacker.id, center: hudPoint(attacker.id) }
+        break
+      case "shockwave":
+        payload = { ...common, mode: "shockwave", center: to0 }
+        break
+      case "x":
+        payload = {
+          ...common,
+          mode: "x",
+          center: { x: (from.x + to0.x) / 2, y: (from.y + to0.y) / 2 },
+        }
+        break
+      case "marker-bang":
+      case "marker-question":
+        payload = { ...common, mode: cfg.mode, from: to0, to: to0, targetIds }
+        break
+      default:
+        payload = { ...common, mode: cfg.mode, from, to: to0 }
+        break
+    }
+
+    setArenaVfx(payload)
+    requestAnimationFrame(() => {
+      setArenaVfx((prev) => (prev && prev.key === key ? { ...prev, active: true } : prev))
+    })
+    await sleep(1600)
+    setArenaVfx(null)
+  }
+  
+  const getFCTFromAnim = (anim: EngineAnimation): { text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" } | null => {
+    const spell = anim.spellName ? `${anim.spellName} ` : ""
+    if (anim.fctMessage) return { text: anim.fctMessage, type: anim.isMiss ? "miss" : "heal" }
+    if (anim.isMiss) return { text: `${spell}ERROU!`, type: "miss" }
+    if (anim.isBlock) return { text: `${spell}🛡 BLOQUEADO!`, type: "block" }
+    const dmg = anim.damage ?? 0
+    if (dmg <= 0) {
+      if (anim.fctOnly) return { text: `${spell}✨`, type: "heal" }
+      return null
+    }
+    if (anim.isCrit) return { text: `${spell}${anim.damage} 💥 CRÍTICO!`, type: "crit" }
+    return { text: `${spell}-${anim.damage}`, type: "damage" }
+  }
+  
+  const getFCTPos = (targetId: string): { x: number; y: number } => {
+    const arena = arenaRef.current
+    if (!arena) return { x: 50, y: 55 }
+    const rect = arena.getBoundingClientRect()
+    const el = hudRefs.current[targetId]
+    if (!el) return { x: 50, y: 55 }
+    const r = el.getBoundingClientRect()
+    return {
+      x: ((r.left - rect.left + r.width / 2) / rect.width) * 100,
+      y: ((r.top - rect.top + r.height * 0.6) / rect.height) * 100,
+    }
+  }
+  
+  const playAnimations = useCallback(
+    async (animations: EngineAnimation[], stateSnapshot: Duelist[]) => {
+      for (const anim of animations) {
+        const caster = stateSnapshot.find((d) => d.id === anim.casterId)
+        const resolvedTargetIds = anim.targetIds?.length ? anim.targetIds : anim.targetId ? [anim.targetId] : []
+        const targets = stateSnapshot.filter((d) => resolvedTargetIds.includes(d.id))
+
+        if (anim.type === "cast" && caster && anim.spellName) {
+          if (!anim.fctOnly) {
+            await sleep(500)
+            await playSpellVfx(anim.spellName, caster, targets)
+          }
+
+          let fctTargets = targets.length > 0 ? targets : []
+          if (fctTargets.length === 0 && anim.targetId) {
+            const t = stateSnapshot.find((d) => d.id === anim.targetId)
+            if (t) fctTargets = [t]
+          }
+          if (fctTargets.length === 0 && anim.fctMessage && caster) fctTargets = [caster]
+          for (const t of fctTargets) {
+            const fctData = getFCTFromAnim(anim)
+            if (!fctData) continue
+            const pos = getFCTPos(t.id)
+            const id = ++fctCounterRef.current
+            setFloatingTexts((prev) => [...prev, { id, text: fctData.text, type: fctData.type, x: pos.x, y: pos.y }])
+            setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 3200)
+          }
+        } else if (anim.type === "skip" && caster) {
+          const pos = getFCTPos(caster.id)
+          const id = ++fctCounterRef.current
+          setFloatingTexts((prev) => [...prev, { id, text: `${caster.name} Atordoado!`, type: "skip", x: pos.x, y: pos.y }])
+          setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 3200)
+          await sleep(500)
+        } else if (anim.type === "potion" && caster) {
+          const pos = getFCTPos(caster.id)
+          const id = ++fctCounterRef.current
+          const potionLabel = anim.potionType ? (POTION_NAMES[anim.potionType] ?? anim.potionType) : "Poção"
+          setFloatingTexts((prev) => [...prev, { id, text: `🧪 ${potionLabel}!`, type: "heal", x: pos.x, y: pos.y }])
+          setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 3200)
+          setPotionGlowId(caster.id)
+          setTimeout(() => setPotionGlowId(null), 1800)
+          await sleep(700)
+        }
+        await sleep(anim.delay ?? 1300)
+      }
+    },
+    []
+  )
   
   // Load attempts and current stage from Supabase
   const loadProgress = async () => {
@@ -374,10 +611,16 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       const oldTypes = new Set(oldD.debuffs.map((x) => x.type))
       const fresh = newD.debuffs.find((db) => !oldTypes.has(db.type))
       if (fresh) {
-        setStatusFloater({ text: DEBUFF_LABEL[fresh.type] || fresh.type, targetId: newD.id, key: Date.now() })
-        setTimeout(() => setStatusFloater(null), 1800)
+        const flashText = DEBUFF_FLASH[fresh.type]
+        if (flashText) {
+          setStatusFloater({ text: flashText, targetId: newD.id, key: Date.now() })
+          setTimeout(() => setStatusFloater(null), 1800)
+        }
       }
     }
+    
+    // Play animations
+    await playAnimations(outcome.animationsToPlay, state)
     
     const nextTurn = roundTurn + 1
     turnNumberRef.current = nextTurn
@@ -739,6 +982,189 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
               </p>
             </div>
           )}
+          <style dangerouslySetInnerHTML={{ __html: `@keyframes duel-crit-shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-4px,1px)}40%{transform:translate(4px,-1px)}60%{transform:translate(-3px,-1px)}80%{transform:translate(3px,1px)}}` }} />
+          {arenaVfx && arenaVfx.from && arenaVfx.to && (arenaVfx.mode === "beam" || arenaVfx.mode.startsWith("beam-") || arenaVfx.mode === "fireball") && (() => {
+            const { from, to, active, color, color2, mode } = arenaVfx
+            const dx = to.x - from.x
+            const dy = to.y - from.y
+            const len = Math.max(8, Math.hypot(dx, dy))
+            const ang = (Math.atan2(dy, dx) * 180) / Math.PI
+            const w = active ? len : 0
+            const h = mode === "beam-thin" ? 2 : mode === "beam-thick" ? 7 : mode === "beam-huge" ? 14 : mode === "beam-pulse" ? 10 : mode === "fireball" ? 0 : 5
+            const dur = mode === "beam-huge" ? "480ms" : "780ms"
+            if (mode === "fireball") {
+              return (
+                <div
+                  key={arenaVfx.key}
+                  className="pointer-events-none absolute z-30 rounded-full shadow-[0_0_28px_rgba(251,146,60,0.9)] transition-all ease-out"
+                  style={{
+                    width: active ? 52 : 18,
+                    height: active ? 52 : 18,
+                    left: active ? to.x - 26 : from.x - 9,
+                    top: active ? to.y - 26 : from.y - 9,
+                    background: `radial-gradient(circle at 30% 30%, ${color2}, ${color})`,
+                    transitionDuration: dur,
+                  }}
+                />
+              )
+            }
+            return (
+              <div
+                key={arenaVfx.key}
+                className={`pointer-events-none absolute z-30 rounded-full shadow-[0_0_22px_currentColor] ease-out ${mode === "beam-pulse" ? "animate-pulse" : ""}`}
+                style={{
+                  color,
+                  background: `linear-gradient(90deg,${color2},${color})`,
+                  width: w,
+                  height: h,
+                  left: from.x,
+                  top: from.y,
+                  transform: `translate(0,-50%) rotate(${ang}deg)`,
+                  transformOrigin: "0 50%",
+                  transitionProperty: "width, opacity",
+                  transitionDuration: dur,
+                  opacity: active ? 1 : 0.85,
+                }}
+              />
+            )
+          })()}
+          {arenaVfx && arenaVfx.mode === "shockwave" && arenaVfx.center && (
+            <div
+              key={arenaVfx.key}
+              className="pointer-events-none absolute z-30 rounded-full border-4 bg-white/10 shadow-[0_0_40px_rgba(255,255,255,0.6)] transition-all ease-out"
+              style={{
+                width: arenaVfx.active ? 220 : 24,
+                height: arenaVfx.active ? 220 : 24,
+                left: arenaVfx.center.x - (arenaVfx.active ? 110 : 12),
+                top: arenaVfx.center.y - (arenaVfx.active ? 110 : 12),
+                borderColor: `${arenaVfx.color}99`,
+                transitionDuration: "900ms",
+              }}
+            />
+          )}
+          {arenaVfx && arenaVfx.mode === "x" && arenaVfx.center && (
+            <div key={arenaVfx.key} className="pointer-events-none absolute z-30" style={{ left: arenaVfx.center.x, top: arenaVfx.center.y, transform: "translate(-50%,-50%)" }}>
+              {(["45deg", "-45deg"] as const).map((rot) => (
+                <div
+                  key={rot}
+                  className={`absolute left-1/2 top-1/2 h-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_12px_currentColor] transition-all ease-out ${arenaVfx.xSize === "lg" ? "w-32" : arenaVfx.xSize === "sm" ? "w-16" : "w-24"}`}
+                  style={{
+                    backgroundColor: arenaVfx.color,
+                    color: arenaVfx.color,
+                    transform: `translate(-50%,-50%) rotate(${rot}) scaleX(${arenaVfx.active ? 1 : 0.2})`,
+                    transitionDuration: "520ms",
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          {arenaVfx && arenaVfx.mode === "explosion" && arenaVfx.center && (
+            <div
+              key={arenaVfx.key}
+              className="pointer-events-none absolute z-30 rounded-full transition-all ease-out"
+              style={{
+                width: arenaVfx.active ? 280 : 40,
+                height: arenaVfx.active ? 280 : 40,
+                left: arenaVfx.center.x - (arenaVfx.active ? 140 : 20),
+                top: arenaVfx.center.y - (arenaVfx.active ? 140 : 20),
+                background: `radial-gradient(circle, ${arenaVfx.color2}cc, ${arenaVfx.color}55, transparent 70%)`,
+                transitionDuration: "900ms",
+              }}
+            />
+          )}
+          {arenaVfx && arenaVfx.mode === "mist" && (
+            <div
+              key={arenaVfx.key}
+              className={`pointer-events-none absolute inset-0 z-30 bg-gradient-to-b transition-opacity duration-1000 ease-in-out ${arenaVfx.active ? "opacity-95" : "opacity-0"}`}
+              style={{ backgroundImage: `linear-gradient(to bottom, ${arenaVfx.color}33, #0f172a99, ${arenaVfx.color2}44)` }}
+            />
+          )}
+          {arenaVfx && arenaVfx.mode === "lightning" && arenaVfx.lightningBolts && (
+            <svg key={arenaVfx.key} className="pointer-events-none absolute inset-0 z-30 h-full w-full">
+              {arenaVfx.lightningBolts.map((b, i) => (
+                <line
+                  key={i}
+                  x1={b.x1}
+                  y1={b.y1}
+                  x2={arenaVfx.active ? b.x2 : b.x1}
+                  y2={arenaVfx.active ? b.y2 : b.y1}
+                  stroke={arenaVfx.color}
+                  strokeWidth={arenaVfx.active ? 5 : 2}
+                  className="transition-all duration-500 ease-out"
+                  style={{ filter: "drop-shadow(0 0 8px gold)" }}
+                />
+              ))}
+            </svg>
+          )}
+          {arenaVfx && arenaVfx.mode === "shield" && arenaVfx.center && (
+            <div
+              key={arenaVfx.key}
+              className="pointer-events-none absolute z-30 rounded-full border-[3px] transition-all duration-700 ease-out"
+              style={{
+                width: arenaVfx.active ? 120 : 40,
+                height: arenaVfx.active ? 120 : 40,
+                left: arenaVfx.center.x - (arenaVfx.active ? 60 : 20),
+                top: arenaVfx.center.y - (arenaVfx.active ? 60 : 20),
+                borderColor: `${arenaVfx.color}`,
+                backgroundColor: `${arenaVfx.color2}22`,
+                boxShadow: `0 0 24px ${arenaVfx.color}`,
+              }}
+            />
+          )}
+          {arenaVfx && arenaVfx.mode === "heal-rise" && arenaVfx.center && (
+            <div
+              key={arenaVfx.key}
+              className="pointer-events-none absolute z-30 w-10 transition-all duration-1000 ease-out"
+              style={{
+                left: arenaVfx.center.x - 20,
+                top: arenaVfx.center.y,
+                height: arenaVfx.active ? 140 : 8,
+                transform: "translateY(-100%)",
+                background: `linear-gradient(to top, transparent, ${arenaVfx.color2}88, ${arenaVfx.color})`,
+                opacity: arenaVfx.active ? 0.9 : 0,
+              }}
+            />
+          )}
+          {arenaVfx && arenaVfx.mode === "flames-hud" && arenaVfx.center && (
+            <div key={arenaVfx.key} className="pointer-events-none absolute z-30 flex gap-0.5 transition-opacity duration-700" style={{ left: arenaVfx.center.x - 28, top: arenaVfx.center.y - 40, opacity: arenaVfx.active ? 1 : 0 }}>
+              <span className="text-2xl drop-shadow-[0_0_6px_red]">🔥</span>
+              <span className="text-2xl drop-shadow-[0_0_6px_orange]">🔥</span>
+            </div>
+          )}
+          {arenaVfx && arenaVfx.mode === "marker-bang" && arenaVfx.from && (
+            <div
+              key={arenaVfx.key}
+              className="pointer-events-none absolute z-40 text-4xl font-black text-yellow-300 transition-all duration-500 ease-out"
+              style={{
+                left: arenaVfx.from.x - 20,
+                top: arenaVfx.from.y - 28,
+                transform: arenaVfx.active ? "scale(1.1)" : "scale(0.4)",
+                textShadow: "0 0 12px #facc15",
+              }}
+            >
+              [!]
+            </div>
+          )}
+          {arenaVfx && arenaVfx.mode === "marker-question" && arenaVfx.from && (
+            <div
+              key={arenaVfx.key}
+              className="pointer-events-none absolute z-40 text-4xl font-black transition-all duration-500 ease-out"
+              style={{
+                left: arenaVfx.from.x - 20,
+                top: arenaVfx.from.y - 28,
+                color: arenaVfx.color,
+                transform: arenaVfx.active ? "scale(1.05)" : "scale(0.4)",
+                textShadow: `0 0 14px ${arenaVfx.color2}`,
+              }}
+            >
+              [?]
+            </div>
+          )}
+          {floatingTexts.map((fct) => (
+            <div key={fct.id} className={`fct fct-${fct.type}`} style={{ left: `${fct.x}%`, top: `${fct.y}%`, transform: "translateX(-50%)" }}>
+              {fct.text}
+            </div>
+          ))}
           
           <div className="grid h-full min-h-[560px] grid-rows-2">
             <div className="relative border-b border-stone-600 p-3">
