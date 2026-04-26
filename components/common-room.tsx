@@ -213,6 +213,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [friendMessages, setFriendMessages] = useState<FriendMessage[]>([])
   const [friendMessageInput, setFriendMessageInput] = useState("")
   const [onlineWizards, setOnlineWizards] = useState(0)
+  const [visitCount, setVisitCount] = useState(0)
   const [duelsInProgress, setDuelsInProgress] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; p1: string; p2: string }>>([])
   const [recentResults, setRecentResults] = useState<Array<{ matchId: string; gameMode: string; winnerNames: string[]; loserNames: string[]; finishedAt: string }>>([])
   const [showRecentPanel, setShowRecentPanel] = useState(false)
@@ -332,6 +333,22 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
     }
     if (typeof window !== "undefined") window.localStorage.setItem(key, JSON.stringify(payload))
   }, [currentUser?.id, currentUser?.username, currentUser?.elo, house, wand, potion, selectedSpells, avatar, gameMode])
+
+  useEffect(() => {
+    // Fetch and increment visit count on mount
+    void (async () => {
+      try {
+        await fetch("/api/visits", { method: "POST" })
+        const res = await fetch("/api/visits")
+        const data = await res.json()
+        if (data?.count !== undefined) {
+          setVisitCount(data.count)
+        }
+      } catch (error) {
+        console.error("Failed to fetch visit count:", error)
+      }
+    })()
+  }, [])
 
   const { totalCost, unforgivableCount } = useMemo(() => {
     let total = 0
@@ -818,6 +835,9 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
             </a>
             <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
               🟢 {onlineWizards} {locale === "pt" ? "Bruxos Online" : "Wizards Online"}
+            </Badge>
+            <Badge className="border-purple-700 bg-purple-950/40 px-3 py-1 text-purple-300">
+              👁️ {visitCount.toLocaleString()} {locale === "pt" ? "Visitas" : "Visits"}
             </Badge>
             {currentUser ? (
               <>
