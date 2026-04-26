@@ -256,7 +256,6 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [spellSearch, setSpellSearch] = useState("")
   const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
   const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "historia" | "death-march" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "worldboss" | "">("")
-  const [showWorldBoss, setShowWorldBoss] = useState(false)
 
   // ── Builds Salvas ────────────────────────────────────────────────────────
   interface SavedBuild {
@@ -896,23 +895,6 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                   {currentUser.username} {currentUser.offlineWins && currentUser.offlineWins > 0 && <span className="ml-1">🥇 ({currentUser.offlineWins})</span>} · ELO {currentUser.elo}
                   {isVip && <span className="ml-1 text-[10px] text-yellow-400">VIP</span>}
                 </Badge>
-                {currentUser && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-purple-700 bg-purple-950/40 px-3 py-1 text-purple-300"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (isReady) {
-                        setShowWorldBoss(true)
-                      }
-                    }}
-                    disabled={!isReady}
-                  >
-                    🐉 {locale === "pt" ? "World Boss" : "World Boss"}
-                  </Button>
-                )}
                 {currentUser && (
                   <Button
                     type="button"
@@ -2266,8 +2248,8 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         <p className="text-amber-600/80">👥 {locale === 'en' ? 'Visits' : 'Visitas'}: {visitCount.toLocaleString()}</p>
       </footer>
       
-      {/* ── World Boss Section (Inline, not modal) ──────────────────────────────────── */}
-      {showWorldBoss && currentUser && isReady && (
+      {/* ── World Boss Section (Always visible at bottom) ────────────────────────── */}
+      {currentUser && isReady && (
         <div className="mt-8 border-t border-amber-900/30 pt-6">
           <WorldBossArena
             playerBuild={{
@@ -2283,7 +2265,7 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
               elo: currentUser.elo,
             }}
             currentUser={currentUser}
-            onExit={() => setShowWorldBoss(false)}
+            onExit={() => {}}
             onAuthChange={onAuthChange}
           />
         </div>
