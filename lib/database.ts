@@ -49,7 +49,7 @@ interface ProfileRow {
   damagewb?: number | null
 }
 
-const PROFILE_SELECT = "id,username,elo,wins,losses,offline_wins,favorite_spell,created_at,is_vip,vip_expires,avatar_url,is_admin,floresta,tentativas_floresta,modo_historia,tentativas_historia,march,damagewb"
+const PROFILE_SELECT = "*"
 
 function isVipActive(row: ProfileRow): boolean {
   if (!row.is_vip) return false
