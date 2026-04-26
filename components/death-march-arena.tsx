@@ -143,14 +143,18 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
       setIsLoaded(true)
       if (!battleStartedRef.current) {
         battleStartedRef.current = true
-        setTimeout(() => startNewBattle(), 0)
+        setTimeout(() => {
+          startNewBattle()
+        }, 100)
       }
     } catch (error) {
       console.error("Failed to load march progress:", error)
       setIsLoaded(true)
       if (!battleStartedRef.current) {
         battleStartedRef.current = true
-        setTimeout(() => startNewBattle(), 0)
+        setTimeout(() => {
+          startNewBattle()
+        }, 100)
       }
     }
   }
@@ -238,17 +242,13 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
   
   const marchWinsRef = useRef(0)
   const battleStartedRef = useRef(false)
-  const loadProgressCalledRef = useRef(false)
   
   useEffect(() => {
     marchWinsRef.current = marchWins
   }, [marchWins])
   
   useEffect(() => {
-    if (!loadProgressCalledRef.current) {
-      loadProgressCalledRef.current = true
-      loadProgress()
-    }
+    loadProgress()
   }, [])
   
   const beginRoundSelection = (state: Duelist[] = duelists) => {
