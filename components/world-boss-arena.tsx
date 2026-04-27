@@ -158,7 +158,7 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     setCombatLog([])
     setIsCombatOver(false)
     setSelectedSpell(null)
-    addLog(locale === "en" ? "World Boss battle begins! You have 3 turns to deal damage!" : "Batalha contra o World Boss começa! Você tem 3 turnos para causar dano!", "system")
+    addLog("World Boss battle begins! You have 3 turns to deal damage!", "system")
   }
   
   const addLog = (message: string, type: CombatLog["type"]) => {
@@ -175,7 +175,7 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     // Check spell mana
     const manaInfo = spellMana[selectedSpell]
     if (!manaInfo || manaInfo.current <= 0) {
-      addLog(locale === "en" ? `${selectedSpell} has no mana left!` : `${selectedSpell} não tem mana restante!`, "system")
+      addLog(`${selectedSpell} has no mana left!`, "system")
       return
     }
     
@@ -224,7 +224,7 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     const isHit = hitRoll < accuracy
     
     if (!isHit) {
-      addLog(locale === "en" ? `${spell.name} missed! (${Math.round(accuracy)}% accuracy)` : `${spell.name} errou! (${Math.round(accuracy)}% de acurácia)`, "system")
+      addLog(`${spell.name} missed! (${Math.round(accuracy)}% accuracy)`, "system")
       // Decrease spell mana even on miss
       setSpellMana(prev => ({
         ...prev,
@@ -254,7 +254,7 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     let damage = baseDamage
     if (wandEffect === "crupe_triple" && !spell.debuff && Math.random() < 0.25) {
       damage = Math.floor(baseDamage * 3)
-      addLog(locale === "en" ? "Crupe Hair: Triple damage!" : "Pelo de Crupe: Dano triplicado!", "system")
+      addLog("Crupe Hair: Triple damage!", "system")
     }
     
     // Apply house modifiers
@@ -270,9 +270,9 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     const isCrit = Math.random() * 100 < critChance
     if (isCrit) {
       damage = Math.floor(damage * 1.5)
-      addLog(locale === "en" ? `CRITICAL HIT! ${spell.name} deals ${damage} damage!` : `ACERTO CRÍTICO! ${spell.name} causa ${damage} de dano!`, "player")
+      addLog(`CRITICAL HIT! ${spell.name} deals ${damage} damage!`, "player")
     } else {
-      addLog(locale === "en" ? `${spell.name} deals ${damage} damage!` : `${spell.name} causa ${damage} de dano!`, "player")
+      addLog(`${spell.name} deals ${damage} damage!`, "player")
     }
     
     // Apply damage to boss
@@ -305,7 +305,7 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
                 console.error("Failed to reset boss after defeat:", error)
               } else {
                 console.log(`World Boss: Defeat reset - boss index ${bossIndex} -> ${nextBossIndex}`)
-                addLog(locale === "en" ? "World Boss defeated! New boss incoming!" : "World Boss derrotado! Novo boss chegando!", "system")
+                addLog("World Boss defeated! New boss incoming!", "system")
               }
             })
         }, 1000)
@@ -360,21 +360,21 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
       const today = new Date().toISOString().split('T')[0]
       localStorage.setItem(`worldboss_fight:${currentUser.id}`, today)
       
-      addLog(locale === "en" ? `Battle over! You dealt ${totalDamage} total damage!` : `Batalha terminada! Você causou ${totalDamage} de dano total!`, "system")
+      addLog(`Battle over! You dealt ${totalDamage} total damage!`, "system")
       
       setTimeout(() => {
         onExit()
       }, 3000)
     } catch (error) {
       console.error("Failed to update player damage:", error)
-      addLog(locale === "en" ? "Failed to save damage to database!" : "Falha ao salvar dano no banco de dados!", "system")
+      addLog("Failed to save damage to database!", "system")
     }
   }
   
   const handlePotion = () => {
     if (playerBuild.potion === "wiggenweld") {
       setPlayerHp(prev => Math.min(maxPlayerHp, prev + 200))
-      addLog(locale === "en" ? "Used Wiggenweld Potion and healed 200 HP!" : "Usou Poção Wiggenweld e curou 200 HP!", "system")
+      addLog("Used Wiggenweld Potion and healed 200 HP!", "system")
     }
   }
   
@@ -390,13 +390,13 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
           <CardContent className="p-6 text-center">
             <Trophy className="w-16 h-16 mx-auto mb-4 text-amber-400" />
             <h2 className="text-2xl font-bold text-amber-100 mb-4">
-              {locale === "en" ? "Already Fought Today" : "Já Batalhou Hoje"}
+              "Already Fought Today"
             </h2>
             <p className="text-amber-200 mb-6">
-              {locale === "en" ? "You can only fight the World Boss once per day. Come back tomorrow!" : "Você só pode lutar contra o World Boss uma vez por dia. Volte amanhã!"}
+              "You can only fight the World Boss once per day. Come back tomorrow!"
             </p>
             <Button onClick={onExit} className="bg-amber-700 hover:bg-amber-600 text-white">
-              {locale === "en" ? "Return" : "Voltar"}
+              "Return"
             </Button>
           </CardContent>
         </Card>

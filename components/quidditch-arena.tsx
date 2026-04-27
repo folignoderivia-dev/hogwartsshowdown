@@ -27,19 +27,19 @@ type Direction = "left" | "right" | "center" | "left_high" | "right_high"
 type Screen = "lobby" | "waiting_opponent" | "playing" | "revealing" | "gameover"
 
 const DIRECTIONS: { key: Direction; label: string; icon: string }[] = [
-  { key: "left",       label: "Esquerda",   icon: "←" },
-  { key: "right",      label: "Direita",    icon: "→" },
-  { key: "center",     label: "Centro",     icon: "●" },
-  { key: "left_high",  label: "Esq. Alto",  icon: "↖" },
-  { key: "right_high", label: "Dir. Alto",  icon: "↗" },
+  { key: "left",       label: "Left",   icon: "←" },
+  { key: "right",      label: "Right",    icon: "→" },
+  { key: "center",     label: "Center",     icon: "●" },
+  { key: "left_high",  label: "Left High",  icon: "↖" },
+  { key: "right_high", label: "Right High",  icon: "↗" },
 ]
 
 const DIR_LABEL: Record<Direction, string> = {
-  left: "Esquerda ←",
-  right: "Direita →",
-  center: "Centro ●",
-  left_high: "Esq. Alto ↖",
-  right_high: "Dir. Alto ↗",
+  left: "Left ←",
+  right: "Right →",
+  center: "Center ●",
+  left_high: "Left High ↖",
+  right_high: "Right High ↖",
 }
 
 interface TurnResult {
@@ -63,8 +63,8 @@ function getPhase(turn: number): 1 | 2 {
 }
 
 function getPhaseName(phase: 1 | 2, role: QuidditchRole) {
-  if (phase === 1) return role === "attacker" ? "Artilheiro" : "Goleiro"
-  return role === "attacker" ? "Apanhador" : "Batedor"
+  if (phase === 1) return role === "attacker" ? "Chaser" : "Keeper"
+  return role === "attacker" ? "Seeker" : "Beater"
 }
 
 // ─── Componente principal ────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
 
   const socketRef = useRef<Socket | null>(null)
   const userId    = playerBuild.userId ?? "guest"
-  const myName    = playerBuild.username ?? playerBuild.name ?? "Bruxo"
+  const myName    = playerBuild.username ?? playerBuild.name ?? "Wizard"
 
   // ─── Socket ─────────────────────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
       const myRole = roles[userId]
       const oppId  = Object.keys(playerNames).find((id) => id !== userId) ?? ""
       setRole(myRole)
-      setOpponentName(playerNames[oppId] ?? "Adversário")
+      setOpponentName(playerNames[oppId] ?? "Opponent")
       setTurn(1)
       setScores({ attacker: 0, defender: 0 })
       setChosen(null)
