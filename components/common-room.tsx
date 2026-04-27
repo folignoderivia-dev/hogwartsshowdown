@@ -1049,6 +1049,25 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
       <div className="mx-auto max-w-[1400px]">
         {/* Header with Medieval Style */}
         <header className="mb-5 text-center relative">
+          {/* Discord Icon - Top Left */}
+          <a
+            href="https://discord.gg/4YHnXquhNf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-0 left-0 flex items-center gap-2 rounded-lg border border-indigo-700 bg-indigo-950/50 px-3 py-2 text-xs text-indigo-300 hover:bg-indigo-900/50 transition-colors"
+            title="Discord"
+          >
+            <img
+              src="https://i.postimg.cc/qMrjtFSS/pngddwing-com.png"
+              alt="Discord"
+              className="h-12 w-12 object-contain"
+              onError={(e) => {
+                e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50' y='50' text-anchor='middle' font-size='40'%3E💬%3C/text%3E%3C/svg%3E"
+              }}
+            />
+            <span className="hidden sm:inline">{locale === "pt" ? "Discord" : "Discord"}</span>
+          </a>
+
           {/* Owl Icon - Bug Report */}
           <button
             type="button"
