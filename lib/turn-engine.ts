@@ -189,7 +189,7 @@ export const calculateAccuracy = (
     const penalty = Math.floor(Math.random() * 26)
     accuracy -= penalty
     if (combatLogs && penalty > 0) {
-      combatLogs.push(`→ 🧚 Cabelo de Veela: ${defender.name} reduziu a acurácia em -${penalty}% (aleatório 0-25%).`)
+      combatLogs.push(`→ 🧚 Veela Hair: ${defender.name} reduced accuracy by -${penalty}% (random 0-25%).`)
     }
   }
   // Occamy (atacante): espelho ativo → −10% acc por "camada" de repetição (−10, −20, −30…)
@@ -258,7 +258,7 @@ const calculateDamage = (
   if (spellNorm && WAND_PASSIVES[defender.wand]?.effect === "kelpie_fire_immune") {
     const n = spellNorm
     if (n.includes("incendio") || n.includes("confrigo") || n.includes("confringo") || n.includes("bombarda")) {
-      combatLogs?.push(`→ 🐴 Crina de Kelpie: ${defender.name} anulou o dano de fogo de ${attacker.name} (${spell?.name ?? "magia"}).`)
+      combatLogs?.push(`→ 🐴 Kelpie Mane: ${defender.name} negated fire damage from ${attacker.name} (${spell?.name ?? "magic"}).`)
       return 0
     }
   }
@@ -267,15 +267,13 @@ const calculateDamage = (
   if (occamyMirrorActive) {
     const layers = 1 + Math.max(0, occamyMirrorRepeat)
     damage *= Math.pow(0.75, layers)
-    combatLogs?.push(
-      `→ 🪶 Pena de Occamy: ${defender.name} espelhou — ${attacker.name} ×${layers} penalidade de dano (${Math.round((1 - Math.pow(0.75, layers)) * 100)}% redução acumulada).`
-    )
+    combatLogs?.push(`→ 🪶 Occamy Feather: ${defender.name} mirrored — ${attacker.name} ×${layers} damage penalty (${Math.round((1 - Math.pow(0.75, layers)) * 100)}% accumulated reduction).`)
   }
   // Crupe: 25% de ×3 só em feitiços “puros” (sem debuff/efeito secundário de status no dado)
   if (WAND_PASSIVES[attacker.wand]?.effect === "crupe_triple" && spell && !spell.debuff) {
     if (Math.random() < 0.25) {
       damage *= 3
-      combatLogs?.push(`→ 🐗 Pelo de Crupe: ${attacker.name} desferiu um golpe triplicado!`)
+      combatLogs?.push(`→ 🐗 Crupe Fur: ${attacker.name} landed a triple strike!`)
     }
   }
   // Cinzal: pilhas de −15% dano (multiplicativo) no atacante
@@ -295,7 +293,7 @@ const getCritChance = (attacker: Duelist, defender?: Duelist, spellNameNorm?: st
   // Veela: defensor nunca pode ser critado (verificado antes de mark/glacius)
   if (WAND_PASSIVES[defender?.wand ?? ""]?.effect === "veela_acc_penalty") {
     if (combatLogs) {
-      combatLogs.push(`→ 🧚 Cabelo de Veela: ${defender?.name ?? "Alvo"} é imune a críticos!`)
+      combatLogs.push(`→ 🧚 Veela Hair: ${defender?.name ?? "Target"} is immune to critical hits!`)
     }
     return 0
   }
@@ -319,7 +317,7 @@ const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target
   if (WAND_PASSIVES[target?.wand ?? ""]?.effect === "troll_force_avg_damage" && spell.powerMin != null && spell.powerMax != null) {
     base = Math.floor((spell.powerMin + spell.powerMax) / 2)
     if (combatLogs) {
-      combatLogs.push(`→ 🧟 Pele de Trasgo: ${target?.name ?? "Alvo"} forçou dano médio de ${base} (em vez de aleatório).`)
+      combatLogs.push(`→ 🧟 Troll Hide: ${target?.name ?? "Target"} forced average damage of ${base} (instead of random).`)
     }
   }
   if (attacker.cruciusWeakness && !n.includes("crucius")) base *= 0.5
@@ -329,7 +327,7 @@ const rollCombatPower = (attacker: Duelist, spell: SpellInfo, sn: string, target
     const add = (attacker.turnsInBattle ?? 0) * 25
     base += add
     if (add > 0 && combatLogs) {
-      const msg = `→ 🕷 Pelo de Acromântula: ${attacker.name} soma +${add} de poder (${attacker.turnsInBattle} turno(s) em campo).`
+      const msg = `→ 🕷 Acromantula Hair: ${attacker.name} adds +${add} power (${attacker.turnsInBattle} turn(s) in field).`
       if (combatLogs[combatLogs.length - 1] !== msg) combatLogs.push(msg)
     }
   }

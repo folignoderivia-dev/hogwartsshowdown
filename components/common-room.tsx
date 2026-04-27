@@ -1171,13 +1171,24 @@ export default function CommonRoom({
 
   return (
     <div className="min-h-screen bg-cover bg-center bg-fixed p-2 sm:p-3 lg:p-4" style={{ backgroundImage: "url('https://i.postimg.cc/D0y9DbnS/clube.png')" }}>
-      {/* ── Mini Online Players List ───────────────────────────────────────────── */}
+      {/* ── Online Users List (Top Bar) ───────────────────────────────────────────── */}
       <div className="sticky top-0 z-40 bg-stone-900/95 border-b border-amber-800/30 px-2 py-1">
         <div className="mx-auto max-w-[1400px]">
-          <div className="flex items-center gap-2 text-[10px] text-amber-300/80">
-            <span className="text-green-400">🟢</span>
-            <span>{locale === "pt" ? "Online:" : "Online:"}</span>
-            <span className="text-amber-200">{onlineWizards}</span>
+          <div className="flex flex-col gap-0.5 text-[10px] text-amber-300/80">
+            <div className="flex items-center gap-2">
+              <span className="text-green-400">🟢</span>
+              <span>{locale === "pt" ? "Online:" : "Online:"}</span>
+              <span className="text-amber-200">{onlineWizards}</span>
+            </div>
+            {onlineUsernames.length > 0 && (
+              <div className="flex flex-wrap gap-1 text-green-200/70">
+                {onlineUsernames.slice(0, 20).map((username) => (
+                  <span key={username} className="truncate">
+                    {username}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1278,20 +1289,6 @@ export default function CommonRoom({
                 🎩 {canClaimGacha ? (locale === "pt" ? "Presente Diário" : "Daily Gift") : (locale === "pt" ? "Volte Amanhã" : "Come Back Tomorrow")}
               </Button>
             )}
-            <div className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
-              <div className="text-xs font-semibold">
-                🟢 {onlineWizards} {locale === "pt" ? "Bruxos Online" : "Wizards Online"}
-              </div>
-              {onlineUsernames.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-green-200/80">
-                  {onlineUsernames.slice(0, 20).map((username) => (
-                    <span key={username} className="truncate">
-                      {username}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
             {currentUser ? (
               <>
                 <Badge className={`border-amber-600 bg-stone-900 px-3 py-1 ${isVip ? "text-yellow-300" : "text-amber-200"}`}>

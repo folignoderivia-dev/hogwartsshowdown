@@ -519,7 +519,15 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     const bossSpells = baseBoss.spells.length > 0 ? baseBoss.spells : SPELL_DATABASE.filter(s => !s.isVipOnly).map(s => s.name)
     
     // PASSO 2: APLICANDO O HP (UI)
-    const bossHpBars = buildHpBars(baseBoss.house).map(bar => bar * (maxHp / 100))
+    // Distribute maxHp evenly across the HP bars (each bar max is 100)
+    const numBars = buildHpBars(baseBoss.house).length
+    const hpPerBar = Math.floor(maxHp / numBars)
+    const remainder = maxHp % numBars
+    const bossHpBars = buildHpBars(baseBoss.house).map((bar, index) => {
+      const baseHp = hpPerBar
+      const extraHp = index < remainder ? 1 : 0
+      return baseHp + extraHp
+    })
     
     const bossDuelist: Duelist = {
       id: `boss-${baseBoss.id}`,
