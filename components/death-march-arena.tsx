@@ -608,13 +608,13 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
         } else if (anim.type === "skip" && caster) {
           const pos = getFCTPos(caster.id)
           const id = ++fctCounterRef.current
-          setFloatingTexts((prev) => [...prev, { id, text: `${caster.name} Atordoado!`, type: "skip", x: pos.x, y: pos.y }])
+          setFloatingTexts((prev) => [...prev, { id, text: `${caster.name} Stunned!`, type: "skip", x: pos.x, y: pos.y }])
           setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 3200)
           await sleep(500)
         } else if (anim.type === "potion" && caster) {
           const pos = getFCTPos(caster.id)
           const id = ++fctCounterRef.current
-          const potionLabel = anim.potionType ? (POTION_NAMES[anim.potionType] ?? anim.potionType) : "Poção"
+          const potionLabel = anim.potionType ? (POTION_NAMES[anim.potionType] ?? anim.potionType) : "Potion"
           setFloatingTexts((prev) => [...prev, { id, text: `🧪 ${potionLabel}!`, type: "heal", x: pos.x, y: pos.y }])
           setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 3200)
           setPotionGlowId(caster.id)

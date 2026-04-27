@@ -406,7 +406,7 @@ const DuelArena = (
         playerDuelist,
         withMana({
           id: "enemy1",
-          name: "Rival Sonserino",
+          name: "Slytherin Rival",
           house: "slytherin",
           wand: "dragon",
           avatar: "",
@@ -442,7 +442,7 @@ const DuelArena = (
       return normalizedSeats.map((id, idx) => {
         const isLocal = !!userId && id === userId
         const duelId = isLocal ? (playerBuild.userId as string) : id
-        const duelName = isLocal ? playerBuild.name : participantNames[idx] || `Bruxo ${idx + 1}`
+        const duelName = isLocal ? playerBuild.name : participantNames[idx] || `Wizard ${idx + 1}`
         const duelHouse = isLocal ? playerBuild.house : "slytherin"
         const duelWand = isLocal ? playerBuild.wand : "dragon"
         const duelAvatar = isLocal ? playerBuild.avatar : DEFAULT_AVATARS[(idx + 1) % DEFAULT_AVATARS.length]
@@ -519,8 +519,8 @@ const DuelArena = (
   const [lockedSpell, setLockedSpell] = useState<string | null>(null)
   const [isParryingActive, setIsParryingActive] = useState(false)
   const pendingActionsRef = useRef<Record<string, RoundAction>>({})
-  const [battleLog, setBattleLog] = useState<string[]>(["[Turno 0]: O duelo começou!"])
-  const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "Sistema", text: "Chat ativo." }])
+  const [battleLog, setBattleLog] = useState<string[]>(["[Turn 0]: The duel began!"])
+  const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([{ sender: "System", text: "Chat active." }])
   const [chatInput, setChatInput] = useState("")
   const isReadOnlySpectator = isSpectator || (!!matchId && !!playerBuild.userId && participantIds.length > 0 && !participantIds.includes(playerBuild.userId))
 
@@ -665,14 +665,14 @@ const DuelArena = (
     (anim: EngineAnimation): { text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" } | null => {
       const spell = anim.spellName ? `${anim.spellName} ` : ""
       if (anim.fctMessage) return { text: anim.fctMessage, type: anim.isMiss ? "miss" : "heal" }
-      if (anim.isMiss) return { text: `${spell}ERROU!`, type: "miss" }
-      if (anim.isBlock) return { text: `${spell}🛡 BLOQUEADO!`, type: "block" }
+      if (anim.isMiss) return { text: `${spell}MISSED!`, type: "miss" }
+      if (anim.isBlock) return { text: `${spell}🛡 BLOCKED!`, type: "block" }
       const dmg = anim.damage ?? 0
       if (dmg <= 0) {
         if (anim.fctOnly) return { text: `${spell}✨`, type: "heal" }
         return null
       }
-      if (anim.isCrit) return { text: `${spell}${anim.damage} 💥 CRÍTICO!`, type: "crit" }
+      if (anim.isCrit) return { text: `${spell}${anim.damage} 💥 CRITICAL!`, type: "crit" }
       return { text: `${spell}-${anim.damage}`, type: "damage" }
     },
     []
@@ -714,7 +714,7 @@ const DuelArena = (
       const eventId = action.eventId || `${selfDuelistId}-${tn}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       const payload: RoundAction = { ...action, casterId: selfDuelistId, turnId: tn, eventId }
       setAwaitingServerAck(true)
-      setBattleMessage("Intenção enviada — aguardando resolução do servidor...")
+      setBattleMessage("Intent sent — awaiting server resolution...")
       setDebugLastEvent(`SUBMIT_ACTION T${tn}`)
       socket.emit("SUBMIT_ACTION", { matchId, userId: selfDuelistId, turn: tn, action: payload })
 
@@ -724,7 +724,7 @@ const DuelArena = (
         setAwaitingServerAck((prev) => {
           if (prev) {
             console.warn("[Arena] Timeout de ack — desbloqueando cliente.")
-            setBattleMessage("Sem resposta do servidor. Tente novamente.")
+            setBattleMessage("No server response. Try again.")
             setBattleStatus("selecting")
             setPotionUsed(false)
           }
@@ -1022,7 +1022,7 @@ const DuelArena = (
         })
       } catch (engineErr) {
         console.warn("[Arena] calculateTurnOutcome:", engineErr)
-        addLog(`[Engine]: exceção no turno ${roundTurn} — abortando resolução.`)
+        addLog(`[Engine]: exception in turn ${roundTurn} — aborting resolution.`)
         setBattleStatus("selecting")
         return
       }
@@ -1064,7 +1064,7 @@ const DuelArena = (
         if (playerBuild.gameMode === "torneio-offline" && outcome.outcome === "win" && challengeStage < TORNEIO_LABELS.length - 1) {
           const nextStage = challengeStage + 1
           setChallengeStage(nextStage)
-          addLog(`[Torneio]: ${playerBuild.name} avançou para ${TORNEIO_LABELS[nextStage]}!`)
+          addLog(`[Tournament]: ${playerBuild.name} advanced to ${TORNEIO_LABELS[nextStage]}!`)
           const nextRound = applyRapinomonioBlock(buildChallengeRound(nextStage))
           setDuelists(nextRound)
           setPendingActions({})
@@ -1094,7 +1094,7 @@ const DuelArena = (
       beginRoundSelection(state)
     } catch (e) {
       console.error("[Arena] runResolution", e)
-      addLog("[Engine]: erro na resolução do turno; estado revertido para seleção.")
+      addLog("[Engine]: error in turn resolution; state reverted to selection.")
       setBattleStatus("selecting")
     } finally {
       resolvingRef.current = false
@@ -1199,13 +1199,13 @@ const DuelArena = (
         } else if (anim.type === "skip" && caster) {
           const pos = getFCTPos(caster.id)
           const id = ++fctCounterRef.current
-          setFloatingTexts((prev) => [...prev, { id, text: `${caster.name} Atordoado!`, type: "skip", x: pos.x, y: pos.y }])
+          setFloatingTexts((prev) => [...prev, { id, text: `${caster.name} Stunned!`, type: "skip", x: pos.x, y: pos.y }])
           setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 3200)
           await sleep(500)
         } else if (anim.type === "potion" && caster) {
           const pos = getFCTPos(caster.id)
           const id = ++fctCounterRef.current
-          const potionLabel = anim.potionType ? (POTION_NAMES[anim.potionType] ?? anim.potionType) : "Poção"
+          const potionLabel = anim.potionType ? (POTION_NAMES[anim.potionType] ?? anim.potionType) : "Potion"
           setFloatingTexts((prev) => [...prev, { id, text: `🧪 ${potionLabel}!`, type: "heal", x: pos.x, y: pos.y }])
           setTimeout(() => setFloatingTexts((prev) => prev.filter((f) => f.id !== id)), 3200)
           // Animação de frasco/brilho sobre o avatar
@@ -1239,10 +1239,10 @@ const DuelArena = (
     socketRef.current = socket
 
     socket.on("connect", () => {
-      console.log("[Socket] Conectado:", socket.id)
+      console.log("[Socket] Connected:", socket.id)
       setSocketConnected(true)
       setSocketDisconnected(false)
-      setDebugLastEvent("socket conectado")
+      setDebugLastEvent("socket connected")
       socket.emit("JOIN_MATCH", {
         matchId,
         userId: selfDuelistId,
@@ -1252,14 +1252,14 @@ const DuelArena = (
     })
 
     socket.on("disconnect", () => {
-      console.warn("[Socket] Desconectado.")
+      console.warn("[Socket] Disconnected.")
       setSocketConnected(false)
       setSocketDisconnected(true)
-      setDebugLastEvent("socket DESCONECTADO")
+      setDebugLastEvent("socket DISCONNECTED")
     })
 
     socket.on("connect_error", (err) => {
-      console.warn("[Socket] Erro de conexão:", err.message)
+      console.warn("[Socket] Connection error:", err.message)
       setSocketDisconnected(true)
     })
 
@@ -1283,14 +1283,14 @@ const DuelArena = (
       gameMode: string
       yourPlayerId: string
     }) => {
-      console.log("[Socket] GAME_START recebido:", serverDuelists.map((d) => d.name))
+      console.log("[Socket] GAME_START received:", serverDuelists.map((d) => d.name))
       setKnownBroadcastPlayers(serverDuelists.map((d) => d.id))
       setDuelists(serverDuelists)
       turnNumberRef.current = serverTurn
       setTurnNumber(serverTurn)
       setGameStartAcknowledged(true)
       setBattleMessage("")
-      setDebugLastEvent(`GAME_START (${serverDuelists.length} duelistas)`)
+      setDebugLastEvent(`GAME_START (${serverDuelists.length} duelists)`)
       // Inicia a seleção após o servidor confirmar o início
       const seeded = serverDuelists
       setBattleStatus("selecting")

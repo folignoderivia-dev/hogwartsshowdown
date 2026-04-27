@@ -202,20 +202,20 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
         {/* ── LOBBY ── */}
         {screen === "lobby" && (
           <div className="flex w-full max-w-sm flex-col gap-6 rounded-2xl border border-amber-700/50 bg-stone-900/90 p-8 text-center shadow-2xl">
-            <h1 className="text-3xl font-bold text-amber-300">🏆 Quadribol 1v1</h1>
-            <p className="text-sm text-amber-200/70">Mini-jogo de Quadribol. Sem varinhas, sem feitiços — só habilidade!</p>
+            <h1 className="text-3xl font-bold text-amber-300">🏆 Quidditch 1v1</h1>
+            <p className="text-sm text-amber-200/70">Quidditch mini-game. No wands, no spells — just skill!</p>
 
             <Button
               onClick={createMatch}
               className="w-full bg-amber-700 py-6 text-lg font-bold text-white hover:bg-amber-600"
             >
-              Criar Partida
+              Create Match
             </Button>
 
             <div className="flex gap-2">
               <input
                 className="flex-1 rounded-lg border border-amber-700 bg-stone-800 px-3 py-2 text-center text-sm text-amber-100 placeholder:text-amber-600"
-                placeholder="Código da sala (Q-XXXXX)"
+                placeholder="Room code (Q-XXXXX)"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && joinMatch()}
@@ -225,12 +225,12 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
                 disabled={!joinCode.trim()}
                 className="border border-amber-600 bg-stone-800 text-amber-200 hover:bg-amber-900"
               >
-                Entrar
+                Join
               </Button>
             </div>
 
             <Button variant="ghost" className="text-amber-500" onClick={onReturn}>
-              ← Voltar ao Lobby
+              ← Back to Lobby
             </Button>
           </div>
         )}
@@ -238,17 +238,17 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
         {/* ── AGUARDANDO OPONENTE ── */}
         {screen === "waiting_opponent" && (
           <div className="flex w-full max-w-sm flex-col gap-6 rounded-2xl border border-amber-700/50 bg-stone-900/90 p-8 text-center shadow-2xl">
-            <h1 className="text-2xl font-bold text-amber-300">🏆 Quadribol 1v1</h1>
-            <p className="text-sm text-amber-400">Compartilhe este código com seu adversário:</p>
+            <h1 className="text-2xl font-bold text-amber-300">🏆 Quidditch 1v1</h1>
+            <p className="text-sm text-amber-400">Share this code with your opponent:</p>
             <div className="rounded-lg border border-amber-600 bg-stone-800 py-4 text-3xl font-mono font-bold tracking-widest text-amber-200">
               {matchCode}
             </div>
             <div className="flex items-center justify-center gap-2 text-amber-300">
               <span className="inline-block h-2 w-2 animate-ping rounded-full bg-amber-400" />
-              <span className="text-sm">Aguardando adversário...</span>
+              <span className="text-sm">Waiting for opponent...</span>
             </div>
             <Button variant="ghost" className="text-amber-500" onClick={onReturn}>
-              ← Cancelar
+              ← Cancel
             </Button>
           </div>
         )}
@@ -259,17 +259,17 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
             {/* Cabeçalho: placar + turno */}
             <div className="flex items-center justify-between rounded-xl border border-amber-700/40 bg-stone-900/85 px-6 py-3">
               <div className="text-center">
-                <p className="text-xs text-amber-400">Artilheiro</p>
+                <p className="text-xs text-amber-400">Chaser</p>
                 <p className="text-3xl font-bold text-amber-200">{scores.attacker}</p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-semibold text-amber-300">
-                  Turno {turn}/6 — {phase === 1 ? "Artilheiro vs Goleiro" : "Apanhador vs Batedor"}
+                  Turn {turn}/6 — {phase === 1 ? "Chaser vs Keeper" : "Seeker vs Beater"}
                 </p>
-                <p className="text-xs text-amber-500">Sua função: <span className="font-bold text-amber-200">{myRoleName}</span></p>
+                <p className="text-xs text-amber-500">Your role: <span className="font-bold text-amber-200">{myRoleName}</span></p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-amber-400">Goleiro</p>
+                <p className="text-xs text-amber-400">Keeper</p>
                 <p className="text-3xl font-bold text-amber-200">{scores.defender}</p>
               </div>
             </div>
@@ -283,12 +283,12 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
                 </p>
                 <img
                   src={oppImage}
-                  alt="Adversário"
+                  alt="Opponent"
                   className="h-44 w-auto animate-[float_3s_ease-in-out_infinite] drop-shadow-[0_0_18px_rgba(255,200,50,0.5)] object-contain"
                   style={{ animationDelay: "0.5s" }}
                 />
                 {waitingOpponent && (
-                  <span className="rounded-full bg-green-700/70 px-2 py-0.5 text-xs text-green-200">✔ Escolheu</span>
+                  <span className="rounded-full bg-green-700/70 px-2 py-0.5 text-xs text-green-200">✔ Chosen</span>
                 )}
               </div>
 
@@ -311,7 +311,7 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
                 </p>
                 <img
                   src={myImage}
-                  alt="Você"
+                  alt="You"
                   className="h-44 w-auto animate-[float_3s_ease-in-out_infinite] drop-shadow-[0_0_18px_rgba(255,200,50,0.5)] object-contain"
                 />
                 {chosen && (
@@ -324,8 +324,8 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
             <div className="rounded-xl border border-amber-700/40 bg-stone-900/85 p-4">
               <p className="mb-3 text-center text-sm font-semibold text-amber-300">
                 {role === "attacker"
-                  ? (phase === 1 ? "Para onde você vai chutar?" : "Para onde você vai esquivar?")
-                  : (phase === 1 ? "Para onde vai o chute?" : "Para onde você vai lançar o Balaço?")}
+                  ? (phase === 1 ? "Where will you kick?" : "Where will you dodge?")
+                  : (phase === 1 ? "Where will the kick go?" : "Where will you throw the Bludger?")}
               </p>
               <div className="grid grid-cols-5 gap-2">
                 {DIRECTIONS.map((d) => (
@@ -352,17 +352,17 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
         {screen === "revealing" && lastResult && role && (
           <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-amber-700/50 bg-stone-900/90 p-8 text-center shadow-2xl">
             <h2 className="text-2xl font-bold text-amber-300">
-              Turno {lastResult.turn} — Resultado
+              Turn {lastResult.turn} — Result
             </h2>
 
             <div className="flex items-center justify-around rounded-lg bg-stone-800 p-4">
               <div className="text-center">
-                <p className="text-xs text-amber-400">Artilheiro</p>
+                <p className="text-xs text-amber-400">Chaser</p>
                 <p className="text-2xl font-bold text-amber-200">{DIR_LABEL[lastResult.attackerChoice]}</p>
               </div>
               <span className="text-3xl">⚡</span>
               <div className="text-center">
-                <p className="text-xs text-amber-400">Goleiro/Batedor</p>
+                <p className="text-xs text-amber-400">Keeper/Beater</p>
                 <p className="text-2xl font-bold text-amber-200">{DIR_LABEL[lastResult.defenderChoice]}</p>
               </div>
             </div>
@@ -370,31 +370,31 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
             {/* Resultado */}
             <div className={`rounded-lg px-4 py-3 text-lg font-bold ${lastResult.scored === role ? "bg-green-800/70 text-green-200" : "bg-red-900/70 text-red-200"}`}>
               {lastResult.scored === "attacker"
-                ? (getPhase(lastResult.turn) === 1 ? "⚡ GOL! Artilheiro marcou!" : "🦅 Esquiva! Apanhador escapou!")
-                : (getPhase(lastResult.turn) === 1 ? "🛡️ Defesa! Goleiro bloqueou!" : "💥 Acertou! Balaço no Apanhador!")}
+                ? (getPhase(lastResult.turn) === 1 ? "⚡ GOAL! Chaser scored!" : "🦅 Dodge! Seeker escaped!")
+                : (getPhase(lastResult.turn) === 1 ? "🛡️ Defense! Keeper blocked!" : "💥 Hit! Bludger on Seeker!")}
               <p className="mt-1 text-sm font-normal text-white/70">
-                {lastResult.scored === role ? "Você marcou um ponto!" : "Oponente marcou um ponto."}
+                {lastResult.scored === role ? "You scored a point!" : "Opponent scored a point."}
               </p>
             </div>
 
             {/* Placar */}
             <div className="flex items-center justify-center gap-8 text-amber-200">
               <div className="text-center">
-                <p className="text-xs text-amber-400">Artilheiro</p>
+                <p className="text-xs text-amber-400">Chaser</p>
                 <p className="text-4xl font-bold">{lastResult.scores.attacker}</p>
               </div>
               <span className="text-2xl text-amber-500">✕</span>
               <div className="text-center">
-                <p className="text-xs text-amber-400">Goleiro</p>
+                <p className="text-xs text-amber-400">Keeper</p>
                 <p className="text-4xl font-bold">{lastResult.scores.defender}</p>
               </div>
             </div>
 
             {lastResult.turn < 6
               ? <Button onClick={nextTurn} className="w-full bg-amber-700 py-5 font-bold text-white hover:bg-amber-600">
-                  Próximo Turno →
+                  Next Turn →
                 </Button>
-              : <p className="animate-pulse text-amber-400">Calculando resultado final...</p>
+              : <p className="animate-pulse text-amber-400">Calculating final result...</p>
             }
           </div>
         )}
@@ -404,20 +404,20 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
           <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-amber-700/50 bg-stone-900/92 p-8 text-center shadow-2xl">
             <div className="text-5xl">{winner.name === myName ? "🏆" : "💀"}</div>
             <h2 className={`text-3xl font-extrabold ${winner.name === myName ? "text-amber-300" : "text-red-400"}`}>
-              {winner.name === myName ? "Você Venceu!" : `${winner.name} Venceu!`}
+              {winner.name === myName ? "You Won!" : `${winner.name} Won!`}
             </h2>
             <p className="text-sm text-amber-400">
-              {winner.role === "attacker" ? "Artilheiro/Apanhador" : "Goleiro/Batedor"} dominou a partida!
+              {winner.role === "attacker" ? "Chaser/Seeker" : "Keeper/Beater"} dominated the match!
             </p>
 
             <div className="flex items-center justify-center gap-10 rounded-lg bg-stone-800 py-5">
               <div className="text-center">
-                <p className="text-xs text-amber-400">Artilheiro</p>
+                <p className="text-xs text-amber-400">Chaser</p>
                 <p className="text-5xl font-bold text-amber-200">{scores.attacker}</p>
               </div>
               <span className="text-2xl text-amber-500">✕</span>
               <div className="text-center">
-                <p className="text-xs text-amber-400">Goleiro</p>
+                <p className="text-xs text-amber-400">Keeper</p>
                 <p className="text-5xl font-bold text-amber-200">{scores.defender}</p>
               </div>
             </div>
@@ -434,10 +434,10 @@ export default function QuidditchArena({ playerBuild, matchId: externalMatchId, 
                 }}
                 className="flex-1 border border-amber-600 bg-stone-800 text-amber-200 hover:bg-amber-900"
               >
-                Jogar Novamente
+                Play Again
               </Button>
               <Button onClick={onReturn} className="flex-1 bg-amber-700 text-white hover:bg-amber-600">
-                Sair
+                Exit
               </Button>
             </div>
           </div>
