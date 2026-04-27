@@ -2,7 +2,7 @@ import { HOUSE_GDD, WAND_PASSIVES, rollSpellPower, type SpellInfo } from "@/lib/
 import type { DebuffType, Duelist, HPState } from "@/lib/arena-types"
 import type { RoundAction } from "@/lib/duelActions"
 
-/** Debuffs que o Trevus pode sortear (1t cada; 2 sorteados por acerto). */
+/** Debuffs that Trevus can roll (1t each; 2 rolled per hit). */
 const TREVUS_RANDOM_DEBUFFS: DebuffType[] = [
   "burn",
   "freeze",
@@ -19,7 +19,7 @@ const TREVUS_RANDOM_DEBUFFS: DebuffType[] = [
   "mark",
 ]
 
-/** Motor puro: recebe `RoundAction` em memória. Persistência Supabase usa `match_turns.action_payload` apenas na Arena. */
+/** Pure engine: receives `RoundAction` in memory. Supabase persistence uses `match_turns.action_payload` only in the Arena. */
 
 export interface EngineAnimation {
   type: "cast" | "skip" | "potion"
@@ -658,7 +658,7 @@ export function calculateTurnOutcome(params: {
     if (centauroFieldActive && isSelfTargetSpell(sn)) {
       const nCur = normSpell(sn)
       if (nCur.includes("ferula") || nCur.includes("episkey") || (nCur.includes("vulnera") && nCur.includes("sanetur"))) {
-        logs.push(`→ ${attacker.name} tentou usar ${sn}, mas está bloqueado pelo Centauro!`)
+        logs.push(`→ ${attacker.name} tried to use ${sn}, but it's blocked by Centaur!`)
         animationsToPlay.push({
           type: "cast",
           casterId: attacker.id,
@@ -667,7 +667,7 @@ export function calculateTurnOutcome(params: {
           isMiss: true,
           fctOnly: true,
           delay: 500,
-          fctMessage: "Bloqueado (Centauro)",
+          fctMessage: "Blocked (Centaur)",
         })
         continue
       }
@@ -676,7 +676,7 @@ export function calculateTurnOutcome(params: {
     // SILÊNCIO: verifica se a magia está silenciada
     const silencedSpells = attacker.silencedSpells ?? []
     if (silencedSpells.includes(sn)) {
-      logs.push(`→ ${attacker.name} tentou usar ${sn}, mas está silenciada!`)
+      logs.push(`→ ${attacker.name} tried to use ${sn}, but it's silenced!`)
       animationsToPlay.push({
         type: "cast",
         casterId: attacker.id,
@@ -685,11 +685,10 @@ export function calculateTurnOutcome(params: {
         isMiss: true,
         fctOnly: true,
         delay: 500,
-        fctMessage: "Silenciado",
+          fctMessage: "Silenciado",
       })
       continue
     }
-
     const isFfaMode = params.gameMode === "ffa" || params.gameMode === "ffa3"
     let targets: Duelist[] = []
     if (isSelfTargetSpell(sn)) {

@@ -20,7 +20,7 @@ export const STORY_BOSSES: StoryBoss[] = [
     house: "ravenclaw",
     wand: "seminviso",
     potion: "despair_potion",
-    spells: ["Obliviate", "Expulso", "Flagellum", "Scarlatum", "Silêncio", "Desilusão"]
+    spells: ["Obliviate", "Expulso", "Flagellum", "Scarlatum", "Silencio", "Disillusionment"]
   },
   {
     id: 2,
@@ -42,7 +42,7 @@ export const STORY_BOSSES: StoryBoss[] = [
     house: "slytherin",
     wand: "dragon",
     potion: "aconito",
-    spells: ["Cara de Lesma", "Confringo", "Estupefaca", "Trevus", "Maximos", "Flagrate"]
+    spells: ["Slugs", "Confrigo", "Stupefy", "Trevus", "Maximos", "Flagrate"]
   },
   {
     id: 4,
