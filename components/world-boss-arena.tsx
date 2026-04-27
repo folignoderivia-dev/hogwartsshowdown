@@ -94,13 +94,33 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
       try {
         const { data: bossData } = await supabase
           .from("world_boss_state")
-          .select("boss_index, current_hp")
+          .select("boss_index, current_hp, last_reset_date")
           .eq("id", 1)
           .single()
         
         if (bossData) {
-          setBossIndex(bossData.boss_index || 0)
-          setBossHp(bossData.current_hp || 5000)
+          // Check if boss needs daily reset (if not defeated today)
+          const lastReset = bossData.last_reset_date ? bossData.last_reset_date.split('T')[0] : null
+          const needsDailyReset = lastReset && lastReset !== today && bossData.current_hp > 0
+          
+          if (needsDailyReset) {
+            // Reset boss for new day
+            const nextBossIndex = (bossData.boss_index + 1) % BOSS_IMAGES.length
+            await supabase
+              .from("world_boss_state")
+              .update({ 
+                boss_index: nextBossIndex,
+                current_hp: 5000,
+                last_reset_date: new Date().toISOString()
+              })
+              .eq("id", 1)
+            setBossIndex(nextBossIndex)
+            setBossHp(5000)
+            console.log(`World Boss: Daily reset - boss index ${bossData.boss_index} -> ${nextBossIndex}`)
+          } else {
+            setBossIndex(bossData.boss_index || 0)
+            setBossHp(bossData.current_hp || 5000)
+          }
         }
       } catch (bossError) {
         console.error("Failed to load boss state, using defaults:", bossError)
@@ -266,6 +286,31 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
         .then(({ error }) => {
           if (error) console.error("Failed to update boss HP:", error)
         })
+      
+      // Check if boss is defeated (HP reaches 0)
+      if (newHp === 0) {
+        // Trigger defeat-based reset
+        setTimeout(() => {
+          const nextBossIndex = (bossIndex + 1) % BOSS_IMAGES.length
+          supabase
+            .from("world_boss_state")
+            .update({ 
+              boss_index: nextBossIndex,
+              current_hp: 5000,
+              last_reset_date: new Date().toISOString()
+            })
+            .eq("id", 1)
+            .then(({ error }) => {
+              if (error) {
+                console.error("Failed to reset boss after defeat:", error)
+              } else {
+                console.log(`World Boss: Defeat reset - boss index ${bossIndex} -> ${nextBossIndex}`)
+                addLog(locale === "en" ? "World Boss defeated! New boss incoming!" : "World Boss derrotado! Novo boss chegando!", "system")
+              }
+            })
+        }, 1000)
+      }
+      
       return newHp
     })
     setTotalDamage(prev => prev + damage)
