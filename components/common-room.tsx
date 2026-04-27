@@ -258,6 +258,7 @@ export default function CommonRoom({
   const [friendMessages, setFriendMessages] = useState<FriendMessage[]>([])
   const [friendMessageInput, setFriendMessageInput] = useState("")
   const [onlineWizards, setOnlineWizards] = useState(0)
+  const [onlineUsernames, setOnlineUsernames] = useState<string[]>([])
   const [visitCount, setVisitCount] = useState(0)
   const [duelsInProgress, setDuelsInProgress] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; p1: string; p2: string }>>([])
   const [recentResults, setRecentResults] = useState<Array<{ matchId: string; gameMode: string; winnerNames: string[]; loserNames: string[]; finishedAt: string }>>([])
@@ -926,6 +927,11 @@ export default function CommonRoom({
         )
       )
       setOnlineUserIds(ids)
+      // Extrai usernames para exibição (até 20)
+      const usernames = Object.entries(state).flatMap(([key, presences]) =>
+        (presences as any[]).map((p: any) => p.username).filter((name: string) => name && name !== "Visitante")
+      )
+      setOnlineUsernames([...new Set(usernames)].slice(0, 20))
     }
     lobby
       .on("presence", { event: "sync" }, syncOnline)
@@ -1272,9 +1278,20 @@ export default function CommonRoom({
                 🎩 {canClaimGacha ? (locale === "pt" ? "Presente Diário" : "Daily Gift") : (locale === "pt" ? "Volte Amanhã" : "Come Back Tomorrow")}
               </Button>
             )}
-            <Badge className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
-              🟢 {onlineWizards} {locale === "pt" ? "Bruxos Online" : "Wizards Online"}
-            </Badge>
+            <div className="border-green-700 bg-green-950/40 px-3 py-1 text-green-300">
+              <div className="text-xs font-semibold">
+                🟢 {onlineWizards} {locale === "pt" ? "Bruxos Online" : "Wizards Online"}
+              </div>
+              {onlineUsernames.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-green-200/80">
+                  {onlineUsernames.slice(0, 20).map((username) => (
+                    <span key={username} className="truncate">
+                      {username}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
             {currentUser ? (
               <>
                 <Badge className={`border-amber-600 bg-stone-900 px-3 py-1 ${isVip ? "text-yellow-300" : "text-amber-200"}`}>
