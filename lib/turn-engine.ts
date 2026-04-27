@@ -425,12 +425,12 @@ export function calculateTurnOutcome(params: {
   for (const action of orderedActions) {
     const attacker = state.find((d) => d.id === action.casterId)
     if (!attacker || isDefeated(attacker.hp)) {
-      logs.push(`[Engine]: ação ignorada para caster inválido/morto (${action.casterId}).`)
+      logs.push(`[Engine]: action ignored for invalid/dead caster (${action.casterId}).`)
       continue
     }
 
     if (action.type === "skip") {
-      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} perdeu a vez!`)
+      logs.push(`[Turn ${params.turnNumber}]: ${attacker.name} lost their turn!`)
       animationsToPlay.push({ type: "skip", casterId: attacker.id, targetIds: [], delay: 1200 })
       continue
     }
@@ -440,20 +440,20 @@ export function calculateTurnOutcome(params: {
 
       // USO ÚNICO: rejeita se a poção já foi usada nesta batalha
       if (attacker.usedPotions?.includes(potKey)) {
-        logs.push(`→ ${attacker.name} já usou a poção (${potKey}) nesta batalha!`)
+        logs.push(`→ ${attacker.name} already used potion (${potKey}) this battle!`)
         animationsToPlay.push({
           type: "cast",
           casterId: attacker.id,
           targetId: attacker.id,
           fctOnly: true,
           delay: 400,
-          fctMessage: "Poção já usada",
+          fctMessage: "Potion already used",
         })
         continue
       }
       state = state.map((d) => d.id === attacker.id ? { ...d, usedPotions: [...(d.usedPotions ?? []), potKey] } : d)
 
-      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} usou poção (${potKey})!`)
+      logs.push(`[Turn ${params.turnNumber}]: ${attacker.name} used potion (${potKey})!`)
 
       if (potKey === "wiggenweld") {
         const self = state.find((d) => d.id === attacker.id)
@@ -462,9 +462,9 @@ export function calculateTurnOutcome(params: {
         const charmDebuff = attacker.debuffs.find((x) => x.type === "charm")
         if (charmDebuff?.meta && healAmt > 0) {
           state = state.map((d) => d.id === charmDebuff.meta ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d)
-          logs.push(`→ CHARM: ${charmDebuff.meta} também recuperou ${healAmt} HP!`)
+          logs.push(`→ CHARM: ${charmDebuff.meta} also recovered ${healAmt} HP!`)
         }
-        logs.push(`→ ${attacker.name} usou Wiggenweld! Recuperou ${healAmt} HP (= último golpe recebido).`)
+        logs.push(`→ ${attacker.name} used Wiggenweld! Recovered ${healAmt} HP (= last hit received).`)
 
       } else if (potKey === "edurus") {
         state = state.map((d) =>
@@ -472,7 +472,7 @@ export function calculateTurnOutcome(params: {
             ? { ...d, debuffs: [...d.debuffs.filter((x) => x.irremovable), { type: "immunity" as DebuffType, duration: 1 }] }
             : d
         )
-        logs.push(`→ ${attacker.name} usou Edurus! Todos os debuffs limpos + Imunidade por 1 turno.`)
+        logs.push(`→ ${attacker.name} used Edurus! All debuffs cleared + Immunity for 1 turn.`)
 
       } else if (potKey === "mortovivo") {
         state = state.map((d) =>
@@ -480,15 +480,15 @@ export function calculateTurnOutcome(params: {
             ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "undead"), { type: "undead" as DebuffType, duration: 1 }], isUndeadThisTurn: true }
             : d
         )
-        logs.push(`→ ${attacker.name} usou Morto Vivo! HP não cairá abaixo de 1 por 1 turno.`)
+        logs.push(`→ ${attacker.name} used Undead! HP won't drop below 1 for 1 turn.`)
 
       } else if (potKey === "maxima") {
         state = state.map((d) => (d.id === attacker.id ? { ...d, nextDamagePotionMult: 1.5 } : d))
-        logs.push(`→ ${attacker.name} usou Maxima! +50% dano no próximo turno.`)
+        logs.push(`→ ${attacker.name} used Maxima! +50% damage next turn.`)
 
       } else if (potKey === "foco") {
         state = state.map((d) => (d.id === attacker.id ? { ...d, permanentAccBonus: (d.permanentAccBonus ?? 0) + 10 } : d))
-        logs.push(`→ ${attacker.name} usou Foco! +10% Accuracy permanente.`)
+        logs.push(`→ ${attacker.name} used Focus! +10% Accuracy permanent.`)
 
       } else if (potKey === "merlin") {
         // Poção de Merlin: copia a última poção utilizada pelo oponente, com eficácia aumentada em 25%
@@ -502,39 +502,39 @@ export function calculateTurnOutcome(params: {
               const self = state.find((d) => d.id === attacker.id)
               const healAmt = Math.round((self?.lastSingleHitDamageReceived ?? 0) * 1.25)
               state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healAmt > 0 ? healFlatTotal(d.hp, healAmt) : d.hp } : d))
-              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou Wiggenweld do oponente (+25%): recuperou ${healAmt} HP.`)
+              logs.push(`→ ${attacker.name} used Merlin Potion! Copied Wiggenweld from opponent (+25%): recovered ${healAmt} HP.`)
             } else if (lastPotion === "edurus") {
               state = state.map((d) =>
                 d.id === attacker.id
                   ? { ...d, debuffs: [...d.debuffs.filter((x) => x.irremovable), { type: "immunity" as DebuffType, duration: 1, irremovable: true }] }
                   : d
               )
-              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou Edurus do oponente (+25%): Imunidade por 2 turnos.`)
+              logs.push(`→ ${attacker.name} used Merlin Potion! Copied Edurus from opponent (+25%): Immunity for 2 turns.`)
             } else if (lastPotion === "maxima") {
               state = state.map((d) => (d.id === attacker.id ? { ...d, nextDamagePotionMult: 1.875 } : d)) // 1.5 * 1.25 = 1.875
-              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou Maxima do oponente (+25%): +87.5% dano no próximo turno.`)
+              logs.push(`→ ${attacker.name} used Merlin Potion! Copied Maxima from opponent (+25%): +87.5% damage next turn.`)
             } else if (lastPotion === "foco") {
               state = state.map((d) => (d.id === attacker.id ? { ...d, permanentAccBonus: (d.permanentAccBonus ?? 0) + 12.5 } : d)) // 10 * 1.25 = 12.5
-              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou Foco do oponente (+25%): +12.5% Accuracy permanente.`)
+              logs.push(`→ ${attacker.name} used Merlin Potion! Copied Focus from opponent (+25%): +12.5% Accuracy permanent.`)
             } else if (lastPotion === "mortovivo") {
               state = state.map((d) =>
                 d.id === attacker.id
                   ? { ...d, debuffs: [...d.debuffs.filter((x) => x.irremovable), { type: "undead" as DebuffType, duration: 1, irremovable: true }] }
                   : d
               )
-              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou Morto Vivo do oponente (+25%): HP não cairá abaixo de 1 por 2 turnos.`)
+              logs.push(`→ ${attacker.name} used Merlin Potion! Copied Undead from opponent (+25%): HP won't drop below 1 for 2 turns.`)
             } else {
-              logs.push(`→ ${attacker.name} usou Poção de Merlin! Copiou ${lastPotion} do oponente (+25% eficácia).`)
+              logs.push(`→ ${attacker.name} used Merlin Potion! Copied ${lastPotion} from opponent (+25% efficacy).`)
             }
           } else {
-            logs.push(`→ ${attacker.name} já usou a poção ${lastPotion} nesta batalha. Merlin falhou.`)
+            logs.push(`→ ${attacker.name} already used potion ${lastPotion} this battle. Merlin failed.`)
           }
         } else {
-          logs.push(`→ ${attacker.name} usou Poção de Merlin! O oponente ainda não usou nenhuma poção. Merlin falhou.`)
+          logs.push(`→ ${attacker.name} used Merlin Potion! Opponent hasn't used any potion yet. Merlin failed.`)
         }
       } else if (potKey === "dragon_tonic") {
         state = state.map((d) => d.id === attacker.id ? { ...d, nextTurnPriorityBonus: (d.nextTurnPriorityBonus ?? 0) + 4 } : d)
-        logs.push(`→ 🐉 Tônico de Dragão! ${attacker.name} ganha +4 de prioridade no próximo turno.`)
+        logs.push(`→ 🐉 Dragon Tonic! ${attacker.name} gains +4 priority next turn.`)
       } else if (potKey === "despair_potion") {
         const opponent = state.find((d) => d.team !== attacker.team && !isDefeated(d.hp))
         if (opponent?.lastSpellUsed && opponent.spellMana) {
@@ -552,9 +552,9 @@ export function calculateTurnOutcome(params: {
             }
             return d
           })
-          logs.push(`→ 💀 Poção do Desespero! ${attacker.name} reduziu 3 de mana de ${opponent.lastSpellUsed} de ${opponent.name}.`)
+          logs.push(`→ 💀 Despair Potion! ${attacker.name} reduced 3 mana from ${opponent.lastSpellUsed} of ${opponent.name}.`)
         } else {
-          logs.push(`→ 💀 Poção do Desespero! ${opponent?.name ?? "Oponente"} ainda não usou nenhuma magia. Efeito falhou.`)
+          logs.push(`→ 💀 Despair Potion! ${opponent?.name ?? "Opponent"} hasn't used any magic yet. Effect failed.`)
         }
 
       } else if (potKey === "felix") {
@@ -567,7 +567,7 @@ export function calculateTurnOutcome(params: {
           sm[minEntry[0]] = { ...sm[minEntry[0]], current: sm[minEntry[0]].max }
           return { ...d, spellMana: sm }
         })
-        logs.push(`→ ${attacker.name} usou Felix Felicis! Mana de uma spell totalmente restaurada.`)
+        logs.push(`→ ${attacker.name} used Felix Felicis! One spell's mana fully restored.`)
 
       } else if (potKey === "aconito") {
         const target = state.find((d) => d.team !== attacker.team && !isDefeated(d.hp))
@@ -577,7 +577,7 @@ export function calculateTurnOutcome(params: {
               ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "poison"), { type: "poison" as DebuffType, duration: 4 }] }
               : d
           )
-          logs.push(`→ ${attacker.name} usou Acônito! ${target.name} envenenado por 4 turnos.`)
+          logs.push(`→ ${attacker.name} used Aconite! ${target.name} poisoned for 4 turns.`)
         }
 
       } else if (potKey === "amortentia") {
@@ -589,10 +589,10 @@ export function calculateTurnOutcome(params: {
             const availablePotions = ["wiggenweld", "edurus", "maxima", "foco", "merlin", "felix", "aconito", "amortentia", "mortovivo"]
             const randomPotion = availablePotions[Math.floor(Math.random() * availablePotions.length)]
             state = state.map((d) => d.id === opponent.id ? { ...d, replacedPotion: randomPotion } : d)
-            logs.push(`→ ${attacker.name} usou Amortentia! A poção de ${opponent.name} foi substituída por ${randomPotion}.`)
+            logs.push(`→ ${attacker.name} used Amortentia! ${opponent.name}'s potion was replaced with ${randomPotion}.`)
           } else {
             // Oponente já usou poção - Amortentia falha
-            logs.push(`→ ${attacker.name} usou Amortentia! ${opponent.name} já usou sua poção. Amortentia falhou.`)
+            logs.push(`→ ${attacker.name} used Amortentia! ${opponent.name} already used their potion. Amortentia failed.`)
           }
         }
       }
@@ -613,7 +613,7 @@ export function calculateTurnOutcome(params: {
         isMiss: true,
         fctOnly: true,
         delay: 500,
-        fctMessage: "Feitiço desconhecido",
+        fctMessage: "Unknown spell",
       })
       continue
     }
@@ -621,7 +621,7 @@ export function calculateTurnOutcome(params: {
 
     const cannotAct = attacker.debuffs.some((d) => d.type === "stun" || d.type === "freeze")
     if (cannotAct) {
-      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} está impossibilitado de agir!`)
+      logs.push(`[Turn ${params.turnNumber}]: ${attacker.name} is unable to act!`)
       animationsToPlay.push({
         type: "cast",
         casterId: attacker.id,
@@ -630,7 +630,7 @@ export function calculateTurnOutcome(params: {
         isMiss: true,
         fctOnly: true,
         delay: 500,
-        fctMessage: "Atordoado / Congelado",
+        fctMessage: "Stunned / Frozen",
       })
       continue
     }
@@ -638,7 +638,7 @@ export function calculateTurnOutcome(params: {
     // IMPERIO: só pode usar o último feitiço (IRREMOVÍVEL)
     if (attacker.debuffs.some((d) => d.type === "taunt") && attacker.lastSpellUsed && action.type === "cast") {
       if (normSpell(sn) !== normSpell(attacker.lastSpellUsed)) {
-        logs.push(`→ ${attacker.name} está sob Imperio! Somente "${attacker.lastSpellUsed}" pode ser lançado (tentou: ${sn}).`)
+        logs.push(`→ ${attacker.name} is under Imperio! Only "${attacker.lastSpellUsed}" can be cast (tried: ${sn}).`)
         animationsToPlay.push({
           type: "cast",
           casterId: attacker.id,
@@ -711,7 +711,7 @@ export function calculateTurnOutcome(params: {
         isMiss: true,
         fctOnly: true,
         delay: 500,
-        fctMessage: "Sem alvo válido",
+        fctMessage: "No valid target",
       })
       continue
     }
@@ -730,7 +730,7 @@ export function calculateTurnOutcome(params: {
         fctMessage: `✨ ${sn}`,
       })
     }
-    logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} lançou ${sn}${isAreaSpell(sn) ? " em área" : ` em ${targets[0].name}`}!`)
+    logs.push(`[Turn ${params.turnNumber}]: ${attacker.name} cast ${sn}${isAreaSpell(sn) ? " in area" : ` on ${targets[0].name}`}!`)
 
     const protegoBlocks = (def: Duelist) => {
       const silenced = def.debuffs.some((d) => d.type === "silence_defense")
@@ -752,7 +752,7 @@ export function calculateTurnOutcome(params: {
       if (WAND_PASSIVES[before?.wand ?? ""]?.effect === "hippogriff_immune_mark_bomb") {
         if (spell.debuff.type === "mark" || spell.debuff.type === "bomba") {
           logs.push(
-            `→ 🪶 Pena de Hipogrifo: ${before?.name ?? "Alvo"} bloqueou ${spell.debuff.type === "mark" ? "Marca" : "Bomba"} de ${attacker.name}.`
+            `→ 🪶 Hippogriff Feather: ${before?.name ?? "Target"} blocked ${spell.debuff.type === "mark" ? "Mark" : "Bomb"} from ${attacker.name}.`
           )
           return
         }
@@ -770,7 +770,7 @@ export function calculateTurnOutcome(params: {
             : d
         )
         if (chanceMultiplier > 1) {
-          logs.push(`→ 🐍 Presa de Basilisco: ${attacker.name} aplicou o debuff com bônus de chance!`)
+          logs.push(`→ 🐍 Basilisk Fang: ${attacker.name} applied debuff with bonus chance!`)
         }
       }
     }
@@ -781,7 +781,7 @@ export function calculateTurnOutcome(params: {
       const dealerName = state.find((d) => d.id === dealerId)?.name ?? dealerId
       let effectiveDmg = capThestralIncomingDamage(def.wand, dmg)
       if (WAND_PASSIVES[def.wand ?? ""]?.effect === "thestral_cap300" && dmg > effectiveDmg) {
-        logs.push(`→ 🪶 Pêlo de Testrálio: ${def.name} limitou o golpe de ${dealerName} a ${effectiveDmg} (${dmg} → cap 300).`)
+        logs.push(`→ 🪶 Thestral Hair: ${def.name} capped the hit from ${dealerName} to ${effectiveDmg} (${dmg} → cap 300).`)
       }
       // UNDEAD: HP não pode cair abaixo de 1 neste turno (debuff ou flag de ativação)
       const isUndead = def.debuffs.some((x) => x.type === "undead") || def.isUndeadThisTurn
@@ -792,14 +792,14 @@ export function calculateTurnOutcome(params: {
         const beforeUndead = effectiveDmg
         effectiveDmg = Math.max(0, Math.min(effectiveDmg, totalHp - 1))
         if (beforeUndead > effectiveDmg) {
-          logs.push(`→ 🧟 Morto-vivo: ${def.name} não cai abaixo de 1 HP neste turno (${beforeUndead} → ${effectiveDmg} recebido).`)
+          logs.push(`→ 🧟 Undead: ${def.name} doesn't drop below 1 HP this turn (${beforeUndead} → ${effectiveDmg} received).`)
         }
       }
       if (isInvulnerable) {
         const beforeInvuln = effectiveDmg
         effectiveDmg = 0
         if (beforeInvuln > 0) {
-          logs.push(`→ 🪶 Pena de Oraqui Orala: ${def.name} é invulnerável! Dano recebido: 0.`)
+          logs.push(`→ 🪶 Oraqui Orala Feather: ${def.name} is invulnerable! Damage received: 0.`)
         }
       }
       state = state.map((d) =>
@@ -828,7 +828,7 @@ export function calculateTurnOutcome(params: {
               : d
           )
           logs.push(
-            `→ 🦡 Espinhos (Lufa-Lufa): ${dealerName} recebeu ${thornDmg} de dano reflexo após ferir ${def.name} (${thornRaw} bruto, ${Math.round(HOUSE_GDD.hufflepuff.thornsPercent * 100)}% do golpe).`
+            `→ 🦡 Thorns (Hufflepuff): ${dealerName} received ${thornDmg} reflex damage after injuring ${def.name} (${thornRaw} raw, ${Math.round(HOUSE_GDD.hufflepuff.thornsPercent * 100)}% of the hit).`
           )
         }
       }
@@ -838,7 +838,7 @@ export function calculateTurnOutcome(params: {
         const nextStacks = prevStacks + 1
         state = state.map((d) => (d.id === dealerId ? { ...d, cinzalWeakenStacks: nextStacks } : d))
         logs.push(
-          `→ 🪶 Presa de Cinzal: ${dealerName} acumula penalidade de dano (pilha ${nextStacks}): −${Math.round((1 - Math.pow(0.85, nextStacks)) * 100)}% multiplicativo nos próximos golpes.`
+          `→ 🪶 Cinzal Claw: ${dealerName} accumulates damage penalty (stack ${nextStacks}): −${Math.round((1 - Math.pow(0.85, nextStacks)) * 100)}% multiplicative on next hits.`
         )
       }
       if (def.debuffs.some((d) => d.type === "salvio_reflect") && dealerId !== defId && effectiveDmg > 0) {
@@ -856,10 +856,10 @@ export function calculateTurnOutcome(params: {
               : d
           )
           logs.push(
-            `→ ✨ Salvio Hexia (reflect): ${dealerName} recebeu ${refDmg} de dano refletido de ${def.name} (${refRaw} bruto antes do cap).`
+            `→ ✨ Salvio Hexia (reflect): ${dealerName} received ${refDmg} reflected damage from ${def.name} (${refRaw} raw before cap).`
           )
           if (dealer && WAND_PASSIVES[dealer.wand ?? ""]?.effect === "thestral_cap300" && refRaw > refDmg) {
-            logs.push(`→ 🪶 Pêlo de Testrálio: ${dealerName} limitou o reflexo a ${refDmg} (${refRaw} → cap 300).`)
+            logs.push(`→ 🪶 Thestral Hair: ${dealerName} capped the reflect to ${refDmg} (${refRaw} → cap 300).`)
           }
         }
       }
@@ -877,7 +877,7 @@ export function calculateTurnOutcome(params: {
       const bloqueiosCura = attacker.debuffs.some((d) => d.type === "bloqueio_cura")
 
       if (isProtectionSpell && silenceDefense) {
-        logs.push(`→ ${attacker.name} tentou usar ${sn}, mas suas defesas estão bloqueadas!`)
+        logs.push(`→ ${attacker.name} tried to use ${sn}, but their defenses are blocked!`)
       } else if (n.includes("protego") && !n.includes("maximo") && !n.includes("diabol")) {
         if (!attacker.lastRoundSpellWasProtego) {
           state = state.map((d) =>
@@ -892,10 +892,10 @@ export function calculateTurnOutcome(params: {
           const charmDebuff = attacker.debuffs.find((x) => x.type === "charm")
           if (charmDebuff?.meta) {
             state = state.map((d) => d.id === charmDebuff.meta ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d)
-            logs.push(`→ CHARM: ${charmDebuff.meta} também recuperou ${healAmt} HP!`)
+            logs.push(`→ CHARM: ${charmDebuff.meta} also recovered ${healAmt} HP!`)
           }
         } else {
-          logs.push(`→ ${attacker.name} tentou usar ${sn}, mas cura está bloqueada!`)
+          logs.push(`→ ${attacker.name} tried to use ${sn}, but healing is blocked!`)
         }
       } else if (n.includes("maximos")) {
         const pct = Math.floor(Math.random() * 91) + 10
@@ -923,7 +923,7 @@ export function calculateTurnOutcome(params: {
           const charmDebuff = attacker.debuffs.find((x) => x.type === "charm")
           if (charmDebuff?.meta) {
             state = state.map((d) => d.id === charmDebuff.meta ? { ...d, hp: healFlatTotal(d.hp, 50) } : d)
-            logs.push(`→ CHARM: ${charmDebuff.meta} também recuperou 50 HP!`)
+            logs.push(`→ CHARM: ${charmDebuff.meta} also recovered 50 HP!`)
           }
         }
       } else if (n.includes("protego") && n.includes("maximo")) {
@@ -940,10 +940,10 @@ export function calculateTurnOutcome(params: {
           }
           return { ...d, spellMana: sm }
         })
-        logs.push(`→ ${attacker.name} usou Fiantu Dure! Restaurou +${restore} de mana em todos os feitiços.`)
+        logs.push(`→ ${attacker.name} used Fiantu Dure! Restored +${restore} mana in all spells.`)
       }
     } else if (n.includes("fumus")) {
-      logs.push(`→ 💨 ${attacker.name} lançou Fumus! Todos os efeitos de todos os bruxos foram removidos!`)
+      logs.push(`→ 💨 ${attacker.name} cast Fumus! All effects from all wizards were removed!`)
       state = state.map((d) => ({
         ...d,
         debuffs: [],
@@ -969,7 +969,7 @@ export function calculateTurnOutcome(params: {
           )
         }
       }
-      logs.push(`→ ${attacker.name} lançou Circum Inflamare! Todos os inimigos em chamas (1t).`)
+      logs.push(`→ ${attacker.name} cast Circum Inflamare! All enemies on fire (1t).`)
     } else if (n.includes("protego") && n.includes("diabol")) {
       for (const t of targets) {
         const isEnemy = t.team !== attacker.team
@@ -986,7 +986,7 @@ export function calculateTurnOutcome(params: {
           ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "protego_diabol"), { type: "protego_diabol" as const, duration: 2 }] }
           : d
       )
-      logs.push(`→ ${attacker.name} lançou Protego Diabólico! Escudo vs Maldições + -15% precisão inimiga (2t).`)
+      logs.push(`→ ${attacker.name} cast Protego Diabolical! Shield vs Curses + -15% enemy accuracy (2t).`)
     } else if (isAreaSpell(sn) && getSpellMaxPower(spell) > 0) {
       const ignoresDefense = spell.ignoresDefense === true
       for (const t of targets) {
@@ -1085,7 +1085,7 @@ export function calculateTurnOutcome(params: {
           animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit: false, delay: 400, damage: dmg, isBlock: bloq, fctOnly: true })
           applySpellDebuffTo(target.id)
         }
-        logs.push(`→ Flagellum! ${hitCount} golpe(s) → ${totalDmg} dano total em ${target.name}!`)
+        logs.push(`→ Flagellum! ${hitCount} hit(s) → ${totalDmg} total damage on ${target.name}!`)
         if (occamyMirrorFg) {
           if (anyLanded) {
             state = state.map((d) => {
@@ -1112,7 +1112,7 @@ export function calculateTurnOutcome(params: {
         retalDmg = capThestralIncomingDamage(targWand, retalDmg)
         if (WAND_PASSIVES[targWand ?? ""]?.effect === "thestral_cap300" && retalBeforeCap > retalDmg) {
           logs.push(
-            `→ 🪶 Pêlo de Testrálio: ${target.name} limitou o Locomotor Mortis a ${retalDmg} (${retalBeforeCap} → cap 300).`
+            `→ 🪶 Thestral Hair: ${target.name} capped Locomotor Mortis to ${retalDmg} (${retalBeforeCap} → cap 300).`
           )
         }
         const bloq = protegoBlocks(target)
@@ -1127,9 +1127,9 @@ export function calculateTurnOutcome(params: {
                 }
               : d
           )
-          logs.push(`→ 💀 Locomotor Mortis! ${attacker.name} devolveu ${retalDmg} dano (${pct}% de ${dmgReceived}) para ${target.name}!`)
+          logs.push(`→ 💀 Locomotor Mortis! ${attacker.name} returned ${retalDmg} damage (${pct}% of ${dmgReceived}) to ${target.name}!`)
         } else if (dmgReceived === 0) {
-          logs.push(`→ Locomotor Mortis: ${attacker.name} não recebeu dano neste turno.`)
+          logs.push(`→ Locomotor Mortis: ${attacker.name} received no damage this turn.`)
         }
         animationsToPlay.push({ type: "cast", casterId: attacker.id, spellName: sn, targetId: target.id, isMiss: false, isCrit: false, delay: 1000, damage: retalDmg, isBlock: bloq, fctOnly: true })
 
@@ -1167,7 +1167,7 @@ export function calculateTurnOutcome(params: {
             if (comboStacks > 0) {
               const mult = 1 + comboStacks * 0.2
               damage = Math.round(damage * mult)
-              logs.push(`→ 🔥 Combo Incêndio: ${attacker.name} está em sequência (${comboStacks}) e amplificou o dano (${Math.round(mult * 100)}%).`)
+              logs.push(`→ 🔥 Incendio Combo: ${attacker.name} is in sequence (${comboStacks}) and amplified damage (${Math.round(mult * 100)}%).`)
             }
           }
 
@@ -1184,12 +1184,12 @@ export function calculateTurnOutcome(params: {
           const bloqueado = protegoBlocks(target)
           if (bloqueado) {
             damage = 0
-            logs.push(`→ ${sn} foi bloqueado pelo Protego de ${target.name}!`)
+            logs.push(`→ ${sn} was blocked by ${target.name}'s Protego!`)
           } else if (damage > 0) {
             if (!ignoresDefense) damage = Math.max(0, damage - (target.defense ?? 0))
             // Dano mínimo garantido de 25 para spells ofensivas não bloqueadas
             if (getSpellMaxPower(spell) > 0 && damage < 25) damage = 25
-            if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRÍTICO! " : ""}${sn} causou ${damage} de dano em ${target.name}!`)
+            if (damage > 0) logs.push(`→ ${isCrit ? "💥 CRITICAL! " : ""}${sn} caused ${damage} damage to ${target.name}!`)
           }
           if (damage > 0) applyDamageWithCircum(target.id, damage, attacker.id, n)
 
@@ -1198,7 +1198,7 @@ export function calculateTurnOutcome(params: {
             const refreshedT = state.find((d) => d.id === target.id)
             if (refreshedT?.debuffs.some((d) => d.type === "protego_maximo")) {
               state = state.map((d) => (d.id === target.id ? { ...d, hp: healFlatTotal(d.hp, 200) } : d))
-              logs.push(`→ 🛡️ Protego Maximo! ${target.name} curou 200 HP (crítico no escudo)!`)
+              logs.push(`→ 🛡️ Protego Maximo! ${target.name} healed 200 HP (critical on shield)!`)
             }
           }
 
@@ -1206,7 +1206,7 @@ export function calculateTurnOutcome(params: {
           if (isCrit && damage > 0 && !bloqueado && WAND_PASSIVES[target.wand]?.effect === "oraq_orala_invuln_crit") {
             if (Math.random() < 0.3) {
               state = state.map((d) => (d.id === target.id ? { ...d, debuffs: [...d.debuffs, { type: "invulnerable" as DebuffType, duration: 1 }] } : d))
-              logs.push(`→ 🪶 Pena de Oraqui Orala! ${target.name} ganha invulnerabilidade no próximo turno (30% ativo).`)
+              logs.push(`→ 🪶 Oraqui Orala Feather! ${target.name} gains invulnerability next turn (30% active).`)
             }
           }
 
@@ -1225,7 +1225,7 @@ export function calculateTurnOutcome(params: {
                 ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "lumus_acc_down"), { type: "lumus_acc_down", duration: 2 }] }
                 : d
             )
-            logs.push(`→ Lumus! ${target.name} sofre −10% acerto (2t).`)
+            logs.push(`→ Lumus! ${target.name} suffers −10% accuracy (2t).`)
           }
 
           // PETRIFICUS TOTALES: bloqueia 1 feitiço aleatório (2t)
@@ -1238,7 +1238,7 @@ export function calculateTurnOutcome(params: {
               // Check if the spell is locked by Seminviso
               const lockedSpellInfo = params.spellDatabase.find(s => s.name === rk)
               if (lockedSpellInfo?.isLocked) {
-                logs.push(`→ Petrificus Totales! "${rk}" de ${target.name} está trancada pelo Seminviso! Petrificus falhou.`)
+                logs.push(`→ Petrificus Totales! "${rk}" of ${target.name} is locked by Seminviso! Petrificus failed.`)
               } else {
                 state = state.map((d) => {
                   if (d.id !== target.id) return d
@@ -1246,7 +1246,7 @@ export function calculateTurnOutcome(params: {
                   ds[rk] = 2
                   return { ...d, disabledSpells: ds }
                 })
-                logs.push(`→ Petrificus Totales! "${rk}" de ${target.name} bloqueado (2t).`)
+                logs.push(`→ Petrificus Totales! "${rk}" of ${target.name} blocked (2t).`)
               }
             }
           }
@@ -1262,7 +1262,7 @@ export function calculateTurnOutcome(params: {
                 d.id === target.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== dt), { type: dt, duration: 1 }] } : d
               )
             }
-            logs.push(`→ Trevus! ${tname} recebeu dois efeitos aleatórios (1t cada).`)
+            logs.push(`→ Trevus! ${tname} received two random effects (1t each).`)
           }
 
           // VERMILLIOUS: golpes extras (1 por 100 HP perdido pelo lançador, máx. 8)
@@ -1316,7 +1316,7 @@ export function calculateTurnOutcome(params: {
                 fctOnly: true,
               })
             }
-            if (extras > 0) logs.push(`→ Vermillious! +${extras} golpe(s) extra(s) (${lostHp} HP abaixo do máximo).`)
+            if (extras > 0) logs.push(`→ Vermillious! +${extras} extra hit(s) (${lostHp} HP below maximum).`)
           }
 
           // AQUA ERUCTO: +25 dano por debuff no atacante; limpa BURN próprio
@@ -1327,7 +1327,7 @@ export function calculateTurnOutcome(params: {
             if (aqStacks > 0) debuffBonus = Math.round(debuffBonus * Math.pow(0.85, aqStacks))
             if (debuffBonus > 0 && !bloqueado) {
               applyDamageWithCircum(target.id, debuffBonus, attacker.id, n)
-              logs.push(`→ Aqua Eructo: +${debuffBonus} dano (${attacker.debuffs.length} debuffs no usuário)!`)
+              logs.push(`→ Aqua Eructo: +${debuffBonus} damage (${attacker.debuffs.length} debuffs on user)!`)
             }
             state = state.map((d) =>
               d.id === attacker.id ? { ...d, debuffs: d.debuffs.filter((x) => x.type !== "burn") } : d
@@ -1348,7 +1348,7 @@ export function calculateTurnOutcome(params: {
                   newSm[rk] = { ...newSm[rk], current: Math.max(0, newSm[rk].current - 1) }
                   return { ...d, spellMana: newSm }
                 })
-                logs.push(`→ Rictumsempra! ${target.name} perdeu 1 mana de "${rk}".`)
+                logs.push(`→ Rictumsempra! ${target.name} lost 1 mana from "${rk}".`)
               }
             }
           }
@@ -1365,7 +1365,7 @@ export function calculateTurnOutcome(params: {
                 // Check if the spell is locked by Seminviso
                 const lockedSpellInfo = params.spellDatabase.find(s => s.name === rk)
                 if (lockedSpellInfo?.isLocked) {
-                  logs.push(`→ Obliviate! "${rk}" de ${target.name} está trancada pelo Seminviso! Obliviate falhou.`)
+                  logs.push(`→ Obliviate! "${rk}" of ${target.name} is locked by Seminviso! Obliviate failed.`)
                 } else {
                   state = state.map((d) => {
                     if (d.id !== target.id) return d
@@ -1373,7 +1373,7 @@ export function calculateTurnOutcome(params: {
                     newSm[rk] = { current: Math.floor(newSm[rk].current / 2), max: Math.floor(newSm[rk].max / 2) }
                     return { ...d, spellMana: newSm }
                   })
-                  logs.push(`→ Obliviate! Mana de "${rk}" de ${target.name} reduzida à metade permanentemente!`)
+                  logs.push(`→ Obliviate! Mana of "${rk}" of ${target.name} halved permanently!`)
                 }
               }
             }
@@ -1382,7 +1382,7 @@ export function calculateTurnOutcome(params: {
           // SECTUMSEMPRA: lifesteal — cura o dano causado
           if (spell.special === "sectumsempra_lifesteal" && damage > 0 && !bloqueado) {
             state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, damage) } : d))
-            logs.push(`→ Sectumsempra! ${attacker.name} curou ${damage} HP do dano causado!`)
+            logs.push(`→ Sectumsempra! ${attacker.name} healed ${damage} HP from damage caused!`)
           }
 
           // FINITE INCANTATEM: transfere debuffs do usuário para o alvo
@@ -1395,9 +1395,9 @@ export function calculateTurnOutcome(params: {
                 if (d.id === attacker.id) return { ...d, debuffs: d.debuffs.filter((dd) => dd.irremovable) }
                 return d
               })
-              logs.push(`→ Finite Incantatem! ${attacker.name} transferiu ${casterDebuffs.length} debuff(s) para ${target.name}!`)
+              logs.push(`→ Finite Incantatem! ${attacker.name} transferred ${casterDebuffs.length} debuff(s) to ${target.name}!`)
             } else {
-              logs.push(`→ Finite Incantatem: ${attacker.name} não tinha debuffs removíveis.`)
+              logs.push(`→ Finite Incantatem: ${attacker.name} had no removable debuffs.`)
             }
           }
 
@@ -1405,14 +1405,14 @@ export function calculateTurnOutcome(params: {
           if (spell.special === "legilimens_reveal" && !bloqueado) {
             const freshTarget = state.find((d) => d.id === target.id)
             const spellList = Object.keys(freshTarget?.spellMana ?? {}).join(", ") || "?"
-            logs.push(`🔮 Legilimens! ${attacker.name} penetrou na mente de ${target.name}! Grimório revelado: [${spellList}]`)
+            logs.push(`🔮 Legilimens! ${attacker.name} penetrated ${target.name}'s mind! Grimoire revealed: [${spellList}]`)
           }
 
           // REVELE SEUS SEGREDOS (VIP): revela o núcleo da varinha do oponente
           if (spell.special === "reveal_wand_core" && !bloqueado) {
             const freshTarget = state.find((d) => d.id === target.id)
             const passive = freshTarget?.wand ? WAND_PASSIVES[freshTarget.wand] : null
-            logs.push(`🔍 Revele seus Segredos! Núcleo de ${target.name}: ${passive?.name ?? "Desconhecido"} — ${passive?.description ?? ""}`)
+            logs.push(`🔍 Reveal Your Secrets! Core of ${target.name}: ${passive?.name ?? "Unknown"} — ${passive?.description ?? ""}`)
           }
 
           // PIERTOTUM LOCOMOTOR: dano = 100 × contador de Maldições do oponente
@@ -1421,9 +1421,9 @@ export function calculateTurnOutcome(params: {
             const piertotumDamage = 100 * opponentCount
             if (piertotumDamage > 0) {
               applyDamageWithCircum(target.id, piertotumDamage, attacker.id, sn)
-              logs.push(`→ Piertotum Locomotor! ${attacker.name} causou ${piertotumDamage} de dano baseado nas ${opponentCount} Maldições de ${target.name}!`)
+              logs.push(`→ Piertotum Locomotor! ${attacker.name} caused ${piertotumDamage} damage based on ${opponentCount} Curses of ${target.name}!`)
             } else {
-              logs.push(`→ Piertotum Locomotor! ${target.name} ainda não usou Maldições. Dano 0.`)
+              logs.push(`→ Piertotum Locomotor! ${target.name} hasn't used Curses yet. Damage 0.`)
             }
           }
 
@@ -1440,7 +1440,7 @@ export function calculateTurnOutcome(params: {
               if (d.id === target.id) return { ...d, hp: healFlatTotal(d.hp, healTarget) }
               return d
             })
-            logs.push(`→ Branquium Remendo! ${attacker.name} curou ${healAttacker} HP (${(multAttacker * 100).toFixed(0)}×) e ${target.name} curou ${healTarget} HP (${(multTarget * 100).toFixed(0)}×)!`)
+            logs.push(`→ Branquium Remendo! ${attacker.name} healed ${healAttacker} HP (${(multAttacker * 100).toFixed(0)}×) and ${target.name} healed ${healTarget} HP (${(multTarget * 100).toFixed(0)}×)!`)
           }
 
           // SILÊNCIO: silencia última magia do oponente por 1 turno E reduz 1 de mana
@@ -1460,9 +1460,9 @@ export function calculateTurnOutcome(params: {
                 }
                 return d
               })
-              logs.push(`→ Silêncio! "${lastSpell}" de ${target.name} foi silenciada por 1 turno e perdeu 1 de mana!`)
+              logs.push(`→ Silence! "${lastSpell}" of ${target.name} was silenced for 1 turn and lost 1 mana!`)
             } else {
-              logs.push(`→ Silêncio! ${target.name} ainda não usou nenhuma magia. Efeito falhou.`)
+              logs.push(`→ Silence! ${target.name} hasn't used any spell yet. Effect failed.`)
             }
           }
 
@@ -1474,7 +1474,7 @@ export function calculateTurnOutcome(params: {
               }
               return d
             })
-            logs.push(`→ Desilusão! ${target.name} está invisível! +25% chance de errar no próximo turno.`)
+            logs.push(`→ Desillusion! ${target.name} is invisible! +25% miss chance next turn.`)
           }
 
           // EXPULSO: remove 1 spell e insere outra imediatamente (sem "buraco" em spellMana/spells)
@@ -1488,7 +1488,7 @@ export function calculateTurnOutcome(params: {
                 // Check if the spell is locked by Seminviso
                 const lockedSpellInfo = params.spellDatabase.find(s => s.name === removedSpell)
                 if (lockedSpellInfo?.isLocked) {
-                  logs.push(`→ Expulso! "${removedSpell}" de ${target.name} está trancada pelo Seminviso! Expulso falhou.`)
+                  logs.push(`→ Expulso! "${removedSpell}" of ${target.name} is locked by Seminviso! Expulso failed.`)
                 } else {
                   const remainingKeys = targetSpells.filter((k) => k !== removedSpell)
                   const newSpell = pickExpulsoReplacementSpell(remainingKeys, params.spellDatabase)
@@ -1500,7 +1500,7 @@ export function calculateTurnOutcome(params: {
                     const keys = Object.keys(newSm).sort((a, b) => a.localeCompare(b))
                     return { ...d, spellMana: newSm, spells: keys }
                   })
-                  logs.push(`→ Expulso! ${attacker.name} substituiu "${removedSpell}" de ${target.name} por "${newSpell.name}"!`)
+                  logs.push(`→ Expulso! ${attacker.name} replaced "${removedSpell}" of ${target.name} with "${newSpell.name}"!`)
                 }
               }
             }
@@ -1512,9 +1512,9 @@ export function calculateTurnOutcome(params: {
             if (freshTarget?.wand && WAND_PASSIVES[freshTarget.wand]) {
               const strippedName = WAND_PASSIVES[freshTarget.wand].name
               state = state.map((d) => (d.id === target.id ? { ...d, wand: "" } : d))
-              logs.push(`→ 🔥 Flagrate! Núcleo "${strippedName}" de ${target.name} foi destruído!`)
+              logs.push(`→ 🔥 Flagrate! Core "${strippedName}" of ${target.name} was destroyed!`)
             } else {
-              logs.push(`→ Flagrate: ${target.name} não possui passiva de núcleo ativa.`)
+              logs.push(`→ Flagrate: ${target.name} has no active core passive.`)
             }
           }
 
@@ -1568,7 +1568,7 @@ export function calculateTurnOutcome(params: {
       // Fênix: cura 25-75 HP fixo por turno (atualizado)
       const healAmt = Math.floor(Math.random() * 51) + 25
       state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d))
-      logs.push(`→ 🦅 Pena de Fênix! ${attacker.name} se regenerou ${healAmt} HP!`)
+      logs.push(`→ 🦅 Phoenix Feather! ${attacker.name} regenerated ${healAmt} HP!`)
       // CHARM: espelha a cura de Phoenix para quem encantou o atacante
       const charmDebuff = atkAfter.debuffs.find((x) => x.type === "charm")
       if (charmDebuff?.meta) {
@@ -1633,7 +1633,7 @@ export function calculateTurnOutcome(params: {
         return d
       })
 
-      logs.push(`⚔️ PARRY PERFEITO! ${state.find((d) => d.id === actionA.casterId)?.name} refletiu o ${spellA} de ${state.find((d) => d.id === actionB.casterId)?.name} com o dobro de força!`)
+      logs.push(`⚔️ PERFECT PARRY! ${state.find((d) => d.id === actionA.casterId)?.name} reflected ${spellA} from ${state.find((d) => d.id === actionB.casterId)?.name} with double force!`)
     } else if (isParryingA) {
       // Parry failed: subtract 1 mana from PlayerA (cost of attempting parry)
       state = state.map((d) => {
@@ -1646,7 +1646,7 @@ export function calculateTurnOutcome(params: {
         }
         return d
       })
-      logs.push(`⚔️ PARRY falhou! ${state.find((d) => d.id === actionA.casterId)?.name} perdeu 1 de mana (feitiços diferentes).`)
+      logs.push(`⚔️ PARRY failed! ${state.find((d) => d.id === actionA.casterId)?.name} lost 1 mana (different spells).`)
     }
 
     // Same logic for PlayerB parrying
@@ -1676,7 +1676,7 @@ export function calculateTurnOutcome(params: {
         return d
       })
 
-      logs.push(`⚔️ PARRY PERFEITO! ${state.find((d) => d.id === actionB.casterId)?.name} refletiu o ${spellB} de ${state.find((d) => d.id === actionA.casterId)?.name} com o dobro de força!`)
+      logs.push(`⚔️ PERFECT PARRY! ${state.find((d) => d.id === actionB.casterId)?.name} reflected ${spellB} from ${state.find((d) => d.id === actionA.casterId)?.name} with double force!`)
     } else if (isParryingB && !isParryingA) {
       // Parry failed: subtract 1 mana from PlayerB (cost of attempting parry)
       state = state.map((d) => {
@@ -1689,7 +1689,7 @@ export function calculateTurnOutcome(params: {
         }
         return d
       })
-      logs.push(`⚔️ PARRY falhou! ${state.find((d) => d.id === actionB.casterId)?.name} perdeu 1 de mana (feitiços diferentes).`)
+      logs.push(`⚔️ PARRY failed! ${state.find((d) => d.id === actionB.casterId)?.name} lost 1 mana (different spells).`)
     }
 
     // Both parrying with same spell: both take 0 damage, both increment parryUses
@@ -1703,7 +1703,7 @@ export function calculateTurnOutcome(params: {
         }
         return d
       })
-      logs.push(`⚔️ EMPATE TÉCNICO DE PARRY! Ambos refletiram o ${spellA} simultaneamente!`)
+      logs.push(`⚔️ TECHNICAL PARRY DRAW! Both reflected ${spellA} simultaneously!`)
     }
   }
 
@@ -1733,11 +1733,11 @@ export function calculateTurnOutcome(params: {
   })
   for (const dot of dotInfo) {
     if (dot.burnDmg > 0) {
-      logs.push(`🔥 ${dot.name} sofreu ${dot.burnDmg} de dano por queimadura!`)
+      logs.push(`🔥 ${dot.name} suffered ${dot.burnDmg} burn damage!`)
       animationsToPlay.push({ type: "cast", casterId: dot.id, spellName: "Queimadura", targetId: dot.id, isMiss: false, isCrit: false, delay: 500, damage: dot.burnDmg, isBlock: false, fctOnly: true })
     }
     if (dot.poisonDmg > 0) {
-      logs.push(`☠️ ${dot.name} sofreu ${dot.poisonDmg} de dano por veneno!`)
+      logs.push(`☠️ ${dot.name} suffered ${dot.poisonDmg} poison damage!`)
       animationsToPlay.push({ type: "cast", casterId: dot.id, spellName: "Veneno", targetId: dot.id, isMiss: false, isCrit: false, delay: 500, damage: dot.poisonDmg, isBlock: false, fctOnly: true })
     }
   }
@@ -1748,9 +1748,9 @@ export function calculateTurnOutcome(params: {
     const bombDmg = capThestralIncomingDamage(bd.wand, bombRaw)
     if (bombDmg > 0) {
       if (WAND_PASSIVES[bd.wand ?? ""]?.effect === "thestral_cap300" && bombRaw > bombDmg) {
-        logs.push(`→ 🪶 Pêlo de Testrálio: ${bd.name} limitou a BOMBA a ${bombDmg} (${bombRaw} → cap 300).`)
+        logs.push(`→ 🪶 Thestral Hair: ${bd.name} capped the BOMB to ${bombDmg} (${bombRaw} → cap 300).`)
       }
-      logs.push(`💣 BOMBA explodiu em ${bd.name}! ${bombDmg} de dano!`)
+      logs.push(`💣 BOMB exploded on ${bd.name}! ${bombDmg} damage!`)
       state = state.map((d) =>
         d.id === bd.id
           ? {
