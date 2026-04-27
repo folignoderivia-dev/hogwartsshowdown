@@ -350,7 +350,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
   const getFCTFromAnim = (anim: EngineAnimation): { text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" } | null => {
     const spell = anim.spellName ? `${anim.spellName} ` : ""
     if (anim.fctMessage) return { text: anim.fctMessage, type: anim.isMiss ? "miss" : "heal" }
-    if (anim.isMiss) return { text: `${spell}ERROU!`, type: "miss" }
+    if (anim.isMiss) return { text: `${spell}MISSED!`, type: "miss" }
     if (anim.isBlock) return { text: `${spell}🛡 BLOQUEADO!`, type: "block" }
     const dmg = anim.damage ?? 0
     if (dmg <= 0) {
@@ -1024,7 +1024,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
               ) : (
                 <span className="text-2xl">🪄</span>
               )}
-              <span className="text-xs font-semibold text-amber-200">{Math.max(0, getTotalHP(duelist.hp))}%</span>
+              <span className="text-xs font-semibold text-amber-200">{Math.max(0, Math.min(100, (getTotalHP(duelist.hp) / (duelist.house === "slytherin" ? 400 : 500)) * 100))}%</span>
             </div>
             <div className="flex flex-wrap gap-1">
               {duelist.debuffs.map((db, idx) => (

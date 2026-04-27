@@ -815,7 +815,7 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
             <p className="font-bold leading-tight text-amber-100" style={{ fontSize: "0.85rem", textShadow: "0 1px 3px #000, 0 0 8px rgba(0,0,0,0.8)" }}>{duelist.name}</p>
             <div className="flex items-center justify-between">
               {HOUSE_CREST[duelist.house] && <img src={HOUSE_CREST[duelist.house]} alt={duelist.house} className="h-10 w-10 object-contain" />}
-              <span className="text-xs font-semibold text-amber-200">{Math.max(0, getTotalHP(duelist.hp))}%</span>
+              <span className="text-xs font-semibold text-amber-200">{Math.max(0, Math.min(100, (getTotalHP(duelist.hp) / (duelist.house === "slytherin" ? 400 : 500)) * 100))}%</span>
             </div>
             <div className="flex flex-wrap gap-1">
               {duelist.debuffs.map((db, idx) => (

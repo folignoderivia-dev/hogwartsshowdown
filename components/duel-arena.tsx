@@ -1783,7 +1783,7 @@ const DuelArena = (
               ) : (
                 <span className="text-2xl">🪄</span>
               )}
-              <span className="text-xs font-semibold text-amber-200">{Math.max(0, getTotalHP(duelist.hp))}%</span>
+              <span className="text-xs font-semibold text-amber-200">{Math.max(0, Math.min(100, (getTotalHP(duelist.hp) / (duelist.house === "slytherin" ? 400 : 500)) * 100))}%</span>
             </div>
             {/* Debuffs */}
             <div className="flex flex-wrap gap-1">

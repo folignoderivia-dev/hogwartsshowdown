@@ -435,7 +435,7 @@ export function calculateTurnOutcome(params: {
     }
 
     if (action.type === "skip") {
-      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} perdeu a vez!`)
+      logs.push(`[Turn ${params.turnNumber}]: ${attacker.name} lost their turn!`)
       animationsToPlay.push({ type: "skip", casterId: attacker.id, targetIds: [], delay: 1200 })
       continue
     }
@@ -459,7 +459,7 @@ export function calculateTurnOutcome(params: {
       // Marca a poção como usada
       state = state.map((d) => d.id === attacker.id ? { ...d, usedPotions: [...(d.usedPotions ?? []), potKey] } : d)
 
-      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} usou poção (${potKey})!`)
+      logs.push(`[Turn ${params.turnNumber}]: ${attacker.name} used potion (${potKey})!`)
 
       if (potKey === "wiggenweld") {
         const self = state.find((d) => d.id === attacker.id)
@@ -638,7 +638,7 @@ export function calculateTurnOutcome(params: {
         isMiss: true,
         fctOnly: true,
         delay: 500,
-        fctMessage: "Feitiço desconhecido",
+        fctMessage: "Unknown spell",
       })
       continue
     }
@@ -646,7 +646,7 @@ export function calculateTurnOutcome(params: {
 
     const cannotAct = attacker.debuffs.some((d) => d.type === "stun" || d.type === "freeze")
     if (cannotAct) {
-      logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} está impossibilitado de agir!`)
+      logs.push(`[Turn ${params.turnNumber}]: ${attacker.name} is unable to act!`)
       animationsToPlay.push({
         type: "cast",
         casterId: attacker.id,
@@ -756,7 +756,7 @@ export function calculateTurnOutcome(params: {
         fctMessage: `✨ ${sn}`,
       })
     }
-    logs.push(`[Turno ${params.turnNumber}]: ${attacker.name} lançou ${sn}${isAreaSpell(sn) ? " em área" : ` em ${targets[0].name}`}!`)
+    logs.push(`[Turn ${params.turnNumber}]: ${attacker.name} cast ${sn}${isAreaSpell(sn) ? " in area" : ` on ${targets[0].name}`}!`)
 
     const protegoBlocks = (def: Duelist) => {
       const silenced = def.debuffs.some((d) => d.type === "silence_defense")
@@ -970,7 +970,7 @@ export function calculateTurnOutcome(params: {
         logs.push(`→ ${attacker.name} usou Fiantu Dure! Restaurou +${restore} de mana em todos os feitiços.`)
       }
     } else if (n.includes("fumus")) {
-      logs.push(`→ 💨 ${attacker.name} lançou Fumus! Todos os efeitos de todos os bruxos foram removidos!`)
+      logs.push(`→ 💨 ${attacker.name} cast Fumus! All effects from all wizards have been removed!`)
       state = state.map((d) => ({
         ...d,
         debuffs: [],
@@ -997,7 +997,7 @@ export function calculateTurnOutcome(params: {
           )
         }
       }
-      logs.push(`→ ${attacker.name} lançou Circum Inflamare! Todos os inimigos em chamas (1t).`)
+      logs.push(`→ ${attacker.name} cast Circum Inflamare! All enemies in flames (1t).`)
     } else if (n.includes("protego") && n.includes("diabol")) {
       // Protego Diabólico: -15% precisão Maldições (todos inimigos) + escudo pessoal vs Maldições
       for (const t of targets) {
@@ -1015,7 +1015,7 @@ export function calculateTurnOutcome(params: {
           ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "protego_diabol"), { type: "protego_diabol" as const, duration: 2 }] }
           : d
       )
-      logs.push(`→ ${attacker.name} lançou Protego Diabólico! Escudo vs Maldições + -15% precisão inimiga (2t).`)
+      logs.push(`→ ${attacker.name} cast Protego Diabólico! Shield vs Curses + -15% enemy accuracy (2t).`)
     } else if (isAreaSpell(sn) && getSpellMaxPower(spell) > 0) {
       const ignoresDefense = spell.ignoresDefense === true
       for (const t of targets) {
@@ -1584,7 +1584,7 @@ export function calculateTurnOutcome(params: {
       // Fênix: cura 25-75 HP fixo por turno (atualizado)
       const healAmt = Math.floor(Math.random() * 51) + 25
       state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmt) } : d))
-      logs.push(`→ 🦅 Pena de Fênix! ${attacker.name} se regenerou ${healAmt} HP!`)
+      logs.push(`→ 🦅 Pena de Fênix! ${attacker.name} regenerated ${healAmt} HP!`)
       // CHARM: espelha a cura de Phoenix para quem encantou o atacante
       const charmDebuff = atkAfter.debuffs.find((x) => x.type === "charm")
       if (charmDebuff?.meta) {
