@@ -996,8 +996,8 @@ export default function CommonRoom({
 
   const handleStartDuel = () => {
     if (!currentUser) return
-    if (isReady && gameMode) {
-      _onStartDuel({
+    if (isReady && gameMode && onStartDuel) {
+      onStartDuel({
         name: currentUser.username,
         house,
         wand,
@@ -1307,7 +1307,7 @@ export default function CommonRoom({
                     className="border-purple-700 bg-purple-950/40 px-3 py-1 text-purple-300"
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (isReady && _onStartDuel) {
+                      if (isReady && onStartDuel) {
                         const build: PlayerBuild = {
                           name: currentUser.username,
                           house,
@@ -1320,7 +1320,7 @@ export default function CommonRoom({
                           username: currentUser.username,
                           elo: currentUser.elo,
                         }
-                        _onStartDuel(build)
+                        onStartDuel(build)
                       }
                     }}
                     disabled={!isReady}
