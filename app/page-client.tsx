@@ -31,6 +31,8 @@ export default function PageClient() {
   const ffaStatsAppliedRef = useRef<Set<string>>(new Set())
   const [isSpectator, setIsSpectator] = useState(false)
   const [resumableMatch, setResumableMatch] = useState<{ matchId: string; mode: PlayerBuild["gameMode"]; status: "waiting" | "in_progress" } | null>(null)
+  const [pendingRoomInvite, setPendingRoomInvite] = useState<string | null>(null)
+
   useEffect(() => {
     void (async () => {
       const id = await getSessionUserId()
@@ -39,6 +41,15 @@ export default function PageClient() {
         if (u) setAccountUser(u)
       }
     })()
+
+    // Check for room invite deep link
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search)
+      const roomParam = urlParams.get("room")
+      if (roomParam) {
+        setPendingRoomInvite(roomParam)
+      }
+    }
   }, [])
 
   const handleStartDuel = (build: PlayerBuild) => {
@@ -342,6 +353,7 @@ export default function PageClient() {
           onSpectateMatch={handleSpectateMatch}
           resumableMatch={resumableMatch}
           onResumeMatch={handleResumeMatch}
+          pendingRoomInvite={pendingRoomInvite}
         />
       ) : playerBuild?.gameMode === "quidditch" ? (
         <QuidditchArena

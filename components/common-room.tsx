@@ -65,6 +65,7 @@ interface CommonRoomProps {
   /** Conta logada (obrigatória para entrar na arena). */
   currentUser: DbUser | null
   onAuthChange: (user: DbUser | null) => void
+  pendingRoomInvite?: string | null
 }
 
 const HOUSES = [
@@ -228,7 +229,20 @@ const UI_LABELS: Record<AppLocale, Record<string, string>> = {
 const MAX_SPELL_POINTS = 6
 const MAX_UNFORGIVABLE = 1
 
-export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, onJoinRoom, onRefreshRooms, openRooms = [], onQuidditchRoomsUpdate, onSpectateMatch, onResumeMatch, resumableMatch, currentUser, onAuthChange }: CommonRoomProps) {
+export default function CommonRoom({
+  onStartDuel,
+  onCreateRoom,
+  onJoinRoom,
+  onRefreshRooms,
+  openRooms = [],
+  onQuidditchRoomsUpdate,
+  onSpectateMatch,
+  onResumeMatch,
+  resumableMatch,
+  currentUser,
+  onAuthChange,
+  pendingRoomInvite,
+}: CommonRoomProps) {
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
   const [authEmail, setAuthEmail] = useState("")
@@ -354,6 +368,123 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
   const [gachaShaking, setGachaShaking] = useState(false)
   const [revealedSticker, setRevealedSticker] = useState<string | null>(null)
   const [canClaimGacha, setCanClaimGacha] = useState(true)
+
+  // ── Deck Slots (Supabase) ─────────────────────────────────────────────────
+  interface DeckSlot {
+    slot_name: string
+    spells: string[]
+    wand: string
+    core: string
+    potions: string
+  }
+  const [deckSlots, setDeckSlots] = useState<DeckSlot[]>([])
+  const [showDeckSlots, setShowDeckSlots] = useState(false)
+  const [newSlotName, setNewSlotName] = useState("")
+
+  useEffect(() => {
+    if (currentUser) {
+      loadDeckSlots()
+    }
+  }, [currentUser])
+
+  // Handle room invite deep linking
+  useEffect(() => {
+    if (pendingRoomInvite && currentUser && onJoinRoom && openRooms.length > 0) {
+      const room = openRooms.find((r) => r.matchId === pendingRoomInvite)
+      if (room) {
+        const payload = buildPayload()
+        if (payload) {
+          handleJoinRoomClick(pendingRoomInvite)
+        }
+      }
+    }
+  }, [pendingRoomInvite, currentUser, openRooms, onJoinRoom])
+
+  const loadDeckSlots = async () => {
+    if (!currentUser) return
+    try {
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("deck_slots")
+        .eq("id", currentUser.id)
+        .single()
+      
+      if (error) {
+        console.error("Failed to load deck slots:", error)
+        return
+      }
+      
+      if (data?.deck_slots) {
+        setDeckSlots(data.deck_slots)
+      }
+    } catch (error) {
+      console.error("Failed to load deck slots:", error)
+    }
+  }
+
+  const saveToNewSlot = async () => {
+    if (!currentUser || !newSlotName.trim()) return
+    
+    const newSlot: DeckSlot = {
+      slot_name: newSlotName.trim(),
+      spells: selectedSpells,
+      wand,
+      core: wand,
+      potions: potion,
+    }
+    
+    const updatedSlots = [...deckSlots, newSlot]
+    
+    try {
+      const supabase = getSupabaseClient()
+      const { error } = await supabase
+        .from("profiles")
+        .update({ deck_slots: updatedSlots })
+        .eq("id", currentUser.id)
+      
+      if (error) {
+        console.error("Failed to save deck slot:", error)
+        return
+      }
+      
+      setDeckSlots(updatedSlots)
+      setNewSlotName("")
+      setShowDeckSlots(false)
+    } catch (error) {
+      console.error("Failed to save deck slot:", error)
+    }
+  }
+
+  const loadDeckSlot = (slot: DeckSlot) => {
+    setWand(slot.wand)
+    setPotion(slot.potions)
+    setSelectedSpells(slot.spells.filter((s) => SPELL_DATABASE.some((sp) => sp.name === s)))
+    setShowDeckSlots(false)
+  }
+
+  const deleteDeckSlot = async (index: number) => {
+    if (!currentUser) return
+    const updatedSlots = deckSlots.filter((_, i) => i !== index)
+    const userId = currentUser.id
+    
+    try {
+      const supabase = getSupabaseClient()
+      const { error } = await supabase
+        .from("profiles")
+        .update({ deck_slots: updatedSlots })
+        .eq("id", userId)
+      
+      if (error) {
+        console.error("Failed to delete deck slot:", error)
+        return
+      }
+      
+      setDeckSlots(updatedSlots)
+    } catch (error) {
+      console.error("Failed to delete deck slot:", error)
+    }
+  }
 
   // ── Builds Salvas ────────────────────────────────────────────────────────
   interface SavedBuild {
@@ -1034,6 +1165,17 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
 
   return (
     <div className="min-h-screen bg-cover bg-center bg-fixed p-2 sm:p-3 lg:p-4" style={{ backgroundImage: "url('https://i.postimg.cc/D0y9DbnS/clube.png')" }}>
+      {/* ── Mini Online Players List ───────────────────────────────────────────── */}
+      <div className="sticky top-0 z-40 bg-stone-900/95 border-b border-amber-800/30 px-2 py-1">
+        <div className="mx-auto max-w-[1400px]">
+          <div className="flex items-center gap-2 text-[10px] text-amber-300/80">
+            <span className="text-green-400">🟢</span>
+            <span>{locale === "pt" ? "Online:" : "Online:"}</span>
+            <span className="text-amber-200">{onlineWizards}</span>
+          </div>
+        </div>
+      </div>
+
       {/* ── Banner BETA ─────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-amber-900/95 px-4 py-1.5 text-xs font-medium text-amber-100 shadow-md backdrop-blur-sm">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />
@@ -1479,14 +1621,31 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                         {modeLabel} · Host: {r.host} · {r.playersJoined}/{r.playersExpected}
                         {r.isVipRoom && <span className="ml-2 text-yellow-400 font-bold">[{locale === 'en' ? 'VIP ROOM' : 'SALA VIP'}]</span>}
                       </span>
-                      <Button
-                        size="sm"
-                        className="h-7 border border-amber-700 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50"
-                        onClick={() => handleJoinRoomClick(r.matchId)}
-                        disabled={!currentUser}
-                      >
-                        {ui.join}
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 border-amber-700 bg-stone-800 text-amber-300 hover:bg-amber-900/30"
+                          onClick={async () => {
+                            const origin = typeof window !== "undefined" ? window.location.origin : ""
+                            const inviteUrl = `${origin}/?room=${encodeURIComponent(r.matchId)}`
+                            await navigator.clipboard.writeText(inviteUrl)
+                            setShareFeedback(locale === 'en' ? 'Invite link copied!' : 'Link de convite copiado!')
+                            window.setTimeout(() => setShareFeedback(""), 1800)
+                          }}
+                          title={locale === 'en' ? 'Copy invite link' : 'Copiar link de convite'}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 border border-amber-700 bg-amber-900/40 text-amber-100 hover:bg-amber-800/50"
+                          onClick={() => handleJoinRoomClick(r.matchId)}
+                          disabled={!currentUser}
+                        >
+                          {locale === 'en' ? 'Join' : 'Entrar'}
+                        </Button>
+                      </div>
                     </div>
                     )
                   })}
@@ -2054,6 +2213,43 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
                 </p>
               </div>
               
+              {/* ── Deck Slots (Supabase) ────────────────────────────────────────── */}
+              {currentUser && (
+                <div className="mb-3">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <p className="flex items-center gap-1 text-xs text-amber-400">
+                      <FolderOpen className="h-3.5 w-3.5" />
+                      {locale === 'en' ? 'Deck Slots' : 'Slots de Deck'}
+                    </p>
+                    <div className="flex gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowDeckSlots(true)}
+                        className="h-6 px-2 text-[10px] border-amber-700 bg-stone-800 text-amber-300 hover:bg-amber-900/30"
+                      >
+                        <FolderOpen className="h-3 w-3 mr-1" />
+                        {locale === 'en' ? 'Load' : 'Carregar'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setNewSlotName(`Deck ${deckSlots.length + 1}`)
+                          setShowDeckSlots(true)
+                        }}
+                        className="h-6 px-2 text-[10px] border-amber-700 bg-stone-800 text-amber-300 hover:bg-amber-900/30"
+                      >
+                        <Save className="h-3 w-3 mr-1" />
+                        {locale === 'en' ? 'Save New' : 'Salvar Novo'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ── Builds Salvas ────────────────────────────────────────────── */}
               {currentUser && savedBuilds.length > 0 && (
                 <div className="mb-3">
@@ -2582,6 +2778,87 @@ export default function CommonRoom({ onStartDuel: _onStartDuel, onCreateRoom, on
         </div>
       )}
       
+      {/* ── Deck Slots Modal ───────────────────────────────────────────────────── */}
+      {showDeckSlots && (
+        <Dialog open={showDeckSlots} onOpenChange={setShowDeckSlots}>
+          <DialogContent className="max-h-[92vh] overflow-y-auto border-amber-700/50 bg-stone-900 text-amber-100">
+            <DialogHeader>
+              <DialogTitle className="text-amber-300">
+                <FolderOpen className="mr-2 inline h-5 w-5" />
+                {locale === "pt" ? "Slots de Deck" : "Deck Slots"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Save New Slot */}
+              <div className="rounded border border-amber-700/50 bg-amber-950/30 p-3">
+                <p className="mb-2 text-sm font-medium text-amber-300">{locale === "pt" ? "Salvar Deck Atual" : "Save Current Deck"}</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newSlotName}
+                    onChange={(e) => setNewSlotName(e.target.value)}
+                    placeholder={locale === "pt" ? "Nome do deck..." : "Deck name..."}
+                    className="border-amber-800 bg-stone-800 text-amber-100 placeholder-amber-500"
+                  />
+                  <Button
+                    onClick={saveToNewSlot}
+                    disabled={!newSlotName.trim()}
+                    className="bg-amber-700 hover:bg-amber-600 text-white"
+                  >
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Load Existing Slots */}
+              {deckSlots.length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-amber-300">{locale === "pt" ? "Carregar Deck" : "Load Deck"}</p>
+                  <div className="space-y-2">
+                    {deckSlots.map((slot, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between rounded border border-amber-700/50 bg-stone-800 p-3"
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium text-amber-200">{slot.slot_name}</p>
+                          <p className="text-xs text-amber-400/70">
+                            {locale === "pt" ? "Feitiços:" : "Spells:"} {slot.spells.length} · {locale === "pt" ? "Núcleo:" : "Core:"} {slot.core}
+                          </p>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => loadDeckSlot(slot)}
+                            className="border-amber-700 bg-stone-800 text-amber-300 hover:bg-amber-900/30"
+                          >
+                            <FolderOpen className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => deleteDeckSlot(index)}
+                            className="border-red-700 bg-stone-800 text-red-300 hover:bg-red-900/30"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {deckSlots.length === 0 && (
+                <p className="text-center text-sm text-amber-400/70">
+                  {locale === "pt" ? "Nenhum deck salvo ainda." : "No decks saved yet."}
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* ── Gacha Modal ──────────────────────────────────────────────────────────── */}
       {showGacha && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
