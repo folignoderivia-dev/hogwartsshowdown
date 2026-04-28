@@ -42,7 +42,7 @@ export default function AdminBalancePanel({ isOpen, onClose, currentUser }: Admi
       // READ-ONLY: Fetch all profiles
       const { data: profiles, error } = await supabase
         .from("profiles")
-        .select("spells, potions, wand, core")
+        .select("deck_slots")
 
       if (error) {
         console.error("Failed to fetch profiles:", error)
@@ -56,39 +56,53 @@ export default function AdminBalancePanel({ isOpen, onClose, currentUser }: Admi
 
       setTotalPlayers(profiles.length)
 
-      // Aggregate spells
+      // Aggregate spells from deck_slots
       const spellCounts: Record<string, number> = {}
       profiles.forEach((profile) => {
-        if (Array.isArray(profile.spells)) {
-          profile.spells.forEach((spell: string) => {
-            spellCounts[spell] = (spellCounts[spell] || 0) + 1
+        if (Array.isArray(profile.deck_slots)) {
+          profile.deck_slots.forEach((slot: { spells?: string[] }) => {
+            if (Array.isArray(slot.spells)) {
+              slot.spells.forEach((spell: string) => {
+                spellCounts[spell] = (spellCounts[spell] || 0) + 1
+              })
+            }
           })
         }
       })
 
-      // Aggregate potions
+      // Aggregate potions from deck_slots
       const potionCounts: Record<string, number> = {}
       profiles.forEach((profile) => {
-        if (Array.isArray(profile.potions)) {
-          profile.potions.forEach((potion: string) => {
-            potionCounts[potion] = (potionCounts[potion] || 0) + 1
+        if (Array.isArray(profile.deck_slots)) {
+          profile.deck_slots.forEach((slot: { potions?: string }) => {
+            if (slot.potions) {
+              potionCounts[slot.potions] = (potionCounts[slot.potions] || 0) + 1
+            }
           })
         }
       })
 
-      // Aggregate cores
+      // Aggregate cores from deck_slots
       const coreCounts: Record<string, number> = {}
       profiles.forEach((profile) => {
-        if (profile.core) {
-          coreCounts[profile.core] = (coreCounts[profile.core] || 0) + 1
+        if (Array.isArray(profile.deck_slots)) {
+          profile.deck_slots.forEach((slot: { core?: string }) => {
+            if (slot.core) {
+              coreCounts[slot.core] = (coreCounts[slot.core] || 0) + 1
+            }
+          })
         }
       })
 
-      // Aggregate wands
+      // Aggregate wands from deck_slots
       const wandCounts: Record<string, number> = {}
       profiles.forEach((profile) => {
-        if (profile.wand) {
-          wandCounts[profile.wand] = (wandCounts[profile.wand] || 0) + 1
+        if (Array.isArray(profile.deck_slots)) {
+          profile.deck_slots.forEach((slot: { wand?: string }) => {
+            if (slot.wand) {
+              wandCounts[slot.wand] = (wandCounts[slot.wand] || 0) + 1
+            }
+          })
         }
       })
 
