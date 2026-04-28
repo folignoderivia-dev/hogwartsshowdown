@@ -15,8 +15,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload, X, Save, FolderOpen, Trash2, Lock } from "lucide-react"
+import { Wand2, FlaskConical, BookOpen, Sparkles, User, Search, Swords, AlertTriangle, Shield, Zap, Heart, Wind, LogIn, Trophy, Bug, Crown, Copy, Upload, X, Save, FolderOpen, Trash2, Lock, TrendingUp } from "lucide-react"
 import AdminErrorPanel from "./admin-error-panel"
+import AdminBalancePanel from "./admin-balance-panel"
 import { formatSpellPower, INITIAL_PLAYER_BUILD, SPELL_DATABASE, type SpellInfo } from "@/lib/data-store"
 import type { PlayerBuild, CustomRoomSettings, GameMode } from "@/lib/types"
 import type { DbUser, FriendMessage, FriendProfile } from "@/lib/database"
@@ -272,6 +273,7 @@ export default function CommonRoom({
   const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest" | "march" | "damagewb" | "story">("elo")
   const [shareFeedback, setShareFeedback] = useState("")
   const [showAdminPanel, setShowAdminPanel] = useState(false)
+  const [showBalancePanel, setShowBalancePanel] = useState(false)
   const [isGmModalOpen, setIsGmModalOpen] = useState(false)
   const [gmMessage, setGmMessage] = useState("")
 
@@ -1326,16 +1328,28 @@ export default function CommonRoom({
                   </Button>
                 )}
                 {currentUser?.isAdmin && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-purple-700 bg-purple-950/30 text-purple-200 hover:bg-purple-950/50"
-                    onClick={() => window.location.href = "/admin"}
-                  >
-                    <Shield className="mr-1 h-3.5 w-3.5" />
-                    {locale === "pt" ? "Painel Admin" : "Admin Panel"}
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-green-700 bg-green-950/30 text-green-200 hover:bg-green-950/50"
+                      onClick={() => setShowBalancePanel(true)}
+                    >
+                      <TrendingUp className="mr-1 h-3.5 w-3.5" />
+                      {locale === "pt" ? "Meta/Balance" : "Meta/Balance"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-purple-700 bg-purple-950/30 text-purple-200 hover:bg-purple-950/50"
+                      onClick={() => window.location.href = "/admin"}
+                    >
+                      <Shield className="mr-1 h-3.5 w-3.5" />
+                      {locale === "pt" ? "Painel Admin" : "Admin Panel"}
+                    </Button>
+                  </>
                 )}
                 <Button
                   type="button"
@@ -2982,6 +2996,14 @@ export default function CommonRoom({
         <AdminErrorPanel
           isOpen={showAdminPanel}
           onClose={() => setShowAdminPanel(false)}
+          currentUser={currentUser}
+        />
+      )}
+      
+      {currentUser && (
+        <AdminBalancePanel
+          isOpen={showBalancePanel}
+          onClose={() => setShowBalancePanel(false)}
           currentUser={currentUser}
         />
       )}
