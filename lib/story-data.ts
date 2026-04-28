@@ -31,7 +31,7 @@ export const STORY_BOSSES: StoryBoss[] = [
     house: "gryffindor",
     wand: "phoenix",
     potion: "wiggenweld",
-    spells: ["Expelliarmus", "Expecto Patronum", "Estupefaca", "Protego", "Protego Maximo", "Lumus"]
+    spells: ["Expelliarmus", "Expecto Patronum", "Stupefy", "Protego", "Protego Maximo", "Lumus"]
   },
   {
     id: 3,

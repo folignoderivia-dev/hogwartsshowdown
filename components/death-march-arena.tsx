@@ -226,7 +226,7 @@ const FIELD_RULES: FieldRule[] = [
 
 const HOUSES = ["gryffindor", "slytherin", "ravenclaw", "hufflepuff"]
 const WANDS = ["holly", "vine", "dragon", "phoenix", "unicorn", "thunderbird"]
-const ALL_SPELLS = SPELL_DATABASE.filter(s => !s.isVipOnly).map(s => s.name)
+const ALL_SPELLS = SPELL_DATABASE.map(s => s.name)
 
 export default function DeathMarchArena({ playerBuild, currentUser, onExit }: DeathMarchArenaProps) {
   const { locale } = useLanguage()

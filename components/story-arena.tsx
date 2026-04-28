@@ -516,7 +516,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       usedPotions: [],
     }
     
-    const bossSpells = baseBoss.spells.length > 0 ? baseBoss.spells : SPELL_DATABASE.filter(s => !s.isVipOnly).map(s => s.name)
+    const bossSpells = baseBoss.spells.length > 0 ? baseBoss.spells : SPELL_DATABASE.map(s => s.name)
     
     // PASSO 2: APLICANDO O HP (UI)
     // Distribute maxHp evenly across the HP bars (each bar max is 100)
