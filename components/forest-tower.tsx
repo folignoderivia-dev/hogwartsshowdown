@@ -260,6 +260,7 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     if (playerBuild.house === "slytherin") {
       critChance += 25 // Slytherin gets +25% crit chance
     }
+    critChance += 25 // Forbidden Forest mode: +25% fixed crit chance for players
     
     const isCrit = canCrit && Math.random() * 100 < critChance
     

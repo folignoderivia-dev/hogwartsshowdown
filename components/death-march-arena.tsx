@@ -727,11 +727,15 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
   }
   
   const handleExit = async () => {
-    // Save march record before exiting
+    // Save march record before exiting (only updates if higher than existing record)
     const success = await updateMarchRecord(currentUser.id, marchWins)
     if (!success) {
       addLog(locale === "en" ? "⚠️ Failed to save march record on exit!" : "⚠️ Falha ao salvar recorde de marcha ao sair!")
     }
+    
+    // Reset marchWins to 0 for next session
+    setMarchWins(0)
+    
     onExit()
   }
 
@@ -739,11 +743,14 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     setGameOver("lose")
     addLog(locale === "en" ? "You were defeated..." : "Você foi derrotado...")
     
-    // Save march record on lose
+    // Save march record on lose (only updates if higher than existing record)
     const success = await updateMarchRecord(currentUser.id, marchWins)
     if (!success) {
       addLog(locale === "en" ? "⚠️ Failed to save march record!" : "⚠️ Falha ao salvar recorde de marcha!")
     }
+    
+    // Reset marchWins to 0 for next session
+    setMarchWins(0)
     
     setTimeout(() => onExit(), 2000)
   }
