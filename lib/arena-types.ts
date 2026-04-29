@@ -36,6 +36,7 @@ export type DebuffType =
   // Status de núcleos
   | "invulnerable" // Oraqui Orala: dano recebido será 0 (1 turno)
   | "invisibility" // Desilusão: oponente tem +25% chance de errar (1 turno)
+  | "blindness" // Lumus: -10% accuracy em todas spells (2t)
 
 export type BattleStatus = "idle" | "selecting" | "resolving" | "finished"
 

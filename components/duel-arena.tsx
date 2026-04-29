@@ -137,6 +137,7 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   damage_amp: "⬆️ DAMAGE+",
   arestum_penalty: "⬇️ ATK/ACC",
   lumus_acc_down: "💡 ACC-20%",
+  blindness: "💡 BLINDNESS",
   spell_disable: "🔒 DISABLE",
   salvio_reflect: "🪞 REFLECT",
   anti_debuff: "✨ ANTI-DEBUFF",
@@ -172,6 +173,7 @@ const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
   damage_amp: "AMPLIFIED DAMAGE!",
   arestum_penalty: "SLOWED!",
   lumus_acc_down: "BLINDED!",
+  blindness: "BLINDED!",
   invisibility: "INVISIBILIZED!",
   spell_disable: "DISABLED!",
   salvio_reflect: "REFLECTED!",
@@ -1557,10 +1559,26 @@ const DuelArena = (
     if (!selfDuelistId) return
     if (!isOnlineMatch && pendingActions[selfDuelistId]) return
     if (!player || isDefeated(player.hp)) return
+
+    // Intel tools (Legilimens, Reveal Your Secrets): free clicks, don't consume mana or end turn
+    const spInfo = getSpellInfo(spellName, SPELL_DATABASE)
+    if (spInfo?.special === "legilimens_reveal" || spInfo?.special === "reveal_wand_core") {
+      const opponent = duelists.find((d) => d.team === "enemy" && !isDefeated(d.hp))
+      if (opponent) {
+        if (spInfo.special === "legilimens_reveal") {
+          const spellList = Object.keys(opponent.spellMana ?? {}).join(", ") || "?"
+          alert(`🔮 Legilimens! Grimoire of ${opponent.name}: [${spellList}]`)
+        } else if (spInfo.special === "reveal_wand_core") {
+          const passive = opponent.wand ? WAND_PASSIVES[opponent.wand] : null
+          alert(`🔍 Reveal Your Secrets! Core of ${opponent.name}: ${passive?.name ?? "Unknown"} — ${passive?.description ?? ""}`)
+        }
+      }
+      return
+    }
+
     const mana = player.spellMana?.[spellName]
     if (!mana || mana.current <= 0) return
     if ((player.disabledSpells?.[spellName] ?? 0) > 0) return
-    const spInfo = getSpellInfo(spellName, SPELL_DATABASE)
     if (player.debuffs.some((d) => d.type === "paralysis") && (spInfo?.priority ?? 0) > 0) return
     const taunt = player.debuffs.find((d) => d.type === "taunt")
     if (taunt && player.lastSpellUsed && spellName !== player.lastSpellUsed) return

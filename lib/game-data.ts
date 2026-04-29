@@ -789,11 +789,10 @@ export const SPELL_DATABASE: SpellInfo[] = [
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
     cost: 1,                       // Custo de mana por uso
-    isVipOnly: true,               // Exclusivo para jogadores VIP
     canCrit: false,                // Nunca causa crítico
     special: "legilimens_reveal",
-    effect: "👑 VIP: Reveals opponent's current Grimoire",
-    effectPt: "👑 VIP: Revela o Grimório atual do oponente",
+    effect: "Intel: Reveals opponent's current Grimoire",
+    effectPt: "Intel: Revela o Grimório atual do oponente",
   },
   {
     name: "Fogo Maldito",
@@ -816,11 +815,10 @@ export const SPELL_DATABASE: SpellInfo[] = [
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
     cost: 1,                       // Custo de mana por uso
-    isVipOnly: true,               // Exclusivo para jogadores VIP
     canCrit: false,                // Nunca causa crítico
     special: "reveal_wand_core",
-    effect: "👑 VIP: Reveals opponent's wand Core",
-    effectPt: "👑 VIP: Revela o Núcleo da varinha do oponente",
+    effect: "Intel: Reveals opponent's wand Core",
+    effectPt: "Intel: Revela o Núcleo da varinha do oponente",
   },
   {
     name: "Bombarda Maxima",

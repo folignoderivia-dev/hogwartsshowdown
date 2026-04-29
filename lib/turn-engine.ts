@@ -15,7 +15,7 @@ const TREVUS_RANDOM_DEBUFFS: DebuffType[] = [
   "silence_defense",
   "no_potion",
   "arestum_penalty",
-  "lumus_acc_down",
+  "blindness",
   "mark",
 ]
 
@@ -214,7 +214,7 @@ export const calculateAccuracy = (
   }
   accuracy -= (defender.arrestoStacks ?? 0) * 5
   // Debuffs de redução de accuracy (aplicados corretamente)
-  if (attacker.debuffs.some((d) => d.type === "lumus_acc_down")) accuracy -= 10
+  if (attacker.debuffs.some((d) => d.type === "blindness")) accuracy -= 10
   // DESILUSÃO: +25% chance de errar
   if (attacker.debuffs.some((d) => d.type === "invisibility")) accuracy -= 25
   // ARESTUM MOMENTUM: -5% acerto por stack
@@ -1175,6 +1175,19 @@ export function calculateTurnOutcome(params: {
             damage = Math.round(damage * (1 + 0.3 * target.debuffs.length))
           }
 
+          // DEPULSO: +50% dano se for o único spell de poder na build
+          if (n.includes("depulso") && damage > 0) {
+            const playerSpells = Object.keys(atkLive.spellMana ?? {})
+            const powerSpells = playerSpells.filter(spellName => {
+              const spellInfo = getSpellInfo(spellName, params.spellDatabase)
+              return spellInfo && getSpellMaxPower(spellInfo) > 0
+            })
+            if (powerSpells.length === 1 && powerSpells[0] === sn) {
+              damage = Math.round(damage * 1.5)
+              logs.push(`→ Depulso Solo Power! ${attacker.name}'s only damage spell - +50% damage!`)
+            }
+          }
+
           if (damage > 0 && spell.canCrit !== false && Math.random() < getCritChance(attacker, target, n, logs)) {
             damage *= 2
             isCrit = true
@@ -1221,10 +1234,10 @@ export function calculateTurnOutcome(params: {
           if (n.includes("lumus") && !bloqueado) {
             state = state.map((d) =>
               d.id === target.id
-                ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "lumus_acc_down"), { type: "lumus_acc_down", duration: 2 }] }
+                ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "blindness"), { type: "blindness", duration: 2 }] }
                 : d
             )
-            logs.push(`→ Lumus! ${target.name} suffers −10% accuracy (2t).`)
+            logs.push(`→ Lumus! ${target.name} suffers −10% accuracy on all spells (2t).`)
           }
 
           // PETRIFICUS TOTALES: bloqueia 1 feitiço aleatório (2t)
