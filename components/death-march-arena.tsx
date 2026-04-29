@@ -149,7 +149,9 @@ function buildSpellManaForSpells(spells: string[], house: string, multiplier: nu
     let max = spell.cost || 3
     if (house === "gryffindor") max = Math.max(1, max + HOUSE_GDD.gryffindor.manaStartDelta)
     if (house === "ravenclaw" && !spell.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
-    max = Math.round(max * multiplier)
+    // For exaustao_arcana rule, multiplier should increase cost, not max mana
+    // So we divide by multiplier to effectively increase cost when multiplier > 1
+    max = multiplier > 1 ? Math.round(max / multiplier) : Math.round(max * multiplier)
     out[sn] = { current: max, max }
   })
   return out
