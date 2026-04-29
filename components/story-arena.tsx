@@ -265,6 +265,9 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       return
     }
 
+    console.log(`[playSpellVfx] Starting spell animation for ${spellName} by ${attacker.id}`)
+    console.log(`[playSpellVfx] Available wand refs:`, Object.keys(wandRefs.current))
+
     // Increased delay to ensure wand ref is available
     await sleep(200)
 
@@ -278,7 +281,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       // Get center of wand hand image
       const centerX = r.left - rect.left + r.width / 2
       const centerY = r.top - rect.top + r.height / 2
-      console.log(`[playSpellVfx] Wand point for ${id}:`, { centerX, centerY })
+      console.log(`[playSpellVfx] Wand point for ${id}:`, { centerX, centerY, wandRect: { left: r.left, top: r.top, width: r.width, height: r.height }, arenaRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } })
       return { x: centerX, y: centerY }
     }
 
