@@ -91,7 +91,7 @@ const DEBUFF_LABEL: Record<string, string> = {
   stun: "⚡ STUN",
   taunt: "🧠 TAUNT",
   disarm: "🪄 DISARM",
-  protego: "�️ PROTEGO",
+  protego: "🛡️ PROTEGO",
   slow: "⏳ SLOW",
   mark: "◎ MARK",
   confusion: "😵 CONFUSION",
@@ -103,6 +103,7 @@ const DEBUFF_LABEL: Record<string, string> = {
   damage_amp: "⬆️ DAMAGE+",
   arestum_penalty: "⬇️ ATK/ACC",
   lumus_acc_down: "💡 ACC-20%",
+  blindness: "💡 BLINDNESS",
   spell_disable: "🔒 DISABLE",
   salvio_reflect: "🪞 REFLECT",
   anti_debuff: "✨ ANTI-DEBUFF",
@@ -114,7 +115,8 @@ const DEBUFF_LABEL: Record<string, string> = {
   damage_reduce: "⬇️ DAMAGE-25%",
   protego_diabol: "🛡️ DIABOLICAL",
   crit_down: "⬇️ CRIT-10%",
-  undead: "🧟 UNDEAD(1t)",
+  bleed: "🩸 BLEED",
+  undead: "💀 UNDEAD(1t)",
   immunity: "🛡️ IMMUNITY",
   charm: "💖 CHARM",
   unforgivable_block: "🜏 CURSE BLOCK",
@@ -163,6 +165,7 @@ const DEBUFF_FLASH: Record<string, string> = {
   crit_down: "CRITICAL −!",
   bomba: "BOMB!",
   bloqueio_cura: "NO HEAL!",
+  bleed: "BLEEDING!",
 }
 const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")
 

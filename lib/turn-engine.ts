@@ -16,6 +16,7 @@ const TREVUS_RANDOM_DEBUFFS: DebuffType[] = [
   "no_potion",
   "arestum_penalty",
   "blindness",
+  "bleed",
   "mark",
 ]
 
@@ -904,9 +905,11 @@ export function calculateTurnOutcome(params: {
           d.id === attacker.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "salvio_reflect"), { type: "salvio_reflect", duration: 1 }] } : d
         )
       } else if (n.includes("vulnera") && n.includes("sanetur")) {
-        state = state.map((d) =>
-          d.id === attacker.id ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "anti_debuff"), { type: "anti_debuff", duration: 2 }] } : d
-        )
+        // Vulnera Sanetur: lifesteal - heals damage caused by enemy this turn
+        // The actual healing happens at the end of the turn when damage is calculated
+        // Set a flag to track that Vulnera Sanetur was used
+        state = state.map((d) => (d.id === attacker.id ? { ...d, vulneraActive: true } : d))
+        logs.push(`→ Vulnera Sanetur! ${attacker.name} prepares to heal from enemy damage this turn!`)
       } else if (n.includes("episkey")) {
         state = state.map((d) =>
           d.id === attacker.id
@@ -1391,11 +1394,14 @@ export function calculateTurnOutcome(params: {
             }
           }
 
-          // SECTUMSEMPRA: lifesteal — cura metade do dano causado
-          if (spell.special === "sectumsempra_lifesteal_half" && damage > 0 && !bloqueado) {
-            const healAmount = Math.round(damage / 2)
-            state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmount) } : d))
-            logs.push(`→ Sectumsempra! ${attacker.name} healed ${healAmount} HP from damage caused (half of ${damage})!`)
+          // SECTUMSEMPRA: causes bleeding (50 damage/turn for 2 turns)
+          if (n.includes("sectumsempra") && !bloqueado) {
+            state = state.map((d) =>
+              d.id === target.id
+                ? { ...d, debuffs: [...d.debuffs.filter((x) => x.type !== "bleed"), { type: "bleed", duration: 2 }] }
+                : d
+            )
+            logs.push(`→ Sectumsempra! ${target.name} is BLEEDING (50 damage/turn, 2t)!`)
           }
 
           // FINITE INCANTATEM: transfere debuffs do usuário para o alvo
@@ -1721,11 +1727,12 @@ export function calculateTurnOutcome(params: {
   }
 
   // ── Dano periódico (DoT) com FCT visível ───────────────────────────────────
-  const dotInfo: Array<{ id: string; name: string; burnDmg: number; poisonDmg: number }> = []
+  const dotInfo: Array<{ id: string; name: string; burnDmg: number; poisonDmg: number; bleedDmg: number }> = []
   state = state.map((d) => {
     let hp = d.hp
     let burnDmg = 0,
-      poisonDmg = 0
+      poisonDmg = 0,
+      bleedDmg = 0
     let lastTick = d.lastSingleHitDamageReceived
     if (d.debuffs.some((x) => x.type === "burn")) {
       burnDmg = capThestralIncomingDamage(d.wand, 25)
@@ -1737,11 +1744,16 @@ export function calculateTurnOutcome(params: {
       hp = applyDamage(hp, poisonDmg, { thestral: d.wand === "thestral" })
       lastTick = poisonDmg
     }
-    if (burnDmg > 0 || poisonDmg > 0) dotInfo.push({ id: d.id, name: d.name, burnDmg, poisonDmg })
+    if (d.debuffs.some((x) => x.type === "bleed")) {
+      bleedDmg = capThestralIncomingDamage(d.wand, 50)
+      hp = applyDamage(hp, bleedDmg, { thestral: d.wand === "thestral" })
+      lastTick = bleedDmg
+    }
+    if (burnDmg > 0 || poisonDmg > 0 || bleedDmg > 0) dotInfo.push({ id: d.id, name: d.name, burnDmg, poisonDmg, bleedDmg })
     return {
       ...d,
       hp,
-      lastSingleHitDamageReceived: burnDmg > 0 || poisonDmg > 0 ? lastTick : d.lastSingleHitDamageReceived,
+      lastSingleHitDamageReceived: burnDmg > 0 || poisonDmg > 0 || bleedDmg > 0 ? lastTick : d.lastSingleHitDamageReceived,
     }
   })
   for (const dot of dotInfo) {
@@ -1753,8 +1765,20 @@ export function calculateTurnOutcome(params: {
       logs.push(`☠️ ${dot.name} suffered ${dot.poisonDmg} poison damage!`)
       animationsToPlay.push({ type: "cast", casterId: dot.id, spellName: "Veneno", targetId: dot.id, isMiss: false, isCrit: false, delay: 500, damage: dot.poisonDmg, isBlock: false, fctOnly: true })
     }
+    if (dot.bleedDmg > 0) {
+      logs.push(`🩸 ${dot.name} suffered ${dot.bleedDmg} bleed damage!`)
+      animationsToPlay.push({ type: "cast", casterId: dot.id, spellName: "Sangramento", targetId: dot.id, isMiss: false, isCrit: false, delay: 500, damage: dot.bleedDmg, isBlock: false, fctOnly: true })
+    }
   }
-  // BOMBA: explode quando o contador expira (duration === 1, prestes a ser removido)
+  // ── Vulnera Sanetur: lifesteal healing at end of turn ─────────────────────────
+  const vulneraHealers = state.filter((d) => (d as any).vulneraActive && (d.damageReceivedThisTurn ?? 0) > 0)
+  for (const healer of vulneraHealers) {
+    const healAmount = healer.damageReceivedThisTurn ?? 0
+    state = state.map((d) => (d.id === healer.id ? { ...d, hp: healFlatTotal(d.hp, healAmount), vulneraActive: false } : d))
+    logs.push(`→ Vulnera Sanetur! ${healer.name} healed ${healAmount} HP from damage received this turn!`)
+  }
+
+  // ── BOMBA: explode quando o contador expira (duration === 1, prestes a ser removido)
   const bombaTargets = state.filter((d) => d.debuffs.some((x) => x.type === "bomba" && x.duration === 1))
   for (const bd of bombaTargets) {
     const bombRaw = Math.round(((500 - getTotalHP(bd.hp)) / 100) * 25)

@@ -614,10 +614,9 @@ export const SPELL_DATABASE: SpellInfo[] = [
     accuracy: 70,                  // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
     cost: 2,                       // Custo de mana por uso
-    special: "sectumsempra_lifesteal_half",
-    debuff: { type: "bloqueio_cura", chance: 100, duration: 2 },
-    effect: "Heals half of damage caused; HEAL_BLOCK on target (2t)",
-    effectPt: "Cura metade do dano causado; BLOQUEIO_CURA no alvo (2t)",
+    debuff: { type: "bleed", chance: 100, duration: 2 },
+    effect: "Causes BLEEDING (50 damage/turn, 2t)",
+    effectPt: "Causa SANGRAMENTO (50 dano/turno, 2t)",
   },
   {
     name: "Vermillious",
@@ -633,13 +632,14 @@ export const SPELL_DATABASE: SpellInfo[] = [
   {
     name: "Vulnera Sanetur",
     namePt: "Vulnera Sanetur",
-    power: 0,                      // Dano base (immunity, sem dano)
+    power: 0,                      // Dano base (lifesteal, sem dano)
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 3,                         // Mana máxima (Power Points)
     cost: 1,                       // Custo de mana por uso
-    special: "vulnera_anti_debuff",
-    effect: "Self: immunity to debuffs (2t)",
-    effectPt: "Self: imunidade a debuffs (2t)",
+    priority: -1,                  // Prioridade -1 (ação de defesa)
+    special: "vulnera_lifesteal",
+    effect: "Self: Lifesteal — heals damage caused by enemy this turn",
+    effectPt: "Self: Roubo de vida — cura o dano causado pelo inimigo neste turno",
   },
   {
     name: "Finite Incantatem",

@@ -87,6 +87,7 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   damage_reduce: "⬇️ DAMAGE-25%",
   protego_diabol: "🛡️ DIABOLICAL",
   crit_down: "⬇️ CRIT-10%",
+  bleed: "🩸 BLEED",
   undead: "💀 UNDEAD(1t)",
   immunity: "🛡️ IMMUNITY",
   charm: "💖 CHARM",
@@ -125,6 +126,7 @@ const DEBUFF_FLASH: Partial<Record<DebuffType, string>> = {
   crit_down: "CRITICAL −!",
   bomba: "BOMB!",
   bloqueio_cura: "NO HEAL!",
+  bleed: "BLEEDING!",
 }
 
 const normSpell = (name: string) => name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "")

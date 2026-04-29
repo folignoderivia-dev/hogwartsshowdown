@@ -28,6 +28,7 @@ export type DebuffType =
   | "damage_reduce"
   | "protego_diabol"
   | "crit_down"
+  | "bleed" // Sectumsempra: sangramento (50 dano/turno, 2t)
   // Status de poções
   | "undead"    // HP não cai abaixo de 1 (1 turno)
   | "immunity"  // Imune a novos debuffs (1 turno)

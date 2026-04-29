@@ -72,10 +72,12 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
   const [acromantulaTurnCount, setAcromantulaTurnCount] = useState(0)
   const [playerSleepTurns, setPlayerSleepTurns] = useState(0)
   const [playerPoisonTurns, setPlayerPoisonTurns] = useState(0)
+  const [playerBleedTurns, setPlayerBleedTurns] = useState(0)
   const [monsterStunTurns, setMonsterStunTurns] = useState(0)
   const [monsterFreezeTurns, setMonsterFreezeTurns] = useState(0)
   const [monsterPoisonTurns, setMonsterPoisonTurns] = useState(0)
   const [monsterBurnTurns, setMonsterBurnTurns] = useState(0)
+  const [monsterBleedTurns, setMonsterBleedTurns] = useState(0)
   
   const [attempts, setAttempts] = useState(3)
   const [spellMana, setSpellMana] = useState<Record<string, { current: number; max: number }>>({})
@@ -159,7 +161,9 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
     setAcromantulaTurnCount(0)
     setPlayerSleepTurns(0)
     setPlayerPoisonTurns(0)
+    setPlayerBleedTurns(0)
     setMonsterPoisonTurns(0)
+    setMonsterBleedTurns(0)
     
     // Initialize spell mana
     setSpellMana(buildSpellManaForSpells(playerBuild.spells || [], playerBuild.house))
@@ -338,8 +342,10 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         setPlayerHp(prev => Math.min(maxPlayerHp, prev + 50))
         addLog(locale === "en" ? `Episkey heals 50 HP!` : `Episkey cura 50 HP!`, "passive")
       } else if (spellNorm.includes("vulnera") && spellNorm.includes("sanetur")) {
-        setPlayerHp(prev => Math.min(maxPlayerHp, prev + 100))
-        addLog(locale === "en" ? `Vulnera Sanetur heals 100 HP!` : `Vulnera Sanetur cura 100 HP!`, "passive")
+        // Vulnera Sanetur: lifesteal - heal damage received this turn
+        // Set a flag to track damage received this turn for healing at end of turn
+        setPlayerDebuffs(prev => new Set([...prev, "vulnera_lifesteal"]))
+        addLog(locale === "en" ? `Vulnera Sanetur! You will heal damage received this turn!` : `Vulnera Sanetur! Você curará o dano recebido neste turno!`, "passive")
       } else if (spellNorm.includes("protego") && !spellNorm.includes("maximo") && !spellNorm.includes("diabol")) {
         addLog(locale === "en" ? `Protego activated!` : `Protego ativado!`, "passive")
       }
@@ -348,15 +354,19 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       if (spell.debuff && !monsterImmuneToDebuffs) {
         const debuffChance = spell.debuff.chance || 0
         if (Math.random() * 100 < debuffChance) {
-          if (spell.debuff.type === "stun") {
+          const debuffType = spell.debuff.type as string
+          if (debuffType === "stun") {
             setMonsterStunTurns(spell.debuff.duration || 1)
             addLog(locale === "en" ? `${spell.name} stuns the monster!` : `${spell.name} atordoa o monstro!`, "passive")
-          } else if (spell.debuff.type === "freeze") {
+          } else if (debuffType === "freeze") {
             setMonsterFreezeTurns(spell.debuff.duration || 1)
             addLog(locale === "en" ? `${spell.name} freezes the monster!` : `${spell.name} congela o monstro!`, "passive")
-          } else if (spell.debuff.type === "burn") {
+          } else if (debuffType === "burn") {
             setMonsterBurnTurns(spell.debuff.duration || 2)
             addLog(locale === "en" ? `${spell.name} burns the monster!` : `${spell.name} queima o monstro!`, "passive")
+          } else if (debuffType === "bleed") {
+            setMonsterBleedTurns(spell.debuff.duration || 2)
+            addLog(locale === "en" ? `${spell.name} bleeds the monster!` : `${spell.name} sangra o monstro!`, "passive")
           } else {
             addLog(locale === "en" ? `${spell.name} applies ${spell.debuff.type}!` : `${spell.name} aplica ${spell.debuff.type}!`, "passive")
           }
@@ -420,6 +430,20 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         addLog(locale === "en" ? `Monster takes ${burnDamage} burn damage!` : `Monstro recebe ${burnDamage} de dano de queima!`, "system")
       }
       
+      // Apply bleed damage even if stunned
+      if (monsterBleedTurns > 0) {
+        const bleedDamage = 50
+        setMonsterHp(prev => {
+          const newHp = Math.max(0, prev - bleedDamage)
+          if (newHp === 0) {
+            handleWin()
+          }
+          return newHp
+        })
+        setMonsterBleedTurns(prev => prev - 1)
+        addLog(locale === "en" ? `Monster takes ${bleedDamage} bleed damage!` : `Monstro recebe ${bleedDamage} de dano de sangramento!`, "system")
+      }
+      
       if (!isCombatOver) {
         setIsPlayerTurn(true)
       }
@@ -442,6 +466,20 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
         })
         setMonsterBurnTurns(prev => prev - 1)
         addLog(locale === "en" ? `Monster takes ${burnDamage} burn damage!` : `Monstro recebe ${burnDamage} de dano de queima!`, "system")
+      }
+      
+      // Apply bleed damage even if frozen
+      if (monsterBleedTurns > 0) {
+        const bleedDamage = 50
+        setMonsterHp(prev => {
+          const newHp = Math.max(0, prev - bleedDamage)
+          if (newHp === 0) {
+            handleWin()
+          }
+          return newHp
+        })
+        setMonsterBleedTurns(prev => prev - 1)
+        addLog(locale === "en" ? `Monster takes ${bleedDamage} bleed damage!` : `Monstro recebe ${bleedDamage} de dano de sangramento!`, "system")
       }
       
       if (!isCombatOver) {
@@ -512,6 +550,19 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       addLog(locale === "en" ? `Monster takes ${burnDamage} burn damage!` : `Monstro recebe ${burnDamage} de dano de queima!`, "system")
     }
     
+    if (monsterBleedTurns > 0) {
+      const bleedDamage = 50
+      setMonsterHp(prev => {
+        const newHp = Math.max(0, prev - bleedDamage)
+        setMonsterBleedTurns(p => p - 1)
+        if (newHp === 0) {
+          handleWin()
+        }
+        return newHp
+      })
+      addLog(locale === "en" ? `Monster takes ${bleedDamage} bleed damage!` : `Monstro recebe ${bleedDamage} de dano de sangramento!`, "system")
+    }
+    
     if (isCombatOver) return
     
     // Check if monster is immune to debuffs (Inferi, Basilisco)
@@ -525,6 +576,19 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       addLog(locale === "en" ? `You take ${poisonDamage} poison damage!` : `Você recebe ${poisonDamage} de dano de veneno!`, "system")
       
       if (playerHp <= poisonDamage) {
+        handleLose()
+        return
+      }
+    }
+    
+    // Apply bleed damage to player
+    if (playerBleedTurns > 0) {
+      const bleedDamage = 50
+      setPlayerHp(prev => Math.max(0, prev - bleedDamage))
+      setPlayerBleedTurns(p => p - 1)
+      addLog(locale === "en" ? `You take ${bleedDamage} bleed damage!` : `Você recebe ${bleedDamage} de dano de sangramento!`, "system")
+      
+      if (playerHp <= bleedDamage) {
         handleLose()
         return
       }
@@ -621,6 +685,21 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
       }
     } else {
       addLog(locale === "en" ? `${monster.name} misses!` : `${monster.name} erra!`, "monster")
+    }
+    
+    // Vulnera Sanetur: heal damage received this turn
+    if (playerDebuffs.has("vulnera_lifesteal")) {
+      setPlayerDebuffs(prev => {
+        const newDebuffs = new Set(prev)
+        newDebuffs.delete("vulnera_lifesteal")
+        return newDebuffs
+      })
+      // Calculate damage received this turn (difference between previous HP and current HP)
+      const damageReceived = maxPlayerHp - playerHp
+      if (damageReceived > 0) {
+        setPlayerHp(prev => Math.min(maxPlayerHp, prev + damageReceived))
+        addLog(locale === "en" ? `Vulnera Sanetur heals ${damageReceived} HP from damage received!` : `Vulnera Sanetur cura ${damageReceived} HP do dano recebido!`, "passive")
+      }
     }
     
     if (!isCombatOver) {
@@ -883,6 +962,12 @@ export default function ForestTower({ playerBuild, currentUser, onExit, onAuthCh
                 {playerPoisonTurns > 0 && (
                   <Badge className="bg-green-900/80 border-green-700 text-green-100">
                     ☠️ {playerPoisonTurns} {locale === "en" ? "turn" : "turno"}
+                  </Badge>
+                )}
+                
+                {playerBleedTurns > 0 && (
+                  <Badge className="bg-red-900/80 border-red-700 text-red-100">
+                    🩸 {playerBleedTurns} {locale === "en" ? "turn" : "turno"}
                   </Badge>
                 )}
               </div>

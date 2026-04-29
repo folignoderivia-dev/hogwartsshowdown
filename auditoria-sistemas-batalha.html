@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auditoria de Sistemas de Batalha - Todos os Modos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e4e4e7;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #fbbf24;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .subtitle {
+            text-align: center;
+            color: #a78bfa;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        h2 {
+            color: #fbbf24;
+            margin: 40px 0 20px 0;
+            font-size: 1.8em;
+            border-bottom: 2px solid #7c3aed;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1e1e2e;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+        }
+        thead {
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+        }
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #fff;
+            font-size: 0.95em;
+            border-bottom: 2px solid #5b21b6;
+        }
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #2d2d3d;
+            vertical-align: top;
+        }
+        tr:hover {
+            background: #2d2d3d;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .mode {
+            color: #fbbf24;
+            font-weight: 600;
+            font-size: 1.05em;
+        }
+        .online {
+            color: #34d399;
+            font-weight: 500;
+        }
+        .offline {
+            color: #f472b6;
+            font-weight: 500;
+        }
+        .feature {
+            color: #a1a1aa;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚔️ AUDITORIA DE SISTEMAS DE BATALHA</h1>
+        <p class="subtitle">10 Modos de Jogo - Análise de Mecânicas e Características</p>
+
+        <h2>🎮 RESUMO DE TODOS OS MODOS</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Modo</th>
+                    <th>Tipo</th>
+                    <th>Jogadores</th>
+                    <th>Objetivo</th>
+                    <th>HP Base</th>
+                    <th>Características Principais</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="mode">1v1 Duel</td>
+                    <td class="online">Online</td>
+                    <td>2</td>
+                    <td>Derrotar o oponente</td>
+                    <td>500 (400 Slytherin)</td>
+                    <td class="feature">Duelo padrão 1x1. Sistema de turnos baseado em priority. Usa turn-engine completo. ELO ranking.</td>
+                </tr>
+                <tr>
+                    <td class="mode">2v2 Team</td>
+                    <td class="online">Online</td>
+                    <td>4 (2x2)</td>
+                    <td>Derrotar equipe adversária</td>
+                    <td>500 (400 Slytherin)</td>
+                    <td class="feature">Duelo em equipe. Ally targeting disponível. Compartilha vitória/derrota da equipe. ELO team ranking.</td>
+                </tr>
+                <tr>
+                    <td class="mode">FFA 3</td>
+                    <td class="online">Online</td>
+                    <td>3</td>
+                    <td>Ser o último sobrevivente</td>
+                    <td>500 (400 Slytherin)</td>
+                    <td class="feature">Free for all. Todos contra todos. Eliminação ao perder todo HP. +1 derrota por eliminação.</td>
+                </tr>
+                <tr>
+                    <td class="mode">FFA 4</td>
+                    <td class="online">Online</td>
+                    <td>4</td>
+                    <td>Ser o último sobrevivente</td>
+                    <td>500 (400 Slytherin)</td>
+                    <td class="feature">Free for all. Todos contra todos. Eliminação ao perder todo HP. +1 derrota por eliminação.</td>
+                </tr>
+                <tr>
+                    <td class="mode">Test (Bot)</td>
+                    <td class="offline">Offline</td>
+                    <td>1 vs Bot</td>
+                    <td>Praticar contra IA</td>
+                    <td>500 (400 Slytherin)</td>
+                    <td class="feature">Modo de prática. Bot usa spells aleatórias. Sem impacto em ranking/ELO. Mana infinita do bot.</td>
+                </tr>
+                <tr>
+                    <td class="mode">Tournament</td>
+                    <td class="offline">Offline</td>
+                    <td>1 vs Bots</td>
+                    <td>Vencer torneio de 4 rounds</td>
+                    <td>500 (400 Slytherin)</td>
+                    <td class="feature">Torneio sequencial: Round of 16 → Quarter → Semi → Final. Bots com difficulty progressiva. Recompensa ranking offline.</td>
+                </tr>
+                <tr>
+                    <td class="mode">Story Mode</td>
+                    <td class="offline">Offline</td>
+                    <td>1 vs Boss</td>
+                    <td>Derrotar bosses da história</td>
+                    <td>500 (400 Slytherin)</td>
+                    <td class="feature">Modo história com bosses específicos (Harry, Voldemort, etc.). Progresso salvo. Unlockable content.</td>
+                </tr>
+                <tr>
+                    <td class="mode">Death March</td>
+                    <td class="offline">Offline</td>
+                    <td>1 vs Bots</td>
+                    <td>Sobreviver máximo de rounds</td>
+                    <td>500 (400 Slytherin)</td>
+                    <td class="feature">Modo sobrevivência. Bots ficam mais fortes a cada round. HP não recupera entre rounds. Ranking de march.</td>
+                </tr>
+                <tr>
+                    <td class="mode">Forbidden Forest</td>
+                    <td class="offline">Offline</td>
+                    <td>1 vs Monster</td>
+                    <td>Subir andares da torre</td>
+                    <td>500 (400 Slytherin)</td>
+                    <td class="feature">Torre infinita. Monstros por andar. 3 tentativas diárias. HP recupera entre combates. Ranking de floresta.</td>
+                </tr>
+                <tr>
+                    <td class="mode">World Boss</td>
+                    <td class="online">Online</td>
+                    <td>Múltiplos vs Boss</td>
+                    <td>Derrotar boss mundial</td>
+                    <td>500 (400 Slytherin)</td>
+                    <td class="feature">Boss com HP compartilhado (5000+). 1 luta diária por jogador. Dano acumulado entre todos. Ranking de dano.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>⚙️ MECÂNICAS COMUNS A TODOS OS MODOS</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Mecânica</th>
+                    <th>Descrição</th>
+                    <th>Aplicação</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="mode">Sistema de Turnos</td>
+                    <td class="feature">Baseado em priority de spells. Priority +10 age antes de Priority +6, etc.</td>
+                    <td class="feature">Todos os modos usam turn-engine.ts</td>
+                </tr>
+                <tr>
+                    <td class="mode">HP System</td>
+                    <td class="feature">5 barras de 100 HP cada (500 total). Slytherin: 4 barras (400 total).</td>
+                    <td class="feature">Todos os modos (exceto World Boss com HP diferente)</td>
+                </tr>
+                <tr>
+                    <td class="mode">Mana System</td>
+                    <td class="feature">Cada spell tem PP (Power Points). Custo por uso. Gryffindor: -2 mana base. Ravenclaw: +3 mana não-Imperdoável.</td>
+                    <td class="feature">Todos os modos</td>
+                </tr>
+                <tr>
+                    <td class="mode">House Modifiers</td>
+                    <td class="feature">Gryffindor: +2 priority. Slytherin: +25% crit. Ravenclaw: +3 mana. Hufflepuff: 10% reflect damage.</td>
+                    <td class="feature">Todos os modos</td>
+                </tr>
+                <tr>
+                    <td class="mode">Wand Cores</td>
+                    <td class="feature">16 núcleos com passivas únicas (accuracy, crit, regen, etc.)</td>
+                    <td class="feature">Todos os modos</td>
+                </tr>
+                <tr>
+                    <td class="mode">Debuffs</td>
+                    <td class="feature">Burn, Stun, Freeze, Taunt, Mark, Confusion, Poison, Paralysis, etc.</td>
+                    <td class="feature">Todos os modos</td>
+                </tr>
+                <tr>
+                    <td class="mode">Accuracy Roll</td>
+                    <td class="feature">0-100% chance de acertar. Modificado por debuffs, núcleos, poções.</td>
+                    <td class="feature">Todos os modos</td>
+                </tr>
+                <tr>
+                    <td class="mode">Critical Hit</td>
+                    <td class="feature">Dano multiplicado (geralmente 1.5x-2x). Modificado por núcleos, debuffs.</td>
+                    <td class="feature">Todos os modos</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🌐 MODOS ONLINE (1v1, 2v2, FFA 3, FFA 4, World Boss)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Modo</th>
+                    <th>Sincronização</th>
+                    <th>ELO/Ranking</th>
+                    <th>Matchmaking</th>
+                    <th>Recompensas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="mode">1v1 Duel</td>
+                    <td class="feature">Socket.io real-time. Match turns sync.</td>
+                    <td class="feature">ELO individual. +win/lose.</td>
+                    <td class="feature">Auto-match por ELO.</td>
+                    <td class="feature">ELO points, ranking position.</td>
+                </tr>
+                <tr>
+                    <td class="mode">2v2 Team</td>
+                    <td class="feature">Socket.io real-time. Team sync.</td>
+                    <td class="feature">ELO team. Vitória/derrota compartilhada.</td>
+                    <td class="feature">Sala custom ou auto-match.</td>
+                    <td class="feature">ELO team, ranking team.</td>
+                </tr>
+                <tr>
+                    <td class="mode">FFA 3/4</td>
+                    <td class="feature">Socket.io real-time. Multi-player sync.</td>
+                    <td class="feature">ELO FFA. +1 derrota por eliminação.</td>
+                    <td class="feature">Sala custom.</td>
+                    <td class="feature">ELO FFA, ranking FFA.</td>
+                </tr>
+                <tr>
+                    <td class="mode">World Boss</td>
+                    <td class="feature">Supabase shared HP state. Async.</td>
+                    <td class="feature">Ranking de dano acumulado.</td>
+                    <td class="feature">Sem matchmaking - boss global.</td>
+                    <td class="feature">Ranking damagewb, stickers especiais.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🎯 MODOS OFFLINE (Test, Tournament, Story, Death March, Forest)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Modo</th>
+                    <th>Progresso</th>
+                    <th>Dificuldade</th>
+                    <th>Recuperação HP</td>
+                    <th>Ranking Offline</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="mode">Test (Bot)</td>
+                    <td class="feature">Sem progresso. Single match.</td>
+                    <td class="feature">Bot básico. Spells aleatórias.</td>
+                    <td class="feature">Recupera entre matches.</td>
+                    <td class="feature">Sem ranking.</td>
+                </tr>
+                <tr>
+                    <td class="mode">Tournament</td>
+                    <td class="feature">4 rounds sequenciais. Progresso por torneio.</td>
+                    <td class="feature">Bots progressivos. Round 4 = hardest.</td>
+                    <td class="feature">Recupera entre rounds.</td>
+                    <td class="feature">Ranking torneio-offline.</td>
+                </tr>
+                <tr>
+                    <td class="mode">Story Mode</td>
+                    <td class="feature">Capítulos sequenciais. Salvo em Supabase.</td>
+                    <td class="feature">Bosses pré-definidos. Difficulty fixa.</td>
+                    <td class="feature">Recupera entre bosses.</td>
+                    <td class="feature">Ranking story. Unlocks content.</td>
+                </tr>
+                <tr>
+                    <td class="mode">Death March</td>
+                    <td class="feature">Rounds infinitos. HP não recupera.</td>
+                    <td class="feature">Bots ficam +fortes cada round.</td>
+                    <td class="feature">NÃO recupera entre rounds.</td>
+                    <td class="feature">Ranking march (máximo round).</td>
+                </tr>
+                <tr>
+                    <td class="mode">Forbidden Forest</td>
+                    <td class="feature">Andares infinitos. 3 tentativas/dia.</td>
+                    <td class="feature">Monstros por andar. Difficulty escalar.</td>
+                    <td class="feature">Recupera entre andares.</td>
+                    <td class="feature">Ranking floresta (máximo andar).</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>👹 MODOS ESPECIAIS (Story, Death March, Forest, World Boss)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Modo</th>
+                    <th>Inimigos</th>
+                    <th>HP Inimigo</th>
+                    <th>Mecânicas Especiais</th>
+                    <th>Limitações</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="mode">Story Mode</td>
+                    <td class="feature">Bosses específicos (Harry, Voldemort, etc.)</td>
+                    <td class="feature">Variable por boss (500-1000+)</td>
+                    <td class="feature">Bosses têm spells específicas. Cutscenes. Progresso narrativo.</td>
+                    <td class="feature">1 boss por capítulo. Linear.</td>
+                </tr>
+                <tr>
+                    <td class="mode">Death March</td>
+                    <td class="feature">Bots aleatórios com difficulty progressiva</td>
+                    <td class="feature">500 (400 Slytherin) base + bonus por round</td>
+                    <td class="feature">HP não recupera. Bots ficam +agressivos. Potions limitadas.</td>
+                    <td class="feature">Sem recuperação HP. Game over = 0 HP.</td>
+                </tr>
+                <tr>
+                    <td class="mode">Forbidden Forest</td>
+                    <td class="feature">Monstros específicos por andar (Arpeu, Lobisomem, etc.)</td>
+                    <td class="feature">Variable por monster (100-500+)</td>
+                    <td class="feature">Monstros têm passivas únicas. 3 tentativas/dia. Drops especiais.</td>
+                    <td class="feature">3 tentativas diárias. Reset diário.</td>
+                </tr>
+                <tr>
+                    <td class="mode">World Boss</td>
+                    <td class="feature">Boss global rotativo (Manticore, Nundu, etc.)</td>
+                    <td class="feature">5000+ HP compartilhado entre todos jogadores</td>
+                    <td class="feature">HP persistente. 1 luta/dia por jogador. Dano acumulado ranking.</td>
+                    <td class="feature">1 luta por dia por jogador. Cooldown diário.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🏆 SISTEMAS DE RANKING</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ranking</th>
+                    <th>Modo</th>
+                    <th>Métrica</th>
+                    <th>Armazenamento</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="mode">ELO 1v1</td>
+                    <td class="feature">1v1 Duel</td>
+                    <td class="feature">Pontos ELO (base 500). +win/-lose.</td>
+                    <td class="feature">Supabase profiles.elo</td>
+                </tr>
+                <tr>
+                    <td class="mode">ELO 2v2</td>
+                    <td class="feature">2v2 Team</td>
+                    <td class="feature">Pontos ELO team. Vitória/derrota compartilhada.</td>
+                    <td class="feature">Supabase profiles.elo (team)</td>
+                </tr>
+                <tr>
+                    <td class="mode">ELO FFA</td>
+                    <td class="feature">FFA 3/4</td>
+                    <td class="feature">Pontos ELO FFA. +1 derrota por eliminação.</td>
+                    <td class="feature">Supabase profiles.elo (ffa)</td>
+                </tr>
+                <tr>
+                    <td class="mode">Ranking Offline</td>
+                    <td class="feature">Tournament</td>
+                    <td class="feature">Vitórias em torneios offline.</td>
+                    <td class="feature">Supabase profiles.offline_wins</td>
+                </tr>
+                <tr>
+                    <td class="mode">Ranking Story</td>
+                    <td class="feature">Story Mode</td>
+                    <td class="feature">Capítulos completados.</td>
+                    <td class="feature">Supabase profiles.modo_historia</td>
+                </tr>
+                <tr>
+                    <td class="mode">Ranking March</td>
+                    <td class="feature">Death March</td>
+                    <td class="feature">Máximo round alcançado.</td>
+                    <td class="feature">Supabase profiles.march</td>
+                </tr>
+                <tr>
+                    <td class="mode">Ranking Forest</td>
+                    <td class="feature">Forbidden Forest</td>
+                    <td class="feature">Máximo andar alcançado.</td>
+                    <td class="feature">Supabase profiles.floresta</td>
+                </tr>
+                <tr>
+                    <td class="mode">Ranking Damage WB</td>
+                    <td class="feature">World Boss</td>
+                    <td class="feature">Dano total acumulado ao boss.</td>
+                    <td class="feature">Supabase profiles.damagewb</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

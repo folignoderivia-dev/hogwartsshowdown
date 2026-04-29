@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auditoria Completa do Grimório - 56 Feitiços</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e4e4e7;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #fbbf24;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .subtitle {
+            text-align: center;
+            color: #a78bfa;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1e1e2e;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        thead {
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+        }
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #fff;
+            font-size: 0.95em;
+            border-bottom: 2px solid #5b21b6;
+        }
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #2d2d3d;
+            vertical-align: top;
+        }
+        tr:hover {
+            background: #2d2d3d;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .vip {
+            background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: bold;
+        }
+        .name {
+            color: #fbbf24;
+            font-weight: 600;
+            font-size: 1.05em;
+        }
+        .accuracy {
+            color: #34d399;
+            font-weight: 500;
+        }
+        .power {
+            color: #f472b6;
+            font-weight: 500;
+        }
+        .priority {
+            color: #a78bfa;
+            font-weight: 500;
+        }
+        .effect {
+            color: #60a5fa;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+        .description {
+            color: #a1a1aa;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+        .legend {
+            background: #1e1e2e;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 30px;
+            border: 1px solid #3d3d4d;
+        }
+        .legend h2 {
+            color: #fbbf24;
+            margin-bottom: 15px;
+        }
+        .legend-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #2d2d3d;
+            border-radius: 8px;
+        }
+        .legend-item strong {
+            color: #a78bfa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧙‍♂️ AUDITORIA COMPLETA DO GRIMÓRIO</h1>
+        <p class="subtitle">56 Feitiços (51 Regulares + 5 VIP Exclusivas) - Análise Mecânica Detalhada</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome (PT-BR)</th>
+                    <th>Accuracy</th>
+                    <th>Power</th>
+                    <th>Priority</th>
+                    <th>Efeito</th>
+                    <th>Descrição Mecânica Detalhada</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="name">Estupefaca</td>
+                    <td class="accuracy">50%</td>
+                    <td class="power">50</td>
+                    <td class="priority">0</td>
+                    <td class="effect">STUN</td>
+                    <td class="description">Aplica debuff STUN com 100% de chance por 1 turno. O alvo perde completamente o próximo turno (não pode agir). Dano fixo de 50. Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Bombarda</td>
+                    <td class="accuracy">70%</td>
+                    <td class="power">50-150</td>
+                    <td class="priority">0</td>
+                    <td class="effect">Área</td>
+                    <td class="description">Feitiço de área que atinge TODOS os inimigos em campo. Dano aleatório entre 50 e 150 (roll: Math.floor(Math.random() * 101) + 50). Mana base: 8 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Incêndio</td>
+                    <td class="accuracy">90%</td>
+                    <td class="power">25-80</td>
+                    <td class="priority">0</td>
+                    <td class="effect">BURN + COMBO</td>
+                    <td class="description">Dano aleatório 25-80. 50% de chance aplicar BURN por 2 turnos (25 dano por turno). MECANISMO DE COMBO: +20% de dano por uso consecutivo (stack multiplicativo). Mana base: 15 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Glacius</td>
+                    <td class="accuracy">60%</td>
+                    <td class="power">30-75</td>
+                    <td class="priority">0</td>
+                    <td class="effect">FREEZE + CRIT</td>
+                    <td class="description">Dano aleatório 30-75. 20% de chance aplicar FREEZE por 2 turnos. MECANISMO ESPECIAL: Se alvo está congelado, CRÍTICO é GARANTIDO (100% de chance). Mana base: 15 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Diffindo</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">50</td>
+                    <td class="priority">0</td>
+                    <td class="effect">SHIELD BREAK</td>
+                    <td class="description">Dano fixo 50. MECANISMO: Ignora completamente Protego (escudo). Se alvo tem Protego ativo, causa 100 de dano fixo (bonus). Nunca erra (100% accuracy). Mana base: 15 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Expelliarmus</td>
+                    <td class="accuracy">80%</td>
+                    <td class="power">25-80</td>
+                    <td class="priority">+2</td>
+                    <td class="effect">DAMAGE REDUCE</td>
+                    <td class="description">Dano aleatório 25-80. Priority +2 (age antes). Aplica debuff damage_reduce com 100% de chance por 1 turno: alvo causa -25% de dano. Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Depulso</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">40</td>
+                    <td class="priority">+2</td>
+                    <td class="effect">IGNORE DEFENSE</td>
+                    <td class="description">Dano fixo 40. Priority +2 (age antes). MECANISMO: Nunca erra (100%), dano não é reduzido por defesa do alvo (ignora defesa), mas respeita Protego. Mana base: 15 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Confrigo</td>
+                    <td class="accuracy">65%</td>
+                    <td class="power">70-150</td>
+                    <td class="priority">0</td>
+                    <td class="effect">MARK</td>
+                    <td class="description">Dano aleatório 70-150. 40% de chance aplicar MARK por 2 turnos: garante CRÍTICO no alvo (100% crit chance). Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Scarlatum</td>
+                    <td class="accuracy">65%</td>
+                    <td class="power">0-200</td>
+                    <td class="priority">0</td>
+                    <td class="effect">RANDOM</td>
+                    <td class="description">Dano completamente aleatório entre 0 e 200. Accuracy 65%. Mana base: 2 PP (baixa), custo: 1. Alto risco, alta recompensa.</td>
+                </tr>
+                <tr>
+                    <td class="name">Subito</td>
+                    <td class="accuracy">80%</td>
+                    <td class="power">50-100</td>
+                    <td class="priority">0</td>
+                    <td class="effect">BOMB</td>
+                    <td class="description">Dano aleatório 50-100. Aplica debuff BOMB com 100% de chance por 2 turnos. MECANISMO: Explosão no final do debuff = 25 de dano por cada 100 HP que o alvo perdeu durante o período. Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Reducto</td>
+                    <td class="accuracy">50%</td>
+                    <td class="power">100</td>
+                    <td class="priority">0</td>
+                    <td class="effect">DEFENSE BLOCK</td>
+                    <td class="description">Dano fixo 100. Aplica debuff silence_defense com 100% de chance por 2 turnos: desativa Protegos e Salvio Hexia do alvo (não pode usar escudos). Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Desumo Tempestas</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">40-200</td>
+                    <td class="priority">0</td>
+                    <td class="effect">ÁREA SELF</td>
+                    <td class="description">Dano aleatório 40-200. Área: atinge TODOS em campo (incluindo o próprio usuário). Custo de mana: 2 (mais alto). Mana base: 5 PP, custo: 2.</td>
+                </tr>
+                <tr>
+                    <td class="name">Protego</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">+6</td>
+                    <td class="effect">SHIELD</td>
+                    <td class="description">Dano 0 (escudo). Priority +6 (age muito antes). MECANISMO: Bloqueia dano. FALHA se usado em sequência (não pode usar 2x seguido). NÃO bloqueia Maldições (Unforgivable) nem Diffindo. Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Ferula</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0 (cura)</td>
+                    <td class="priority">+2</td>
+                    <td class="effect">HEAL RNG</td>
+                    <td class="description">Dano 0 (cura). Priority +2. Cura aleatória entre 25 e 150 HP no próprio usuário. Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Circum Inflamare</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">+1</td>
+                    <td class="effect">ÁREA BURN</td>
+                    <td class="description">Dano 0. Priority +1. Área: aplica BURN em TODOS os inimigos com 100% de chance por 1 turno (25 dano/turno). Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Impedimenta</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">+10</td>
+                    <td class="effect">NO POTION</td>
+                    <td class="description">Dano 0. Priority +10 (age primeiro). Aplica debuff no_potion com 100% de chance por 2 turnos: bloqueia uso de poção/item do alvo. Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Arestum Momentum</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">25-60</td>
+                    <td class="priority">+3</td>
+                    <td class="effect">ÁREA NERF</td>
+                    <td class="description">Dano aleatório 25-60. Priority +3. Área: -5% de dano e -5% de accuracy em TODOS os inimigos por 2 turnos. Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Obliviate</td>
+                    <td class="accuracy">75%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">MANA DRAIN</td>
+                    <td class="description">Dano 0. Accuracy 75%. MECANISMO: Reduz pela metade (50%) a mana de um feitiço aleatório do alvo PERMANENTEMENTE (não recupera). Mana base: 3 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Confundos</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">25-70</td>
+                    <td class="priority">0</td>
+                    <td class="effect">CONFUSION</td>
+                    <td class="description">Dano aleatório 25-70. 40% de chance aplicar CONFUSION por 2 turnos: alvo pode perder o turno aleatoriamente (skip action). Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Crucius</td>
+                    <td class="accuracy">80%</td>
+                    <td class="power">150</td>
+                    <td class="priority">0</td>
+                    <td class="effect">CURSE STACK</td>
+                    <td class="description">Dano fixo 150. MALDIÇÃO (Unforgivable). MECANISMO: +30% de dano por CADA debuff ativo no alvo (stack multiplicativo). Custo de mana: 3 (alto). Mana base: 3 PP, custo: 3.</td>
+                </tr>
+                <tr>
+                    <td class="name">Imperio</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">+3</td>
+                    <td class="effect">TAUNT</td>
+                    <td class="description">Dano 0. MALDIÇÃO (Unforgivable). Priority +3. Aplica debuff taunt com 100% de chance por 3 turnos: bloqueia TODOS os feitiços exceto o último usado, IRREMOVÍVEL (não pode ser removido). Mana base: 3 PP, custo: 3.</td>
+                </tr>
+                <tr>
+                    <td class="name">Avada Kedavra</td>
+                    <td class="accuracy">40%</td>
+                    <td class="power">300</td>
+                    <td class="priority">0</td>
+                    <td class="effect">CURSE RISK</td>
+                    <td class="description">Dano fixo 300 (máximo do jogo). MALDIÇÃO (Unforgivable). Accuracy 40% (baixa). MECANISMO DE RISCO: se ERRAR, usuário perde 100 HP. Mana base: 3 PP, custo: 3.</td>
+                </tr>
+                <tr>
+                    <td class="name">Flagrate</td>
+                    <td class="accuracy">70%</td>
+                    <td class="power">50</td>
+                    <td class="priority">0</td>
+                    <td class="effect">STRIP</td>
+                    <td class="description">Dano fixo 50. MECANISMO: Remove completamente o Núcleo/passiva da varinha do alvo (perde todos os benefícios do núcleo). Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Aqua Eructo</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">25</td>
+                    <td class="priority">+6</td>
+                    <td class="effect">CLEANSE + BOOST</td>
+                    <td class="description">Dano fixo 25. Priority +6. MECANISMO: +25 de dano por CADA debuff no próprio usuário. Limpa BURN próprio. Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Eletricus</td>
+                    <td class="accuracy">80%</td>
+                    <td class="power">50-100</td>
+                    <td class="priority">0</td>
+                    <td class="effect">PARALYSIS</td>
+                    <td class="description">Dano aleatório 50-100. Aplica debuff paralysis com 100% de chance por 2 turnos: prioridade do alvo vira 0 (age por último sempre). Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Trevus</td>
+                    <td class="accuracy">60%</td>
+                    <td class="power">80</td>
+                    <td class="priority">0</td>
+                    <td class="effect">RANDOM DEBUFF</td>
+                    <td class="description">Dano fixo 80. MECANISMO: Aplica 2 debuffs aleatórios no alvo por 1 turno (pode ser qualquer debuff do pool). Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Pericullum</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">20-50</td>
+                    <td class="priority">0</td>
+                    <td class="effect">CRIT DOWN</td>
+                    <td class="description">Dano aleatório 20-50. Aplica debuff crit_down com 100% de chance por 1 turno: reduz taxa crítica do alvo em 10% no próximo turno. Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Rictumsempra</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">25-50</td>
+                    <td class="priority">0</td>
+                    <td class="effect">MANA DRAIN</td>
+                    <td class="description">Dano aleatório 25-50. MECANISMO: Reduz 1 de mana de um feitiço aleatório do alvo (não permanente, pode ser recuperado). Mana base: 15 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Expulso</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">SWAP SPELL</td>
+                    <td class="description">Dano 0. MECANISMO: Substitui 1 feitiço aleatório do alvo por outro do grimório (remove o feitiço atual e coloca um novo aleatório). Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Cara de Lesma</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">50</td>
+                    <td class="priority">0</td>
+                    <td class="effect">POISON</td>
+                    <td class="description">Dano fixo 50. 40% de chance aplicar POISON por 2 turnos: 50 de dano por turno (total 100 dano extra). Mana base: 15 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Flagellum</td>
+                    <td class="accuracy">70%</td>
+                    <td class="power">75</td>
+                    <td class="priority">0</td>
+                    <td class="effect">MULTI-HIT</td>
+                    <td class="description">Dano fixo 75. MECANISMO: Multi-hit aleatório entre 1 e 4x (cada hit aplica o dano). canCrit: false (nunca causa crítico). Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Lumus</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">ACC DOWN</td>
+                    <td class="description">Dano 0. MECANISMO: Reduz 10% da accuracy do alvo por 2 turnos (stack multiplicativo com outros debuffs de acc). Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Petrificus Totales</td>
+                    <td class="accuracy">60%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">DISABLE SPELL</td>
+                    <td class="description">Dano 0. Accuracy 60%. MECANISMO: Bloqueia 1 feitiço aleatório do alvo por 2 turnos (não pode usar aquele feitiço específico). Mana base: 3 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Salvio Hexia</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">REFLECT</td>
+                    <td class="description">Dano 0. MECANISMO SELF: Reflect - devolve até 100% do dano recebido no turno por 1 turno (retaliation). Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Sectumsempra</td>
+                    <td class="accuracy">60%</td>
+                    <td class="power">100</td>
+                    <td class="priority">0</td>
+                    <td class="effect">LIFESTEAL + BLOCK</td>
+                    <td class="description">Dano fixo 100. MECANISMO: Cura o usuário pelo dano causado (lifesteal). Aplica debuff bloqueio_cura no alvo por 2 turnos (alvo não pode curar). Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Vermillious</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">25</td>
+                    <td class="priority">0</td>
+                    <td class="effect">DYNAMIC HITS</td>
+                    <td class="description">Dano fixo 25 por hit. MECANISMO: 1 hit + 1 hit adicional por cada 100 HP perdido pelo usuário (ex: perdeu 200 HP = 3 hits total). Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Vulnera Sanetur</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">IMMUNITY</td>
+                    <td class="description">Dano 0. MECANISMO SELF: Imunidade total a debuffs por 2 turnos (não recebe nenhum debuff novo). Mana base: 3 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Finite Incantatem</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">TRANSFER DEBUFF</td>
+                    <td class="description">Dano 0. MECANISMO: Transfere TODOS os debuffs do próprio usuário para o alvo (exceto debuffs IRREMOVÍVEIS como Imperio). Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Fumus</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">-1</td>
+                    <td class="effect">CLEANSE ALL</td>
+                    <td class="description">Dano 0. Priority -1 (age por último). MECANISMO: Limpa TODOS os buffs e debuffs de TODOS em campo (incluindo o próprio usuário). Reset geral. Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Episkey</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0 (cura)</td>
+                    <td class="priority">0</td>
+                    <td class="effect">HEAL + CRIT</td>
+                    <td class="description">Dano 0. MECANISMO SELF: Cura 50 HP fixo + aumenta taxa crítica por 2 turnos. Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Protego Diabólico</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">+6</td>
+                    <td class="effect">SHIELD CURSE</td>
+                    <td class="description">Dano 0. Priority +6. MECANISMO: Escudo vs Maldições (bloqueia Unforgivable) + -15% de precisão inimiga por 2 turnos. Mana base: 3 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Protego Maximo</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">+6</td>
+                    <td class="effect">SHIELD HEAL</td>
+                    <td class="description">Dano 0. Priority +6. MECANISMO SELF: Se oponente causar CRÍTICO no escudo, cura 200 HP. Mana base: 3 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Maximos</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">+3</td>
+                    <td class="effect">DAMAGE BOOST</td>
+                    <td class="description">Dano 0. Priority +3. MECANISMO: Aumenta o dano do PRÓXIMO feitiço em 10-100% (aleatório: Math.floor(Math.random() * 91) + 10). Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Locomotor Mortis</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">-1</td>
+                    <td class="effect">RETALIATE</td>
+                    <td class="description">Dano 0. Priority -1 (age por último). MECANISMO: Devolve 25-150% do dano recebido no turno (retaliation). canCrit: false (nunca crita). Mana base: 10 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Fiantu Dure</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">MANA RESTORE</td>
+                    <td class="description">Dano 0. MECANISMO SELF: Restaura 1-3 de mana em TODOS os feitiços do próprio usuário (recuperação de recursos). Mana base: 3 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Piertotum Locomotor</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">+4</td>
+                    <td class="effect">SCALE DAMAGE</td>
+                    <td class="description">Dano 0. Priority +4. MECANISMO: Dano = 100 × contador de Maldições (Unforgivable) do oponente (ex: oponente tem 2 maldições ativas = 200 de dano). Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Branquium Remendo</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">ERRATIC HEAL</td>
+                    <td class="description">Dano 0. MECANISMO: Cura errática - cura tanto o próprio usuário quanto o oponente (pode ajudar ou prejudicar). Custo de mana: 2 (mais alto). Mana base: 5 PP, custo: 2.</td>
+                </tr>
+                <tr>
+                    <td class="name">Silêncio</td>
+                    <td class="accuracy">80%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">SILENCE SPELL</td>
+                    <td class="description">Dano 0. Accuracy 80%. MECANISMO: Se acertar, silencia (desativa) a última magia usada pelo oponente por 1 turno. Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name">Desilusão</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">INVISIBILITY</td>
+                    <td class="description">Dano 0. MECANISMO SELF: Aplica invisibilidade por 1 turno - oponente tem +25% de chance de errar (miss chance). Mana base: 5 PP, custo: 1.</td>
+                </tr>
+                <tr>
+                    <td class="name vip">Legilimens (VIP) 👑</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">REVEAL GRIMOIRE</td>
+                    <td class="description">Dano 0. MECANISMO: Revela o Grimório atual do oponente (mostra quais feitiços ele tem). canCrit: false. isVipOnly: true. Custo de mana: 2. Mana base: 5 PP, custo: 2.</td>
+                </tr>
+                <tr>
+                    <td class="name vip">Fogo Maldito (VIP) 👑</td>
+                    <td class="accuracy">44%</td>
+                    <td class="power">100</td>
+                    <td class="priority">0</td>
+                    <td class="effect">ÁREA SCALE</td>
+                    <td class="description">Dano fixo 100 base. Área: atinge todos inimigos. MECANISMO: Poder +50 por cada 100 HP perdido pelo usuário (ex: perdeu 200 HP = +100 power = 200 total). 100% BURN por 2 turnos. isVipOnly: true. Custo de mana: 2. Mana base: 5 PP, custo: 2.</td>
+                </tr>
+                <tr>
+                    <td class="name vip">Revele seus Segredos (VIP) 👑</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">0</td>
+                    <td class="effect">REVEAL CORE</td>
+                    <td class="description">Dano 0. MECANISMO: Revela o Núcleo da varinha do oponente (mostra qual passiva ele tem). canCrit: false. isVipOnly: true. Custo de mana: 2. Mana base: 5 PP, custo: 2.</td>
+                </tr>
+                <tr>
+                    <td class="name vip">Bombarda Maxima (VIP) 👑</td>
+                    <td class="accuracy">65%</td>
+                    <td class="power">100-200</td>
+                    <td class="priority">0</td>
+                    <td class="effect">ÁREA PIERCE</td>
+                    <td class="description">Dano aleatório 100-200. Área: atinge todos inimigos. MECANISMO: 25% de chance de ignorar defesa do alvo (pierce). isVipOnly: true. Custo de mana: 3 (máximo). Mana base: 8 PP, custo: 3.</td>
+                </tr>
+                <tr>
+                    <td class="name vip">Expecto Patronum (VIP) 👑</td>
+                    <td class="accuracy">100%</td>
+                    <td class="power">0</td>
+                    <td class="priority">+4</td>
+                    <td class="effect">BLOCK CURSES</td>
+                    <td class="description">Dano 0. Priority +4. MECANISMO: Bloqueia Maldições (Unforgivable) do alvo por 1 turno (counter). canCrit: false. isVipOnly: true. Custo de mana: 2. Mana base: 5 PP, custo: 2.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="legend">
+            <h2>📖 Legenda de Termos Técnicos</h2>
+            <div class="legend-item">
+                <strong>PP (Power Points):</strong> Mana base máxima da spell. Determina quantas vezes pode ser usada antes de esgotar.
+            </div>
+            <div class="legend-item">
+                <strong>Cost:</strong> Custo de mana por uso (1-3). Spells com cost 3 são mais "caras" em termos de recursos.
+            </div>
+            <div class="legend-item">
+                <strong>Priority:</strong> Determina ordem de ação. Valores positivos agam antes, negativos agam depois. Ex: Priority +10 age antes de Priority +6.
+            </div>
+            <div class="legend-item">
+                <strong>Accuracy:</strong> Chance de acertar o alvo (0-100%). 100% = nunca erra, 40% = alta chance de errar.
+            </div>
+            <div class="legend-item">
+                <strong>canCrit: false:</strong> Spell nunca causa dano crítico (dano multiplicado).
+            </div>
+            <div class="legend-item">
+                <strong>ignoresDefense: true:</strong> Dano não é reduzido pela defesa do alvo (mas pode ser bloqueado por escudos).
+            </div>
+            <div class="legend-item">
+                <strong>isUnforgivable:</strong> Maldição imperdoável - não pode ser bloqueado por Protego normal, requer Protego Diabólico.
+            </div>
+            <div class="legend-item">
+                <strong>isVipOnly:</strong> Spell exclusiva para jogadores VIP (assinantes).
+            </div>
+            <div class="legend-item">
+                <strong>IRREMOVÍVEL:</strong> Debuff não pode ser removido por spells de limpeza (Fumus, Vulnera Sanetur).
+            </div>
+        </div>
+    </div>
+</body>
+</html>

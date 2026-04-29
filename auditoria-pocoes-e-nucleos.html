@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auditoria Completa - Poções e Núcleos de Varinha</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e4e4e7;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #fbbf24;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .subtitle {
+            text-align: center;
+            color: #a78bfa;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        h2 {
+            color: #fbbf24;
+            margin: 40px 0 20px 0;
+            font-size: 1.8em;
+            border-bottom: 2px solid #7c3aed;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1e1e2e;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+        }
+        thead {
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+        }
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #fff;
+            font-size: 0.95em;
+            border-bottom: 2px solid #5b21b6;
+        }
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #2d2d3d;
+            vertical-align: top;
+        }
+        tr:hover {
+            background: #2d2d3d;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .name {
+            color: #fbbf24;
+            font-weight: 600;
+            font-size: 1.05em;
+        }
+        .id {
+            color: #60a5fa;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        .effect {
+            color: #34d399;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+        .description {
+            color: #a1a1aa;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+        .legend {
+            background: #1e1e2e;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 30px;
+            border: 1px solid #3d3d4d;
+        }
+        .legend h3 {
+            color: #fbbf24;
+            margin-bottom: 15px;
+        }
+        .legend-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #2d2d3d;
+            border-radius: 8px;
+        }
+        .legend-item strong {
+            color: #a78bfa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 AUDITORIA COMPLETA - POÇÕES E NÚCLEOS</h1>
+        <p class="subtitle">8 Poções + 16 Núcleos de Varinha - Análise Mecânica Detalhada</p>
+
+        <h2>🧪 POÇÕES (8 TOTAL)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome (PT-BR)</th>
+                    <th>ID</th>
+                    <th>Efeito</th>
+                    <th>Descrição Mecânica Detalhada</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="name">Poção Wiggenweld</td>
+                    <td class="id">wiggenweld</td>
+                    <td class="effect">heal_last_damage</td>
+                    <td class="description">Cura HP igual ao último dano recebido pelo usuário. MECANISMO: Armazena o valor do último dano recebido e aplica como cura. Se o último dano foi 150, cura 150 HP. Não tem limite máximo de cura baseado no dano recebido. Uso único por batalha (reseta após cada dano recebido).</td>
+                </tr>
+                <tr>
+                    <td class="name">Poção Edurus</td>
+                    <td class="id">edurus</td>
+                    <td class="effect">immunity_1_turn</td>
+                    <td class="description">Limpa TODOS os debuffs ativos no usuário + concede imunidade a debuffs por 1 turno completo. MECANISMO: Remove todos os debuffs (burn, stun, freeze, taunt, mark, confusion, poison, paralysis, etc.) e impede que novos debuffs sejam aplicados durante o próximo turno. Não protege contra dano direto, apenas debuffs.</td>
+                </tr>
+                <tr>
+                    <td class="name">Poção Morto-Vivo</td>
+                    <td class="id">mortovivo</td>
+                    <td class="effect">undead_1_turn</td>
+                    <td class="description">HP nunca cai abaixo de 1 por 1 turno completo. MECANISMO: Se o usuário receber dano que reduziria o HP para 0 ou abaixo, o HP é fixado em 1. Funciona como um "escudo de sobrevivência" que garante que o usuário não morra naquele turno, independentemente da quantidade de dano recebido. Dano excessivo não é acumulado para o próximo turno.</td>
+                </tr>
+                <tr>
+                    <td class="name">Poção Maxima</td>
+                    <td class="id">maxima</td>
+                    <td class="effect">damage_boost_50</td>
+                    <td class="description">+50% de dano no próximo turno. MECANISMO: Aplica buff multiplicativo de 1.5x ao dano de TODOS os feitiços usados no próximo turno. Ex: se um feitiço causa 100 de dano, com Maxima causa 150. O buff dura apenas 1 turno e é aplicado antes de outros modificadores de dano (crítico, cores, etc.).</td>
+                </tr>
+                <tr>
+                    <td class="name">Poção Foco</td>
+                    <td class="id">foco</td>
+                    <td class="effect">accuracy_plus_10</td>
+                    <td class="description">+10% Accuracy PERMANENTE. MECANISMO: Aumenta a precisão base de TODOS os feitiços em 10% permanentemente (não expira). Ex: se um feitiço tem 70% accuracy, com Foco passa a ter 80%. O bonus é aplicado antes do roll de accuracy e stack multiplicativamente com outros modificadores de accuracy (debuffs, cores, etc.).</td>
+                </tr>
+                <tr>
+                    <td class="name">Poção Merlin</td>
+                    <td class="id">merlin</td>
+                    <td class="effect">copy_potion_boost</td>
+                    <td class="description">Copia a última poção usada pelo oponente com +25% de eficácia. MECANISMO: Identifica qual foi a última poção usada pelo oponente e aplica o mesmo efeito ao usuário, mas com 25% de bonus. Ex: se o oponente usou Maxima (+50% dano), usuário recebe +62.5% dano (50 * 1.25). Se o oponente não usou poção, esta não tem efeito.</td>
+                </tr>
+                <tr>
+                    <td class="name">Tônico de Dragão</td>
+                    <td class="id">dragon_tonic</td>
+                    <td class="effect">priority_plus_4</td>
+                    <td class="description">Aumenta a prioridade do usuário em +4 no próximo turno. MECANISMO: Aplica buff de +4 priority para o próximo turno. Ex: se o usuário tem priority 0 base, com Tônico tem priority +4 no próximo turno (age antes de spells com priority menor). O bonus dura apenas 1 turno e é somado à priority base das spells.</td>
+                </tr>
+                <tr>
+                    <td class="name">Poção do Desespero</td>
+                    <td class="id">despair_potion</td>
+                    <td class="effect">mana_drain_3</td>
+                    <td class="description">Reduz 3 de mana do oponente baseado na última magia que ele usou. MECANISMO: Identifica qual foi o último feitiço usado pelo oponente e reduz 3 de mana daquele feitiço específico. Se o feitiço já tinha 0 de mana, não pode ser reduzido abaixo de 0. O efeito é permanente para aquela batalha (a mana não recupera automaticamente).</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🪄 NÚCLEOS DE VARINHA (16 TOTAL)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome (PT-BR)</th>
+                    <th>ID</th>
+                    <th>Efeito</th>
+                    <th>Descrição Mecânica Detalhada</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="name">Pelo de Unicórnio</td>
+                    <td class="id">unicorn</td>
+                    <td class="effect">accuracy_plus10</td>
+                    <td class="description">+10% Accuracy (exceto Imperdoáveis). MECANISMO: Aumenta a precisão base de TODOS os feitiços não-Imperdoáveis em 10%. Ex: se um feitiço tem 70% accuracy, com Unicorn tem 80%. O bonus NÃO se aplica a Maldições (Unforgivable: Crucius, Imperio, Avada Kedavra). Stack multiplicativo com outros modificadores de accuracy.</td>
+                </tr>
+                <tr>
+                    <td class="name">Coração de Dragão</td>
+                    <td class="id">dragon</td>
+                    <td class="effect">crit20_acc_minus15</td>
+                    <td class="description">+20% Crit / -15% Accuracy. MECANISMO: Aumenta a chance de crítico base em 20% (stack aditivo com outros bonus de crit). Reduz a accuracy base em 15% (stack multiplicativo). Trade-off: mais dano potencial, mas menos chance de acertar. Ex: se base crit é 10%, com Dragon fica 30%. Se base accuracy é 80%, com Dragon fica 68% (80 * 0.85).</td>
+                </tr>
+                <tr>
+                    <td class="name">Pena de Fênix</td>
+                    <td class="id">phoenix</td>
+                    <td class="effect">phoenix_regen</td>
+                    <td class="description">Cura 25-75 HP fixo no fim do turno. MECANISMO: No final de cada turno (após todas as ações), recupera HP aleatório entre 25 e 75. A cura é fixa e não depende de dano recebido ou causado. Stack aditivo com outras fontes de cura. O valor é rollado aleatoriamente a cada turno (Math.floor(Math.random() * 51) + 25).</td>
+                </tr>
+                <tr>
+                    <td class="name">Pelo de Testrálio</td>
+                    <td class="id">thestral</td>
+                    <td class="effect">thestral_cap300</td>
+                    <td class="description">Dano único máximo: 300. MECANISMO: Qualquer dano único recebido é limitado a 300 HP. Ex: se um Avada Kedavra causaria 500 de dano, com Thestral causa apenas 300. O limite é por HIT individual, não por turno total. Multi-hit spells (Flagellum) são limitadas por hit, não pelo total. Não afeta dano por turno (DOT, burn, poison).</td>
+                </tr>
+                <tr>
+                    <td class="name">Presa de Basilisco</td>
+                    <td class="id">basilisk</td>
+                    <td class="effect">basilisk_debuff_chance</td>
+                    <td class="description">+20% chance de aplicar debuffs. MECANISMO: Aumenta a chance de aplicar debuffs de TODOS os feitiços em 20% (stack aditivo). Ex: se um feitiço tem 40% de chance aplicar BURN, com Basilisk tem 60%. Aplica-se a TODOS os tipos de debuffs (burn, stun, freeze, taunt, mark, confusion, poison, paralysis, etc.). O bonus é aplicado antes do roll de chance.</td>
+                </tr>
+                <tr>
+                    <td class="name">Pena de Pássaro Trovão</td>
+                    <td class="id">thunderbird</td>
+                    <td class="effect">thunder_priority</td>
+                    <td class="description">+1 Prioridade global. MECANISMO: Aumenta a priority base de TODOS os feitiços em +1. Ex: se um feitiço tem priority 0, com Thunderbird tem priority +1 (age antes de priority 0). O bonus é somado à priority base de cada feitiço. Stack aditivo com outros modificadores de priority (casas, poções, etc.).</td>
+                </tr>
+                <tr>
+                    <td class="name">Pena de Occamy</td>
+                    <td class="id">occamy</td>
+                    <td class="effect">occamy_mirror</td>
+                    <td class="description">Espelho ativo: mesmo feitiço que o alvo - −25% dano por repetição (acumula) e −10% acc por camada. MECANISMO: Copia o feitiço usado pelo alvo no turno anterior. Se usar o mesmo feitiço consecutivamente: −25% dano (multiplicativo) e −10% accuracy (multiplicativo) por repetição. Ex: 1ª vez: 100%, 2ª vez: 75% dano / 90% acc, 3ª vez: 56.25% dano / 81% acc. Penalidade reseta ao trocar de feitiço.</td>
+                </tr>
+                <tr>
+                    <td class="name">Crina de Kelpie</td>
+                    <td class="id">kelpie</td>
+                    <td class="effect">kelpie_fire_immune</td>
+                    <td class="description">Imune a dano de Incêndio, Confringo/Confrigo e Bombarda. MECANISMO: Dano de spells do tipo fogo (Incendio, Confrigo, Bombarda) é reduzido a 0. A imunidade é específica a essas spells apenas. Outras spells de dano (Avada Kedavra, Diffindo, etc.) causam dano normal. O efeito é passivo e constante.</td>
+                </tr>
+                <tr>
+                    <td class="name">Pelo de Acromântula</td>
+                    <td class="id">acromantula</td>
+                    <td class="effect">acromantula_power_stack</td>
+                    <td class="description">+25 dano empilhável por turno completo. MECANISMO: No final de cada turno completo (após todas as ações), ganha +25 de dano base. O bonus é empilhável (stack aditivo) e não tem limite máximo. Ex: Turno 1: +25, Turno 2: +50, Turno 3: +75, etc. O bonus é aplicado ao dano base de TODOS os feitiços. Reseta ao fim da batalha.</td>
+                </tr>
+                <tr>
+                    <td class="name">Pele de Rapinomônio</td>
+                    <td class="id">rapinomonio</td>
+                    <td class="effect">rapinomonio_drain_start</td>
+                    <td class="description">Início: 1 spell aleatória de cada duelista com mana 0. MECANISMO: No início da batalha, 1 feitiço aleatório de cada duelista (usuário e oponente) tem sua mana reduzida a 0. O feitiço é escolhido aleatoriamente do grimório. A mana não recupera automaticamente (precisa usar Fiantu Dure ou Rictumsempra para recuperar). O efeito acontece apenas 1x no início.</td>
+                </tr>
+                <tr>
+                    <td class="name">Cabelo de Veela</td>
+                    <td class="id">veela</td>
+                    <td class="effect">veela_acc_penalty</td>
+                    <td class="description">Penalidade aleatória de Acc (0-25%) / Imune a críticos. MECANISMO: Cada turno, a accuracy do oponente é reduzida aleatoriamente entre 0% e 25% (roll: Math.floor(Math.random() * 26)). A penalidade é aplicada antes do roll de accuracy. MECANISMO SECUNDÁRIO: Usuário é imune a críticos (canCrit: false efetivo). O oponente nunca causa dano crítico no usuário.</td>
+                </tr>
+                <tr>
+                    <td class="name">Pelo de Crupe</td>
+                    <td class="id">crupe</td>
+                    <td class="effect">crupe_triple</td>
+                    <td class="description">Feitiços sem debuff/efeito de status: 25% chance de dano ×3. MECANISMO: Se um feitiço não aplica debuffs ou efeitos de status (apenas dano puro), há 25% de chance do dano ser multiplicado por 3. Ex: se um feitiço causa 100 de dano, com Crupe pode causar 300. A chance é rollada a cada uso. Feitiços com efeitos (burn, stun, freeze, etc.) não são afetados.</td>
+                </tr>
+                <tr>
+                    <td class="name">Presa de Cinzal</td>
+                    <td class="id">cinzal</td>
+                    <td class="effect">cinzal_weaken</td>
+                    <td class="description">Cada golpe de 100+ de dano recebido: atacante acumula −15% dano (multiplicativo). MECANISMO: Sempre que o usuário recebe um golpe de 100+ de dano, o atacante acumula um debuff de −15% dano. O debuff é multiplicativo e empilhável. Ex: 1 golpe 100+: −15% dano, 2 golpes 100+: −27.75% dano (0.85 * 0.85), 3 golpes 100+: −38.59% dano. Não há limite de stacks. Reseta ao fim da batalha.</td>
+                </tr>
+                <tr>
+                    <td class="name">Pelo de Centauro</td>
+                    <td class="id">centauro</td>
+                    <td class="effect">centauro_block_heals</td>
+                    <td class="description">Com Centauro no campo: Ferula, Episkey e Vulnera Sanetur ficam com mana 0 para todos os duelistas. MECANISMO: Se ALGUM duelista no campo tem Centauro, as spells de cura (Ferula, Episkey, Vulnera Sanetur) de TODOS os duelistas têm sua mana reduzida a 0. Isso impede o uso dessas spells durante a batalha. O efeito é passivo e afeta todos, inclusive o próprio usuário do Centauro.</td>
+                </tr>
+                <tr>
+                    <td class="name">Pena de Hipogrifo</td>
+                    <td class="id">hippogriff</td>
+                    <td class="effect">hippogriff_immune_mark_bomb</td>
+                    <td class="description">Imunidade total a MARCA e BOMBA. MECANISMO: Usuário é completamente imune aos debuffs MARK (Confrigo) e BOMB (Subito). Se um oponente tenta aplicar MARK ou BOMB, o debuff falha e não é aplicado. A imunidade é específica a esses debuffs apenas. Outros debuffs (burn, stun, freeze, etc.) são aplicados normalmente. O efeito é passivo e constante.</td>
+                </tr>
+                <tr>
+                    <td class="name">Pele de Trasgo</td>
+                    <td class="id">troll</td>
+                    <td class="effect">troll_force_avg_damage</td>
+                    <td class="description">Impede que as magias do oponente causem o dano máximo. MECANISMO: Qualquer dano recebido é estabilizado no valor médio (não permite dano máximo). Ex: se um feitiço causa 25-80 de dano, com Troll sempre causa o valor médio (52.5). Se um feitiço causa 0-200 de dano, sempre causa 100. O efeito ignora o roll aleatório e força o valor médio. Não afeta dano fixo.</td>
+                </tr>
+                <tr>
+                    <td class="name">Pena de Oraqui Orala</td>
+                    <td class="id">oraq_orala</td>
+                    <td class="effect">oraq_orala_invuln_crit</td>
+                    <td class="description">Ao receber Crítico: 30% chance de invulnerabilidade no próximo turno. MECANISMO: Sempre que o usuário recebe um dano crítico, há 30% de chance de ganhar invulnerabilidade no próximo turno. Invulnerabilidade: 100% chance de errar do oponente (miss chance). A chance é rollada a cada crítico recebido. O efeito dura 1 turno e não é cumulativo.</td>
+                </tr>
+                <tr>
+                    <td class="name">Pelo de Seminviso</td>
+                    <td class="id">seminviso</td>
+                    <td class="effect">seminviso_spell_lock</td>
+                    <td class="description">Permite trancar 1 magia: imune a Expulso, Obliviate e Petrificus. MECANISMO: No início da batalha, o usuário escolhe 1 feitiço do seu grimório para "trancar". Esse feitiço fica imune a Expulso (não pode ser substituído), Obliviate (não pode ter mana reduzida) e Petrificus (não pode ser bloqueado). Apenas 1 feitiço pode ser trancado por batalha. O efeito é escolhido pelo usuário antes da batalha começar.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="legend">
+            <h3>📖 Legenda de Termos Técnicos</h3>
+            <div class="legend-item">
+                <strong>Stack Aditivo:</strong> Os valores são somados diretamente (ex: 10% + 20% = 30%).
+            </div>
+            <div class="legend-item">
+                <strong>Stack Multiplicativo:</strong> Os valores são multiplicados (ex: 10% * 20% = 12%).
+            </div>
+            <div class="legend-item">
+                <strong>Priority:</strong> Determina ordem de ação. Valores positivos agem antes, negativos agem depois.
+            </div>
+            <div class="legend-item">
+                <strong>Accuracy:</strong> Chance de acertar o alvo (0-100%).
+            </div>
+            <div class="legend-item">
+                <strong>Crit:</strong> Dano crítico - geralmente multiplica o dano base por 1.5x ou 2x.
+            </div>
+            <div class="legend-item">
+                <strong>Debuff:</strong> Efeito negativo aplicado ao alvo (burn, stun, freeze, etc.).
+            </div>
+            <div class="legend-item">
+                <strong>Buff:</strong> Efeito positivo aplicado ao usuário (aumento de dano, accuracy, etc.).
+            </div>
+            <div class="legend-item">
+                <strong>Imperdoáveis (Unforgivable):</strong> Maldições especiais (Crucius, Imperio, Avada Kedavra) com mecânicas únicas.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
