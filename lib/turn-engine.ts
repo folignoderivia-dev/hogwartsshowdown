@@ -1378,10 +1378,11 @@ export function calculateTurnOutcome(params: {
             }
           }
 
-          // SECTUMSEMPRA: lifesteal — cura o dano causado
-          if (spell.special === "sectumsempra_lifesteal" && damage > 0 && !bloqueado) {
-            state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, damage) } : d))
-            logs.push(`→ Sectumsempra! ${attacker.name} healed ${damage} HP from damage caused!`)
+          // SECTUMSEMPRA: lifesteal — cura metade do dano causado
+          if (spell.special === "sectumsempra_lifesteal_half" && damage > 0 && !bloqueado) {
+            const healAmount = Math.round(damage / 2)
+            state = state.map((d) => (d.id === attacker.id ? { ...d, hp: healFlatTotal(d.hp, healAmount) } : d))
+            logs.push(`→ Sectumsempra! ${attacker.name} healed ${healAmount} HP from damage caused (half of ${damage})!`)
           }
 
           // FINITE INCANTATEM: transfere debuffs do usuário para o alvo
