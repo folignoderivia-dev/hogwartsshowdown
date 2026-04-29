@@ -268,7 +268,10 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       const el = hudRefs.current[id]
       if (!el) return { x: rect.width / 2, y: rect.height / 2 }
       const r = el.getBoundingClientRect()
-      return { x: r.left - rect.left + r.width / 2, y: r.top - rect.top + r.height / 2 }
+      // Start from center of HUD element
+      const centerX = r.left - rect.left + r.width / 2
+      const centerY = r.top - rect.top + r.height / 2
+      return { x: centerX, y: centerY }
     }
 
     const from = hudPoint(attacker.id)
@@ -1009,7 +1012,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     const image = side === "top" ? HAND_TOP : HAND_BOTTOM
     const size = side === "top" ? "h-[230px]" : "h-[285px]"
     return (
-      <img src={image} alt={`${duelist.name}'s Wand`} className={`pointer-events-none absolute z-10 ${positionClass} ${size} w-auto object-contain ${mirror ? "-scale-x-100" : ""} ${dead ? "grayscale opacity-50" : "opacity-95"}`} />
+      <img src={image} alt={`${duelist.name}'s Wand`} className={`pointer-events-none absolute z-10 ${positionClass} ${size} w-auto object-contain ${mirror ? "-scale-x-100" : ""} ${dead ? "grayscale opacity-50" : "opacity-95 animate-float"} style={{ animationDuration: "3s" }}`} />
     )
   }
   
@@ -1127,7 +1130,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
                 {bottomDuelists.map((d, idx) => (
                   <div key={d.id}>
                     {renderHUD(d)}
-                    {renderWand(d, "bottom", idx === 0 ? "-bottom-20 left-3" : "-bottom-20 right-3", idx === 1)}
+                    {renderWand(d, "bottom", idx === 0 ? "-bottom-20 left-1/2 -translate-x-1/2" : "-bottom-20 right-3", idx === 1)}
                   </div>
                 ))}
               </div>
