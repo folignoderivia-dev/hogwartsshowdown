@@ -1249,6 +1249,7 @@ const DuelArena = (
       yourPlayerId: string
     }) => {
       console.log("[Socket] GAME_START received:", serverDuelists.map((d) => d.name))
+      console.log("[Socket] GAME_START spellMana debug:", serverDuelists.map((d) => ({ id: d.id, name: d.name, spellManaKeys: Object.keys(d.spellMana || {}), spells: d.spells })))
       setKnownBroadcastPlayers(serverDuelists.map((d) => d.id))
       setDuelists(serverDuelists)
       turnNumberRef.current = serverTurn
