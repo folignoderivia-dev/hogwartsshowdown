@@ -761,33 +761,25 @@ const DuelArena = (
     }
 
     console.log(`[playSpellVfx] Starting spell animation for ${spellName} by ${attacker.id}`)
-    console.log(`[playSpellVfx] Available wand refs:`, Object.keys(wandRefs.current))
 
-    // Increased delay to ensure wand ref is available
-    await sleep(200)
+    // Small delay before animation
+    await sleep(100)
 
-    const getWandPoint = (id: string): Point => {
-      const wandEl = wandRefs.current[id]
-      if (!wandEl) {
-        console.log(`[playSpellVfx] Wand ref not found for ${id}, falling back to HUD center`)
+    const getHudPoint = (id: string): Point => {
+      const el = hudRefs.current[id]
+      if (!el) {
+        console.log(`[playSpellVfx] HUD ref not found for ${id}, falling back to arena center`)
         return { x: rect.width / 2, y: rect.height / 2 }
       }
-      const r = wandEl.getBoundingClientRect()
-      // Get center of wand hand image
+      const r = el.getBoundingClientRect()
+      // Get center of HUD button
       const centerX = r.left - rect.left + r.width / 2
       const centerY = r.top - rect.top + r.height / 2
-      console.log(`[playSpellVfx] Wand point for ${id}:`, { centerX, centerY, wandRect: { left: r.left, top: r.top, width: r.width, height: r.height }, arenaRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } })
+      console.log(`[playSpellVfx] HUD point for ${id}:`, { centerX, centerY })
       return { x: centerX, y: centerY }
     }
 
-    const hudPoint = (id: string): Point => {
-      const el = hudRefs.current[id]
-      if (!el) return { x: rect.width / 2, y: rect.height / 2 }
-      const r = el.getBoundingClientRect()
-      return { x: r.left - rect.left + r.width / 2, y: r.top - rect.top + r.height / 2 }
-    }
-
-    const from = getWandPoint(attacker.id)
+    const from = getHudPoint(attacker.id)
     const targetIds = targets.map((t) => t.id)
     
     // Check if it's a self-target spell
@@ -810,7 +802,7 @@ const DuelArena = (
 
     // Otherwise, use beam animation for target spells
     if (targets.length > 0) {
-      const to = hudPoint(targets[0].id)
+      const to = getHudPoint(targets[0].id)
       const color = getSpellBeamColor(spellName)
       setSpellBeam({ fromX: from.x, fromY: from.y, toX: to.x, toY: to.y, color })
       await sleep(300)
