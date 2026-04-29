@@ -265,8 +265,8 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       return
     }
 
-    // Small delay to ensure wand ref is available
-    await sleep(100)
+    // Increased delay to ensure wand ref is available
+    await sleep(200)
 
     const getWandPoint = (id: string): { x: number; y: number } => {
       const wandEl = wandRefs.current[id]

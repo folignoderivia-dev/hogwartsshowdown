@@ -499,8 +499,8 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
       return
     }
 
-    // Small delay to ensure wand ref is available
-    await sleep(100)
+    // Increased delay to ensure wand ref is available
+    await sleep(200)
 
     const getWandPoint = (id: string): Point => {
       const wandEl = wandRefs.current[id]
