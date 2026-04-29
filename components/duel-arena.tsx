@@ -1712,7 +1712,7 @@ const DuelArena = (
         type="button"
         onClick={() => onTargetClick(duelist.id)}
         disabled={!targetable}
-        className={`relative w-full touch-manipulation select-none rounded-lg border-2 bg-stone-900/85 p-2 text-left transition-transform duration-150 ${dead ? "opacity-50 border-stone-600" : targetable ? "border-amber-400 animate-pulse" : "border-amber-900/80"} ${impactTargetId === duelist.id ? "scale-[1.03] ring-2 ring-amber-300" : ""}`}
+        className={`relative w-full touch-manipulation select-none rounded-lg border-2 bg-stone-900/85 p-2 text-center transition-transform duration-150 ${dead ? "opacity-50 border-stone-600" : targetable ? "border-amber-400 animate-pulse" : "border-amber-900/80"} ${impactTargetId === duelist.id ? "scale-[1.03] ring-2 ring-amber-300" : ""}`}
       >
         {currentTargetId === duelist.id && <div className="absolute -top-2 left-1/2 z-50 -translate-x-1/2 text-xl text-amber-300">⬇</div>}
         <div className="mb-1 flex items-start gap-2">
@@ -1784,7 +1784,7 @@ const DuelArena = (
     const image = side === "top" ? HAND_TOP : HAND_BOTTOM
     const size = side === "top" ? "h-[230px]" : "h-[285px]"
     return (
-      <img src={image} alt={`${duelist.name}'s Wand`} className={`pointer-events-none absolute z-10 ${positionClass} ${size} w-auto object-contain ${mirror ? "-scale-x-100" : ""} ${dead ? "grayscale opacity-50" : "opacity-95"}`} />
+      <img src={image} alt={`${duelist.name}'s Wand`} className={`pointer-events-none absolute z-10 ${positionClass} ${size} w-auto object-contain ${mirror ? "-scale-x-100" : ""} ${dead ? "grayscale opacity-50" : "opacity-95 animate-float"} style={{ animationDuration: "3s" }}`} />
     )
   }
 
@@ -1914,7 +1914,7 @@ const DuelArena = (
                     {renderWand(
                       duelist,
                       isTop ? "top" : "bottom",
-                      isTop ? (idx === 0 ? "-top-10 -left-16" : "-top-10 -right-[20px]") : "-bottom-20 left-1/2 -translate-x-1/2",
+                      isTop ? "-top-10 left-1/2 -translate-x-1/2" : "-bottom-20 left-1/2 -translate-x-1/2",
                       idx % 2 === 1
                     )}
                   </div>
@@ -1928,7 +1928,7 @@ const DuelArena = (
                   {topDuelists.map((d, idx) => (
                     <div key={d.id}>
                       {renderHUD(d)}
-                      {renderWand(d, "top", idx === 0 ? "-top-10 -right-[20px]" : "-top-10 -left-16", idx === 0)}
+                      {renderWand(d, "top", idx === 0 ? "-top-10 left-1/2 -translate-x-1/2" : "-top-10 left-1/2 -translate-x-1/2", idx === 0)}
                     </div>
                   ))}
                 </div>
@@ -1938,7 +1938,7 @@ const DuelArena = (
                   {bottomDuelists.map((d, idx) => (
                     <div key={d.id}>
                       {renderHUD(d)}
-                      {renderWand(d, "bottom", idx === 0 ? "-bottom-20 left-3" : "-bottom-20 right-3", idx === 1)}
+                      {renderWand(d, "bottom", idx === 0 ? "-bottom-20 left-1/2 -translate-x-1/2" : "-bottom-20 right-3", idx === 1)}
                     </div>
                   ))}
                 </div>

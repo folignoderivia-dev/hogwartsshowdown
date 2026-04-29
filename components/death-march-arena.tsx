@@ -763,7 +763,7 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
         type="button"
         onClick={() => onTargetClick(duelist.id)}
         disabled={!targetable}
-        className={`relative w-full touch-manipulation select-none rounded-lg border-2 bg-stone-900/85 p-2 text-left transition-transform duration-150 ${dead ? "opacity-50 border-stone-600" : targetable ? "border-amber-400 animate-pulse" : "border-amber-900/80"}`}
+        className={`relative w-full touch-manipulation select-none rounded-lg border-2 bg-stone-900/85 p-2 text-center transition-transform duration-150 ${dead ? "opacity-50 border-stone-600" : targetable ? "border-amber-400 animate-pulse" : "border-amber-900/80"}`}
       >
         <div className="mb-1 flex items-start gap-2">
           <div className="relative flex-shrink-0">
@@ -784,6 +784,15 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
         </div>
         {renderHearts(duelist.hp)}
       </button>
+    )
+  }
+
+  const renderWand = (duelist: Duelist, side: "top" | "bottom", positionClass: string, mirror = false) => {
+    const dead = isDefeated(duelist.hp)
+    const image = side === "top" ? HAND_TOP : HAND_BOTTOM
+    const size = side === "top" ? "h-[230px]" : "h-[285px]"
+    return (
+      <img src={image} alt={`${duelist.name}'s Wand`} className={`pointer-events-none absolute z-10 ${positionClass} ${size} w-auto object-contain ${mirror ? "-scale-x-100" : ""} ${dead ? "grayscale opacity-50" : "opacity-95 animate-float"} style={{ animationDuration: "3s" }}`} />
     )
   }
   
@@ -854,10 +863,24 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
           ))}
           <div className="grid h-full min-h-[560px] grid-rows-2">
             <div className="relative border-b border-stone-600 p-3">
-              <div className="grid gap-3 grid-cols-1">{topDuelists.map((d) => <div key={d.id}>{renderHUD(d)}</div>)}</div>
+              <div className="grid gap-3 grid-cols-1">
+                {topDuelists.map((d) => (
+                  <div key={d.id}>
+                    {renderHUD(d)}
+                    {renderWand(d, "top", "-top-10 left-1/2 -translate-x-1/2", false)}
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="relative p-3">
-              <div className="grid gap-3 grid-cols-1">{bottomDuelists.map((d) => <div key={d.id}>{renderHUD(d)}</div>)}</div>
+              <div className="grid gap-3 grid-cols-1">
+                {bottomDuelists.map((d) => (
+                  <div key={d.id}>
+                    {renderHUD(d)}
+                    {renderWand(d, "bottom", "-bottom-20 left-1/2 -translate-x-1/2", false)}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

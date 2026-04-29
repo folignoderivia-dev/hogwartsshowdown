@@ -268,7 +268,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       const el = hudRefs.current[id]
       if (!el) return { x: rect.width / 2, y: rect.height / 2 }
       const r = el.getBoundingClientRect()
-      // Start from center of HUD element
+      // Get center of HUD button
       const centerX = r.left - rect.left + r.width / 2
       const centerY = r.top - rect.top + r.height / 2
       return { x: centerX, y: centerY }
@@ -949,7 +949,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
         type="button"
         onClick={() => onTargetClick(duelist.id)}
         disabled={!targetable}
-        className={`relative w-full touch-manipulation select-none rounded-lg border-2 bg-stone-900/85 p-2 text-left transition-transform duration-150 ${dead ? "opacity-50 border-stone-600" : targetable ? "border-amber-400 animate-pulse" : "border-amber-900/80"} ${impactTargetId === duelist.id ? "scale-[1.03] ring-2 ring-amber-300" : ""}`}
+        className={`relative w-full touch-manipulation select-none rounded-lg border-2 bg-stone-900/85 p-2 text-center transition-transform duration-150 ${dead ? "opacity-50 border-stone-600" : targetable ? "border-amber-400 animate-pulse" : "border-amber-900/80"} ${impactTargetId === duelist.id ? "scale-[1.03] ring-2 ring-amber-300" : ""}`}
       >
         {currentTargetId === duelist.id && <div className="absolute -top-2 left-1/2 z-50 -translate-x-1/2 text-xl text-amber-300">⬇</div>}
         <div className="mb-1 flex items-start gap-2">
@@ -1120,7 +1120,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
                 {topDuelists.map((d, idx) => (
                   <div key={d.id}>
                     {renderHUD(d)}
-                    {renderWand(d, "top", idx === 0 ? "-top-10 -right-[20px]" : "-top-10 -left-16", idx === 0)}
+                    {renderWand(d, "top", idx === 0 ? "-top-10 left-1/2 -translate-x-1/2" : "-top-10 left-1/2 -translate-x-1/2", idx === 0)}
                   </div>
                 ))}
               </div>
