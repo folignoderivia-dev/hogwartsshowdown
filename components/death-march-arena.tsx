@@ -961,7 +961,7 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
           <p className="mb-2 text-xs font-bold text-amber-300">{locale === "en" ? "Battle Log" : "Log de Batalha"}</p>
           <div className="h-32 overflow-y-auto rounded border border-amber-800 bg-stone-900 p-2">
             {battleLog.slice(-40).map((line, i) => (
-              <p key={i} className={`mb-1 battle-log-text ${line.startsWith("→") ? "text-red-300" : "text-amber-100/90"}`}>{line}</p>
+              <p key={i} className={`mb-1 battle-log-text ${line.startsWith("→") ? (line.includes("CRITICAL DAMAGE") ? "text-yellow-300" : line.includes("BLOCKED") ? "text-blue-300" : line.includes("errou") ? "text-stone-400" : "text-red-300") : "text-amber-100/90"}`}>{line}</p>
             ))}
           </div>
         </div>

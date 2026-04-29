@@ -1155,7 +1155,7 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
                 {bottomDuelists.map((d, idx) => (
                   <div key={d.id}>
                     {renderHUD(d)}
-                    {renderWand(d, "bottom", idx === 0 ? "-bottom-20 left-1/2 -translate-x-1/2" : "-bottom-20 right-3", idx === 1)}
+                    {renderWand(d, "bottom", "-bottom-20 left-1/2 -translate-x-1/2", false)}
                   </div>
                 ))}
               </div>
