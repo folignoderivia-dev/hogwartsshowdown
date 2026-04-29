@@ -477,11 +477,18 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     return { x: r.left - rect.left + r.width / 2, y: r.top - rect.top + r.height / 2 }
   }
 
-  const getFCTFromAnim = (anim: EngineAnimation) => {
-    if (anim.type === "cast" && anim.fctMessage) {
-      return { text: anim.fctMessage, type: "damage" }
+  const getFCTFromAnim = (anim: EngineAnimation): { text: string; type: "damage" | "crit" | "miss" | "heal" | "block" | "skip" } | null => {
+    const spell = anim.spellName ? `${anim.spellName} ` : ""
+    if (anim.fctMessage) return { text: anim.fctMessage, type: anim.isMiss ? "miss" : "heal" }
+    if (anim.isMiss) return { text: `${spell}MISSED!`, type: "miss" }
+    if (anim.isBlock) return { text: `${spell}🛡 BLOCKED!`, type: "block" }
+    const dmg = anim.damage ?? 0
+    if (dmg <= 0) {
+      if (anim.fctOnly) return { text: `${spell}✨`, type: "heal" }
+      return null
     }
-    return null
+    if (anim.isCrit) return { text: `${spell}${anim.damage} 💥 CRITICAL DAMAGE!`, type: "crit" }
+    return { text: `${spell}-${anim.damage}`, type: "damage" }
   }
 
   const playSpellVfx = async (spellName: string, attacker: Duelist, targets: Duelist[]) => {
@@ -492,9 +499,15 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
       return
     }
 
+    // Small delay to ensure wand ref is available
+    await sleep(100)
+
     const getWandPoint = (id: string): Point => {
       const wandEl = wandRefs.current[id]
-      if (!wandEl) return { x: rect.width / 2, y: rect.height / 2 }
+      if (!wandEl) {
+        console.log(`[playSpellVfx] Wand ref not found for ${id}, falling back to HUD center`)
+        return { x: rect.width / 2, y: rect.height / 2 }
+      }
       const r = wandEl.getBoundingClientRect()
       // Get center of wand hand image
       return { x: r.left - rect.left + r.width / 2, y: r.top - rect.top + r.height / 2 }

@@ -265,13 +265,20 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
       return
     }
 
+    // Small delay to ensure wand ref is available
+    await sleep(100)
+
     const getWandPoint = (id: string): { x: number; y: number } => {
       const wandEl = wandRefs.current[id]
-      if (!wandEl) return { x: rect.width / 2, y: rect.height / 2 }
+      if (!wandEl) {
+        console.log(`[playSpellVfx] Wand ref not found for ${id}, falling back to HUD center`)
+        return { x: rect.width / 2, y: rect.height / 2 }
+      }
       const r = wandEl.getBoundingClientRect()
       // Get center of wand hand image
       const centerX = r.left - rect.left + r.width / 2
       const centerY = r.top - rect.top + r.height / 2
+      console.log(`[playSpellVfx] Wand point for ${id}:`, { centerX, centerY })
       return { x: centerX, y: centerY }
     }
 
@@ -320,13 +327,13 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     const spell = anim.spellName ? `${anim.spellName} ` : ""
     if (anim.fctMessage) return { text: anim.fctMessage, type: anim.isMiss ? "miss" : "heal" }
     if (anim.isMiss) return { text: `${spell}MISSED!`, type: "miss" }
-    if (anim.isBlock) return { text: `${spell}🛡 BLOQUEADO!`, type: "block" }
+    if (anim.isBlock) return { text: `${spell}🛡 BLOCKED!`, type: "block" }
     const dmg = anim.damage ?? 0
     if (dmg <= 0) {
       if (anim.fctOnly) return { text: `${spell}✨`, type: "heal" }
       return null
     }
-    if (anim.isCrit) return { text: `${spell}${anim.damage} 💥 CRÍTICO!`, type: "crit" }
+    if (anim.isCrit) return { text: `${spell}${anim.damage} 💥 CRITICAL DAMAGE!`, type: "crit" }
     return { text: `${spell}-${anim.damage}`, type: "damage" }
   }
   
