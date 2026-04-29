@@ -234,6 +234,7 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
   const duelistsRef = useRef<Duelist[]>([])
   const turnNumberRef = useRef(turnNumber)
   const hudRefs = useRef<Record<string, HTMLElement>>({})
+  const wandRefs = useRef<Record<string, HTMLImageElement>>({})
   const arenaRef = useRef<HTMLDivElement>(null)
   const fctCounterRef = useRef(0)
   
@@ -491,6 +492,14 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
       return
     }
 
+    const getWandPoint = (id: string): Point => {
+      const wandEl = wandRefs.current[id]
+      if (!wandEl) return { x: rect.width / 2, y: rect.height / 2 }
+      const r = wandEl.getBoundingClientRect()
+      // Get center of wand hand image
+      return { x: r.left - rect.left + r.width / 2, y: r.top - rect.top + r.height / 2 }
+    }
+
     const hudPoint = (id: string): Point => {
       const el = hudRefs.current[id]
       if (!el) return { x: rect.width / 2, y: rect.height / 2 }
@@ -498,7 +507,7 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
       return { x: r.left - rect.left + r.width / 2, y: r.top - rect.top + r.height / 2 }
     }
 
-    const from = hudPoint(attacker.id)
+    const from = getWandPoint(attacker.id)
     const targetIds = targets.map((t) => t.id)
     
     // Check if it's a self-target spell
@@ -792,7 +801,14 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
     const image = side === "top" ? HAND_TOP : HAND_BOTTOM
     const size = side === "top" ? "h-[230px]" : "h-[285px]"
     return (
-      <img src={image} alt={`${duelist.name}'s Wand`} className={`pointer-events-none absolute z-10 ${positionClass} ${size} w-auto object-contain ${mirror ? "-scale-x-100" : ""} ${dead ? "grayscale opacity-50" : "opacity-95 animate-float"} style={{ animationDuration: "3s" }}`} />
+      <img 
+        ref={(el) => {
+          if (el) wandRefs.current[duelist.id] = el
+        }}
+        src={image} 
+        alt={`${duelist.name}'s Wand`} 
+        className={`pointer-events-none absolute z-10 ${positionClass} ${size} w-auto object-contain ${mirror ? "-scale-x-100" : ""} ${dead ? "grayscale opacity-50" : "opacity-95 animate-float"} style={{ animationDuration: "3s" }}`} 
+      />
     )
   }
   
