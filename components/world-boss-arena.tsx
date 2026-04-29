@@ -158,6 +158,7 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     setCombatLog([])
     setIsCombatOver(false)
     setSelectedSpell(null)
+    setTotalDamage(0) // Reset damage for current battle
     addLog("World Boss battle begins! You have 3 turns to deal damage!", "system")
   }
   
