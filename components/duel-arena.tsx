@@ -1208,6 +1208,7 @@ const DuelArena = (
       setSocketConnected(true)
       setSocketDisconnected(false)
       setDebugLastEvent("socket connected")
+      console.log("[Socket] Sending build to server:", { userId: selfDuelistId, build: playerBuild })
       socket.emit("JOIN_MATCH", {
         matchId,
         userId: selfDuelistId,
