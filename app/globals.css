@@ -200,3 +200,76 @@
   text-shadow: 0 1px 3px rgba(0,0,0,0.8);
   line-height: 1.4;
 }
+
+/* ── Spell Animation Keyframes ─────────────────────────────────────────── */
+/* Shield Pulse Animation */
+@keyframes shieldPulse {
+  0% { transform: scale(0); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+/* Healing Pulse Animation */
+@keyframes healingPulse {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+/* Buff Flash Animation */
+@keyframes buffFlash {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+/* Invisibility Effect Animation */
+@keyframes invisibilityEffect {
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.1); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+/* Radial Expand Animation (Explosions) */
+@keyframes radialExpand {
+  0% { transform: scale(0); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+/* Weather Flash Animation */
+@keyframes weatherFlash {
+  0% { opacity: 0; }
+  20% { opacity: 0.8; }
+  40% { opacity: 0.4; }
+  60% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+/* Fire Rise Animation */
+@keyframes fireRise {
+  0% { transform: translateY(100%); opacity: 1; }
+  100% { transform: translateY(0); opacity: 0; }
+}
+
+/* Erratic Splashes Animation */
+@keyframes erraticSplashes {
+  0% { opacity: 1; }
+  25% { opacity: 0.8; }
+  50% { opacity: 1; }
+  75% { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+/* Screen Shake Animation */
+@keyframes screenShake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-5px); }
+  20% { transform: translateX(5px); }
+  30% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  50% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+  70% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+  90% { transform: translateX(-1px); }
+}

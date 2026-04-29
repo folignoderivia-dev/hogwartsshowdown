@@ -205,7 +205,7 @@ const UI_LABELS: Record<AppLocale, Record<string, string>> = {
     join: "Entrar",
     startOffline: "Iniciar Offline",
     createRoom: "Criar Sala",
-    joinRoom: "Entrar em Sala",
+    joinRoom: "Procurar Sala",
     gameMode: "Modo de Jogo:",
   },
   en: {
@@ -2682,7 +2682,7 @@ export default function CommonRoom({
               }`}
             >
               <Wand2 className="mr-2 h-5 w-5" />
-              {ui.startOffline}
+              {gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta" || gameMode === "historia" ? ui.startOffline : ui.createRoom}
             </Button>
             {gameMode !== "teste" && gameMode !== "torneio-offline" && (
               <Button
