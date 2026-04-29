@@ -295,7 +295,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     powerMax: 150,                 // Dano máximo
     accuracy: 65,                  // Chance de acerto (0-100%)
     pp: 10,                        // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     debuff: { type: "mark", chance: 40, duration: 2 },
     effect: "40% MARK: guaranteed crit on target (2t)",
     effectPt: "40% MARCA: crítico garantido no alvo (2t)",
@@ -318,7 +318,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     powerMax: 100,                 // Dano máximo
     accuracy: 80,                  // Chance de acerto (0-100%)
     pp: 10,                        // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     debuff: { type: "bomba", chance: 100, duration: 2 },
     effect: "BOMB (2t): explosion = 25 damage per 100 HP lost by target",
     effectPt: "BOMBA (2t): explosão = 25 dano por 100 HP perdido do alvo",
@@ -329,7 +329,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 100,                    // Dano base fixo
     accuracy: 50,                  // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     debuff: { type: "silence_defense", chance: 100, duration: 2 },
     effect: "DEFENSE BLOCK: disables Protegos and Salvio (2t)",
     effectPt: "BLOQUEIO DEFESA: desativa Protegos e Salvio (2t)",
@@ -341,7 +341,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     powerMax: 200,                 // Dano máximo
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
-    cost: 2,                       // Custo de mana por uso
+    cost: 1,                       // Custo de mana por uso
     effect: "Area: hits everyone on field (including self), random damage",
     effectPt: "Área: atinge todos em campo (inclusive self), dano aleatório",
   },
@@ -413,7 +413,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 0,                      // Dano base (mana drain, sem dano)
     accuracy: 75,                  // Chance de acerto (0-100%)
     pp: 3,                         // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     special: "obliviate_mana",
     effect: "Halves mana of a random target spell (permanent)",
     effectPt: "Reduz pela metade a mana de um feitiço aleatório do alvo (permanente)",
@@ -473,7 +473,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 50,                     // Dano base fixo
     accuracy: 70,                  // Chance de acerto (0-100%)
     pp: 10,                        // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     special: "flagrate_strip",
     effect: "Removes wand Core/passive from target",
     effectPt: "Remove Núcleo/passiva da varinha do alvo",
@@ -599,7 +599,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 0,                      // Dano base (reflect, sem dano)
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     special: "salvio_reflect",
     effect: "Self: Reflect — returns up to 100% of damage received (1t)",
     effectPt: "Self: Reflect — devolve até 100% do dano recebido (1t)",
@@ -610,7 +610,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 100,                    // Dano base fixo
     accuracy: 60,                  // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     special: "sectumsempra_lifesteal",
     debuff: { type: "bloqueio_cura", chance: 100, duration: 2 },
     effect: "Heals damage caused; HEAL_BLOCK on target (2t)",
@@ -678,7 +678,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 0,                      // Dano base (escudo, sem dano)
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 3,                         // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     priority: 6,                   // Modificador de ordem de turno
     special: "protego_diabolico_shield",
     effect: "Priority +6; shield vs Curses + -15% enemy accuracy (2t)",
@@ -690,7 +690,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 0,                      // Dano base (escudo, sem dano)
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 3,                         // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     priority: 6,                   // Modificador de ordem de turno
     special: "protego_maximo_crit_heal",
     effect: "Priority +6; Self: heals 200 HP if opponent crits on shield",
@@ -751,7 +751,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 0,                      // Dano base (cura, sem dano)
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
-    cost: 2,                       // Custo de mana por uso
+    cost: 1,                       // Custo de mana por uso
     special: "branquium_heal",
     effect: "Erratic heal: heals both you and opponent",
     effectPt: "Cura errática: cura tanto você quanto o oponente",
@@ -785,7 +785,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 0,                      // Dano base (reveal, sem dano)
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
-    cost: 2,                       // Custo de mana por uso
+    cost: 1,                       // Custo de mana por uso
     isVipOnly: true,               // Exclusivo para jogadores VIP
     canCrit: false,                // Nunca causa crítico
     special: "legilimens_reveal",
@@ -799,7 +799,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     powerMax: 100,                 // Dano máximo
     accuracy: 44,                  // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
-    cost: 2,                       // Custo de mana por uso
+    cost: 3,                       // Custo de mana por uso
     isVipOnly: true,               // Exclusivo para jogadores VIP
     debuff: { type: "burn", chance: 100, duration: 2 },
     special: "fogo_maldito_scale",
@@ -812,7 +812,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 0,                      // Dano base (reveal, sem dano)
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
-    cost: 2,                       // Custo de mana por uso
+    cost: 1,                       // Custo de mana por uso
     isVipOnly: true,               // Exclusivo para jogadores VIP
     canCrit: false,                // Nunca causa crítico
     special: "reveal_wand_core",
@@ -826,7 +826,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     powerMax: 200,                 // Dano máximo
     accuracy: 65,                  // Chance de acerto (0-100%)
     pp: 8,                         // Mana máxima (Power Points)
-    cost: 3,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     isVipOnly: true,               // Exclusivo para jogadores VIP
     special: "bombarda_maxima_pierce",
     effect: "👑 VIP: Area; 25% chance to ignore defense",
@@ -838,7 +838,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 0,                      // Dano base (block, sem dano)
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
-    cost: 2,                       // Custo de mana por uso
+    cost: 1,                       // Custo de mana por uso
     isVipOnly: true,               // Exclusivo para jogadores VIP
     canCrit: false,                // Nunca causa crítico
     priority: 4,                   // Modificador de ordem de turno
