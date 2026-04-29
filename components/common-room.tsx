@@ -742,6 +742,7 @@ export default function CommonRoom({
   const [vipProof, setVipProof] = useState("")
   const [vipProofSent, setVipProofSent] = useState(false)
   const [showCustomRoom, setShowCustomRoom] = useState(false)
+  const [tournamentModal, setTournamentModal] = useState(false)
   const [customSettings, setCustomSettings] = useState<CustomRoomSettings>({
     bannedSpells: [], bannedWands: [], bannedPotions: [], turnTimeout: 60, potionLimit: 1,
   })
@@ -1247,6 +1248,23 @@ export default function CommonRoom({
             <span className="hidden sm:inline">{locale === "pt" ? "Achou um Bug? envie mensagem para o GM" : "Found a Bug? Send message to GM"}</span>
           </button>
 
+          {/* Tournament Banner - Top Right (below Owl) */}
+          <button
+            type="button"
+            onClick={() => setTournamentModal(true)}
+            className="absolute top-14 right-0 z-20 rounded-lg border-2 border-yellow-600 bg-gradient-to-br from-yellow-900/90 to-amber-900/90 px-2 py-1.5 shadow-lg hover:from-yellow-800/90 hover:to-amber-800/90 transition-all"
+            title={locale === "pt" ? "Primeiro Torneio de Varinhas Cruzadas-BR" : "First Crossed Wands-BR Tournament"}
+          >
+            <img
+              src="https://i.postimg.cc/BnwyRnRk/Chat-GPT-Image-29-04-2026-15-10-40.png"
+              alt="Tournament Banner"
+              className="h-16 w-auto object-contain"
+              onError={(e) => {
+                e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50' y='50' text-anchor='middle' font-size='40'%3E🏆%3C/text%3E%3C/svg%3E"
+              }}
+            />
+          </button>
+
           <div className="medieval-frame mx-auto mb-3 inline-block rounded-lg bg-gradient-to-b from-amber-900/80 to-amber-950/90 px-6 py-3">
             <h1 className="text-3xl font-bold tracking-tight text-amber-200" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>
               Varinhas Cruzadas - PVP
@@ -1523,6 +1541,71 @@ export default function CommonRoom({
                 onClick={() => setPixModal(false)}
               >
                 <X className="mr-2 h-4 w-4" />
+                {locale === 'en' ? 'Close' : 'Fechar'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Tournament Modal ─────────────────────────────────────────────── */}
+        <Dialog open={tournamentModal} onOpenChange={setTournamentModal}>
+          <DialogContent className="max-h-[92vh] overflow-y-auto border-amber-700/50 bg-gradient-to-b from-stone-900 to-stone-950 text-amber-100">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-amber-300">🏆 {locale === 'en' ? 'First Crossed Wands-BR Tournament' : 'Primeiro Torneio de Varinhas Cruzadas-BR'}</DialogTitle>
+                <button
+                  type="button"
+                  onClick={() => setTournamentModal(false)}
+                  className="rounded-full p-1 text-amber-500 hover:bg-stone-700 hover:text-amber-200 transition-colors"
+                  aria-label={locale === 'en' ? 'Close' : 'Fechar'}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="rounded-lg border border-yellow-600/50 bg-yellow-900/20 p-4">
+                <p className="mb-3 text-sm font-semibold text-yellow-200">
+                  {locale === 'en' ? '🎯 Tournament Details' : '🎯 Detalhes do Torneio'}
+                </p>
+                <ul className="space-y-2 text-sm text-amber-200/90">
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-400">•</span>
+                    <span>{locale === 'en' ? 'Once we reach 100 players, we will start the Crossed Wands tournament' : 'Assim que alcançarmos 100 jogadores, iniciaremos o torneio de varinhas cruzadas'}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-400">•</span>
+                    <span>{locale === 'en' ? 'May be streamed live by a streamer' : 'Pode ser transmitido em live por algum streamer'}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-400">•</span>
+                    <span>{locale === 'en' ? '16 to 32 participants in PvP battles with rules and supervision' : '16 a 32 participantes em batalhas PVP com regras e assistidas'}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-400">•</span>
+                    <span>{locale === 'en' ? 'Fully elimination format' : 'Formato totalmente eliminatório'}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-400">•</span>
+                    <span>{locale === 'en' ? 'The champion of this first edition will receive R$ 100 via PIX to celebrate the opening of our server' : 'O campeão desta primeira edição receberá R$ 100 via PIX em comemoração à abertura do nosso servidor'}</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="rounded-lg border border-amber-700/50 bg-stone-800 p-4">
+                <p className="mb-2 text-sm font-semibold text-amber-300">
+                  {locale === 'en' ? '🌟 Join the Community' : '🌟 Faça Parte da Comunidade'}
+                </p>
+                <p className="text-sm text-amber-200/80">
+                  {locale === 'en' ? 'Join the competitive Hogwarts dueling community! Invite your friends and train with them in competitive mode. Discover the strongest build you can create!' : 'Faça parte também da comunidade de duelos competitivos de Hogwarts! Chame seus amigos e treine no competitivo com eles, e descubra qual a build mais forte que você consegue fazer!'}
+                </p>
+              </div>
+            </div>
+            <DialogFooter className="mt-4">
+              <Button
+                variant="outline"
+                className="w-full border-amber-700 text-amber-300 hover:bg-amber-900/50"
+                onClick={() => setTournamentModal(false)}
+              >
                 {locale === 'en' ? 'Close' : 'Fechar'}
               </Button>
             </DialogFooter>

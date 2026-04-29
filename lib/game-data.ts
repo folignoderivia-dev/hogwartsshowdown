@@ -611,7 +611,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     name: "Sectumsempra",
     namePt: "Sectumsempra",
     power: 100,                    // Dano base fixo
-    accuracy: 70,                  // Chance de acerto (0-100%)
+    accuracy: 55,                  // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
     cost: 2,                       // Custo de mana por uso
     debuff: { type: "bleed", chance: 100, duration: 2 },
@@ -635,7 +635,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     power: 0,                      // Dano base (lifesteal, sem dano)
     accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 3,                         // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    cost: 2,                       // Custo de mana por uso
     priority: -1,                  // Prioridade -1 (ação de defesa)
     special: "vulnera_lifesteal",
     effect: "Self: Lifesteal — heals damage caused by enemy this turn",
