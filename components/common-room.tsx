@@ -276,6 +276,8 @@ export default function CommonRoom({
   const [showBalancePanel, setShowBalancePanel] = useState(false)
   const [isGmModalOpen, setIsGmModalOpen] = useState(false)
   const [gmMessage, setGmMessage] = useState("")
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [createdRoomId, setCreatedRoomId] = useState<string | null>(null)
 
   // ── Global Error Telemetry ─────────────────────────────────────────────────
   const lastLoggedErrorRef = useRef<{ message: string; timestamp: number } | null>(null)
@@ -575,7 +577,14 @@ export default function CommonRoom({
       setCanClaimGacha(false)
       setRevealedSticker(null)
       setShowGacha(false)
-      onAuthChange({ ...currentUser, lastGachaPull: now, unlockedStickers: newStickers })
+      
+      // Reload accountUser from database to ensure unlockedStickers are correctly loaded
+      const updatedUser = await getUserById(currentUser.id)
+      if (updatedUser) {
+        onAuthChange(updatedUser)
+      } else {
+        onAuthChange({ ...currentUser, lastGachaPull: now, unlockedStickers: newStickers })
+      }
     } catch (error) {
       console.error("Gacha: Failed to claim sticker", error)
     }
@@ -1037,6 +1046,8 @@ export default function CommonRoom({
     const payload = buildPayload()
     if (!payload || !onCreateRoom) return
     onCreateRoom(payload)
+    // Show invite modal after creating room
+    setShowInviteModal(true)
   }
 
   const handleJoinRoomClick = (matchId: string) => {
@@ -3089,6 +3100,60 @@ export default function CommonRoom({
           onClose={() => setShowBalancePanel(false)}
           currentUser={currentUser}
         />
+      )}
+
+      {/* ── Invite Friends Modal ─────────────────────────────────────────────── */}
+      {showInviteModal && (
+        <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
+          <DialogContent className="max-h-[92vh] overflow-y-auto border-amber-700/50 bg-gradient-to-b from-stone-900 to-stone-950 text-amber-100">
+            <DialogHeader>
+              <DialogTitle className="text-amber-300">
+                <User className="mr-2 inline h-5 w-5" />
+                {locale === 'pt' ? 'Convidar Amigos' : 'Invite Friends'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-amber-200/90">
+                {locale === 'pt' ? 'Compartilhe o código da sala com seus amigos online:' : 'Share the room code with your online friends:'}
+              </p>
+              {friends.length === 0 ? (
+                <p className="text-xs text-amber-200/95">{locale === 'en' ? 'You have not added friends yet.' : 'Você ainda não adicionou amigos.'}</p>
+              ) : (
+                <div className="space-y-2">
+                  {friends.map((friend) => (
+                    <div key={friend.id} className="flex items-center justify-between rounded border border-amber-900/60 bg-stone-900/60 px-3 py-2 text-xs text-amber-100">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-block h-2 w-2 rounded-full ${onlineUserIds.has(friend.id) ? "bg-green-400 shadow-[0_0_4px_#4ade80]" : "bg-stone-500"}`}
+                          title={onlineUserIds.has(friend.id) ? 'Online' : 'Offline'}
+                        />
+                        <p className="font-semibold text-amber-200">{friend.username}</p>
+                      </div>
+                      {onlineUserIds.has(friend.id) && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-6 border border-amber-700 bg-amber-900/40 px-2 text-[11px] text-amber-100 hover:bg-amber-800/50"
+                          onClick={() => void handleOpenFriendChat(friend.id)}
+                        >
+                          {locale === 'en' ? 'Send Room Code' : 'Enviar Código'}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-stone-700 text-stone-400 hover:bg-stone-800 hover:text-stone-200"
+                onClick={() => setShowInviteModal(false)}
+              >
+                {locale === 'en' ? 'Close' : 'Fechar'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )
