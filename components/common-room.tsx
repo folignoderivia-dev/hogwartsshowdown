@@ -1256,7 +1256,7 @@ export default function CommonRoom({
             title={locale === "pt" ? "Primeiro Torneio de Varinhas Cruzadas-BR" : "First Crossed Wands-BR Tournament"}
           >
             <img
-              src="https://i.postimg.cc/BnwyRnRk/Chat-GPT-Image-29-04-2026-15-10-40.png"
+              src="https://i.postimg.cc/7hDvVPR4/favicon.png"
               alt="Tournament Banner"
               className="h-16 w-auto object-contain"
               onError={(e) => {
