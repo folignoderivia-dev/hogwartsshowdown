@@ -1568,9 +1568,11 @@ const DuelArena = (
         if (spInfo.special === "legilimens_reveal") {
           const spellList = Object.keys(opponent.spellMana ?? {}).join(", ") || "?"
           alert(`🔮 Legilimens! Grimoire of ${opponent.name}: [${spellList}]`)
+          setBattleLog((prev) => [...prev, `[Turn ${turnNumber}] ${player?.name} used Legilimens: ${opponent.name}'s Grimoire was revealed!`])
         } else if (spInfo.special === "reveal_wand_core") {
           const passive = opponent.wand ? WAND_PASSIVES[opponent.wand] : null
           alert(`🔍 Reveal Your Secrets! Core of ${opponent.name}: ${passive?.name ?? "Unknown"} — ${passive?.description ?? ""}`)
+          setBattleLog((prev) => [...prev, `[Turn ${turnNumber}] ${player?.name} used Reveal Your Secrets: ${opponent.name}'s Wand Core was revealed!`])
         }
       }
       return

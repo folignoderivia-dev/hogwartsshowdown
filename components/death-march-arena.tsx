@@ -75,6 +75,7 @@ const DEBUFF_LABEL: Record<DebuffType, string> = {
   damage_amp: "⬆️ DAMAGE+",
   arestum_penalty: "⬇️ ATK/ACC",
   lumus_acc_down: "💡 ACC-20%",
+  blindness: "💡 BLINDNESS",
   spell_disable: "🔒 DISABLE",
   salvio_reflect: "🪞 REFLECT",
   anti_debuff: "✨ ANTI-DEBUFF",
@@ -733,8 +734,8 @@ export default function DeathMarchArena({ playerBuild, currentUser, onExit }: De
       addLog(locale === "en" ? "⚠️ Failed to save march record on exit!" : "⚠️ Falha ao salvar recorde de marcha ao sair!")
     }
     
-    // Reset marchWins to 0 for next session
-    setMarchWins(0)
+    // Do NOT reset marchWins on exit - only reset on explicit loss or give up
+    // This protects against disconnect wipes
     
     onExit()
   }

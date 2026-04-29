@@ -39,12 +39,11 @@ function buildHpBars(house: string): number[] {
 function buildSpellManaForSpells(spells: string[], house: string): Record<string, { current: number; max: number }> {
   const out: Record<string, { current: number; max: number }> = {}
   spells.forEach((sn) => {
-    const spell = SPELL_DATABASE.find(s => s.name === sn)
-    if (!spell) return
-    // Use standard spell cost (same as regular duel arena)
-    let max = spell.cost || 3
+    const info = getSpellInfo(sn, SPELL_DATABASE)
+    if (!info) return
+    let max = info.pp
     if (house === "gryffindor") max = Math.max(1, max + HOUSE_GDD.gryffindor.manaStartDelta)
-    if (house === "ravenclaw" && !spell.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
+    if (house === "ravenclaw" && !info.isUnforgivable) max += HOUSE_GDD.ravenclaw.manaBonusNonUnforgivable
     out[sn] = { current: max, max }
   })
   return out
@@ -83,12 +82,25 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
   const loadBossData = async () => {
     try {
       const today = new Date().toISOString().split('T')[0]
-      const lastFight = localStorage.getItem(`worldboss_fight:${currentUser.id}`)
-      
-      if (lastFight === today) {
-        setHasFoughtToday(true)
+
+      // Check last_wb_attempt from Supabase
+      try {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("last_wb_attempt")
+          .eq("id", currentUser.id)
+          .single()
+
+        if (profileData?.last_wb_attempt) {
+          const lastAttempt = profileData.last_wb_attempt.split('T')[0]
+          if (lastAttempt === today) {
+            setHasFoughtToday(true)
+          }
+        }
+      } catch (profileError) {
+        console.error("Failed to check last_wb_attempt:", profileError)
       }
-      
+
       // Get boss index from world_boss_state table (id is always 1)
       // If table doesn't exist or query fails, use defaults
       try {
@@ -320,6 +332,10 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
     
     // Check turn count
     if (turnNumber >= 3) {
+      // World Boss Enrage: deal 1000 fixed damage on 3rd turn
+      const enrageDamage = 1000
+      setPlayerHp(prev => Math.max(0, prev - enrageDamage))
+      addLog(`World Boss ENRAGES! Deals ${enrageDamage} damage!`, "boss")
       endBattle()
     } else {
       setTurnNumber(prev => prev + 1)
@@ -357,9 +373,12 @@ export default function WorldBossArena({ playerBuild, currentUser, onExit, onAut
       
       console.log(`World Boss: Updated damagewb for user ${currentUser.id} from ${currentDamage} to ${newTotalDamage}`)
       
-      // Mark as fought today
-      const today = new Date().toISOString().split('T')[0]
-      localStorage.setItem(`worldboss_fight:${currentUser.id}`, today)
+      // Mark as fought today in Supabase
+      const today = new Date().toISOString()
+      await supabase
+        .from("profiles")
+        .update({ last_wb_attempt: today })
+        .eq("id", currentUser.id)
       
       addLog(`Battle over! You dealt ${totalDamage} total damage!`, "system")
       
