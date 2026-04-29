@@ -237,15 +237,15 @@ export const SPELL_DATABASE: SpellInfo[] = [
     pp: 15,                        // Mana máxima (Power Points)
     cost: 1,                       // Custo de mana por uso
     debuff: { type: "burn", chance: 50, duration: 2 },
-    effect: "50% BURN (25 damage/turn, 2t); combo: +20% damage per consecutive use",
-    effectPt: "50% BURN (25 dano/turno, 2t); combo: +20% dano por uso consecutivo",
+    effect: "50% BURN (50 damage/turn, 2t); combo: +20% damage per consecutive use",
+    effectPt: "50% BURN (50 dano/turno, 2t); combo: +20% dano por uso consecutivo",
   },
   {
     name: "Glacius",
     namePt: "Glacius",
     powerMin: 30,                  // Dano mínimo
     powerMax: 75,                  // Dano máximo
-    accuracy: 60,                  // Chance de acerto (0-100%)
+    accuracy: 70,                  // Chance de acerto (0-100%)
     pp: 15,                        // Mana máxima (Power Points)
     cost: 1,                       // Custo de mana por uso
     debuff: { type: "freeze", chance: 20, duration: 2 },
@@ -294,7 +294,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     powerMin: 70,                  // Dano mínimo
     powerMax: 150,                 // Dano máximo
     accuracy: 65,                  // Chance de acerto (0-100%)
-    pp: 10,                        // Mana máxima (Power Points)
+    pp: 5,                         // Mana máxima (Power Points)
     cost: 2,                       // Custo de mana por uso
     debuff: { type: "mark", chance: 40, duration: 2 },
     effect: "40% MARK: guaranteed crit on target (2t)",
@@ -305,11 +305,12 @@ export const SPELL_DATABASE: SpellInfo[] = [
     namePt: "Scarlatum",
     powerMin: 0,                   // Dano mínimo
     powerMax: 200,                 // Dano máximo
-    accuracy: 65,                  // Chance de acerto (0-100%)
-    pp: 2,                         // Mana máxima (Power Points)
+    accuracy: 90,                  // Chance de acerto (0-100%)
+    pp: 10,                        // Mana máxima (Power Points)
     cost: 1,                       // Custo de mana por uso
-    effect: "Random damage (0-200); accuracy 65% and mana 2",
-    effectPt: "Dano aleatório (0-200); precisão 65% e mana 2",
+    canCrit: false,                // Nunca causa crítico (0% crit fixo)
+    effect: "Random damage (0-200); accuracy 90% and mana 10; cannot crit",
+    effectPt: "Dano aleatório (0-200); precisão 90% e mana 10; não pode critar",
   },
   {
     name: "Subito",
@@ -317,7 +318,7 @@ export const SPELL_DATABASE: SpellInfo[] = [
     powerMin: 50,                  // Dano mínimo
     powerMax: 100,                 // Dano máximo
     accuracy: 80,                  // Chance de acerto (0-100%)
-    pp: 10,                        // Mana máxima (Power Points)
+    pp: 5,                         // Mana máxima (Power Points)
     cost: 2,                       // Custo de mana por uso
     debuff: { type: "bomba", chance: 100, duration: 2 },
     effect: "BOMB (2t): explosion = 25 damage per 100 HP lost by target",
@@ -326,13 +327,15 @@ export const SPELL_DATABASE: SpellInfo[] = [
   {
     name: "Reducto",
     namePt: "Reducto",
-    power: 100,                    // Dano base fixo
-    accuracy: 50,                  // Chance de acerto (0-100%)
+    powerMin: 50,                  // Dano mínimo
+    powerMax: 75,                  // Dano máximo
+    accuracy: 100,                 // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
     cost: 2,                       // Custo de mana por uso
     debuff: { type: "silence_defense", chance: 100, duration: 2 },
-    effect: "DEFENSE BLOCK: disables Protegos and Salvio (2t)",
-    effectPt: "BLOQUEIO DEFESA: desativa Protegos e Salvio (2t)",
+    special: "reducto_buff_damage",
+    effect: "DEFENSE BLOCK: disables Protegos and Salvio (2t); +50 damage per buff on target",
+    effectPt: "BLOQUEIO DEFESA: desativa Protegos e Salvio (2t); +50 dano por buff no alvo",
   },
   {
     name: "Desumo Tempestas",
@@ -379,16 +382,16 @@ export const SPELL_DATABASE: SpellInfo[] = [
     priority: 1,                   // Modificador de ordem de turno
     debuff: { type: "burn", chance: 100, duration: 1 },
     special: "circum_area_burn",
-    effect: "Area: applies BURN to all enemies (1t)",
-    effectPt: "Área: aplica BURN em todos os inimigos (1t)",
+    effect: "Area: applies BURN (50 damage/turn) to all enemies (1t)",
+    effectPt: "Área: aplica BURN (50 dano/turno) em todos os inimigos (1t)",
   },
   {
     name: "Impedimenta",
     namePt: "Impedimenta",
     power: 0,                      // Dano base (debuff, sem dano)
     accuracy: 100,                 // Chance de acerto (0-100%)
-    pp: 10,                        // Mana máxima (Power Points)
-    cost: 1,                       // Custo de mana por uso
+    pp: 3,                         // Mana máxima (Power Points)
+    cost: 2,                       // Custo de mana por uso
     priority: 10,                  // Modificador de ordem de turno
     debuff: { type: "no_potion", chance: 100, duration: 2 },
     effect: "Priority +10; blocks target's potion/item use (2t)",
@@ -451,9 +454,9 @@ export const SPELL_DATABASE: SpellInfo[] = [
     cost: 3,                       // Custo de mana por uso
     isUnforgivable: true,          // Maldição imperdoável
     priority: 3,                   // Modificador de ordem de turno
-    debuff: { type: "taunt", chance: 100, duration: 3 },
-    effect: "CURSE: blocks all spells except the last one (3t, IRREMOVABLE)",
-    effectPt: "MALDIÇÃO: bloqueia todos feitiços exceto o último (3t, IRREMOVÍVEL)",
+    debuff: { type: "taunt", chance: 100, duration: 2 },
+    effect: "CURSE: blocks all spells except the last one (2t, IRREMOVABLE)",
+    effectPt: "MALDIÇÃO: bloqueia todos feitiços exceto o último (2t, IRREMOVÍVEL)",
   },
   {
     name: "Avada Kedavra",
@@ -471,8 +474,8 @@ export const SPELL_DATABASE: SpellInfo[] = [
     name: "Flagrate",
     namePt: "Flagrate",
     power: 50,                     // Dano base fixo
-    accuracy: 70,                  // Chance de acerto (0-100%)
-    pp: 10,                        // Mana máxima (Power Points)
+    accuracy: 50,                  // Chance de acerto (0-100%)
+    pp: 5,                         // Mana máxima (Power Points)
     cost: 2,                       // Custo de mana por uso
     special: "flagrate_strip",
     effect: "Removes wand Core/passive from target",
@@ -563,13 +566,13 @@ export const SPELL_DATABASE: SpellInfo[] = [
     name: "Flagellum",
     namePt: "Flagellum",
     power: 75,                     // Dano base fixo por hit
-    accuracy: 70,                  // Chance de acerto (0-100%)
+    accuracy: 60,                  // Chance de acerto (0-100%)
     pp: 10,                        // Mana máxima (Power Points)
     cost: 1,                       // Custo de mana por uso
     canCrit: false,                // Nunca causa crítico
     special: "flagellum_multi",
-    effect: "Multi-hit 1-4x; no crit",
-    effectPt: "Multi-hit 1-4x; sem crítico",
+    effect: "Multi-hit 1-4x; no crit; 60% accuracy per hit",
+    effectPt: "Multi-hit 1-4x; sem crítico; 60% acerto por hit",
   },
   {
     name: "Lumus",
@@ -608,13 +611,13 @@ export const SPELL_DATABASE: SpellInfo[] = [
     name: "Sectumsempra",
     namePt: "Sectumsempra",
     power: 100,                    // Dano base fixo
-    accuracy: 60,                  // Chance de acerto (0-100%)
+    accuracy: 70,                  // Chance de acerto (0-100%)
     pp: 5,                         // Mana máxima (Power Points)
     cost: 2,                       // Custo de mana por uso
-    special: "sectumsempra_lifesteal",
+    special: "sectumsempra_lifesteal_half",
     debuff: { type: "bloqueio_cura", chance: 100, duration: 2 },
-    effect: "Heals damage caused; HEAL_BLOCK on target (2t)",
-    effectPt: "Cura o dano causado; BLOQUEIO_CURA no alvo (2t)",
+    effect: "Heals half of damage caused; HEAL_BLOCK on target (2t)",
+    effectPt: "Cura metade do dano causado; BLOQUEIO_CURA no alvo (2t)",
   },
   {
     name: "Vermillious",
@@ -795,16 +798,16 @@ export const SPELL_DATABASE: SpellInfo[] = [
   {
     name: "Fogo Maldito",
     namePt: "Fogo Maldito",
-    powerMin: 100,                 // Dano mínimo
-    powerMax: 100,                 // Dano máximo
+    powerMin: 80,                  // Dano mínimo
+    powerMax: 300,                 // Dano máximo
     accuracy: 44,                  // Chance de acerto (0-100%)
-    pp: 5,                         // Mana máxima (Power Points)
+    pp: 1,                         // Mana máxima (Power Points)
     cost: 3,                       // Custo de mana por uso
     isVipOnly: true,               // Exclusivo para jogadores VIP
     debuff: { type: "burn", chance: 100, duration: 2 },
     special: "fogo_maldito_scale",
-    effect: "👑 VIP: Area; power +50 per 100 HP lost; BURN (2t)",
-    effectPt: "👑 VIP: Área; poder +50 por 100 HP perdido; BURN (2t)",
+    effect: "👑 VIP: Area; power +50 per 100 HP lost; BURN (50 damage/turn, 2t)",
+    effectPt: "👑 VIP: Área; poder +50 por 100 HP perdido; BURN (50 dano/turno, 2t)",
   },
   {
     name: "Reveal Your Secrets",
