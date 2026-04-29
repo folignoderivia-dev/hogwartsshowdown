@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Hogwarts Showdown</string>
-    <string name="title_activity_main">Hogwarts Showdown</string>
-    <string name="package_name">com.hogwartsshowdown.app</string>
-    <string name="custom_url_scheme">com.hogwartsshowdown.app</string>
+    <string name="app_name">Varinhas Cruzadas</string>
+    <string name="title_activity_main">Varinhas Cruzadas</string>
+    <string name="package_name">com.varinhascruzadas.apk</string>
+    <string name="custom_url_scheme">com.varinhascruzadas.apk</string>
 </resources>

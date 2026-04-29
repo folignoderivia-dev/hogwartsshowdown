@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli"
 
 const config: CapacitorConfig = {
-  appId: "com.hogwartsshowdown.app",
-  appName: "Hogwarts Showdown",
+  appId: "com.varinhascruzadas.apk",
+  appName: "Varinhas Cruzadas",
   webDir: "public",
   // Modo "live reload remoto": o APK abre diretamente o site Vercel.
   // Assim qualquer atualização no site reflete no app sem novo APK.
@@ -13,7 +13,7 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: false,
-    backgroundColor: "#1c1a14",
+    backgroundColor: "#1a1a2e",
     webContentsDebuggingEnabled: false,
   },
 }

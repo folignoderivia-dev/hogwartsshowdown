@@ -19,15 +19,17 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'Varinhas Cruzadas - Simulador de Duelos Bruxos & PvP Online',
+  title: 'Varinhas Cruzadas',
   description: 'O sucessor espiritual dos jogos de navegador de HP. Duelos táticos, sistema de ranking estilo Pokémon Showdown e combate competitivo em tempo real. Jogue agora o melhor Harry Potter MMO de navegador.',
   keywords: 'Hogwarts MMO, Harry Potter MMO, Hogwarts Online, Harry Potter Online, Varinhas Cruzadas, Hogwarts PvP, Simulador de Duelo, Duelos Bruxos, Pokémon Showdown, Hogwarts Showdown, Web Browser Game Harry Potter, Jogo de navegador Harry Potter, RPG Hogwarts Online',
   metadataBase: new URL('https://varinhascruzadas.com.br'),
   alternates: {
     canonical: 'https://varinhascruzadas.com.br',
   },
+  manifest: '/manifest.json',
+  themeColor: '#1a1a2e',
   openGraph: {
-    title: 'Varinhas Cruzadas - Simulador de Duelos Bruxos & PvP Online',
+    title: 'Varinhas Cruzadas',
     description: 'O sucessor espiritual dos jogos de navegador de HP. Duelos táticos, sistema de ranking estilo Pokémon Showdown e combate competitivo em tempo real.',
     url: 'https://varinhascruzadas.com.br',
     siteName: 'Varinhas Cruzadas',
@@ -44,13 +46,18 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Varinhas Cruzadas - Simulador de Duelos Bruxos & PvP Online',
+    title: 'Varinhas Cruzadas',
     description: 'O sucessor espiritual dos jogos de navegador de HP. Duelos táticos, sistema de ranking estilo Pokémon Showdown e combate competitivo em tempo real.',
     images: ['/og-image.webp'],
   },
   icons: {
-    icon: '/favicon.webp',
-    apple: '/apple-icon.png',
+    icon: [
+      { url: 'https://i.postimg.cc/7hDvVPR4/favicon.png', sizes: '192x192', type: 'image/png' },
+      { url: 'https://i.postimg.cc/7hDvVPR4/favicon.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: 'https://i.postimg.cc/7hDvVPR4/favicon.png', sizes: '180x180', type: 'image/png' },
+    ],
   },
 }
 
