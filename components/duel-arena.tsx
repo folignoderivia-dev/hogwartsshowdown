@@ -769,12 +769,12 @@ const DuelArena = (
       const el = hudRefs.current[id]
       if (!el) {
         console.log(`[playSpellVfx] HUD ref not found for ${id}, falling back to arena center`)
-        return { x: rect.width / 2, y: rect.height / 2 }
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
       }
       const r = el.getBoundingClientRect()
-      // Get center of HUD button
-      const centerX = r.left - rect.left + r.width / 2
-      const centerY = r.top - rect.top + r.height / 2
+      // Get center of HUD button in absolute viewport coordinates
+      const centerX = r.left + r.width / 2
+      const centerY = r.top + r.height / 2
       console.log(`[playSpellVfx] HUD point for ${id}:`, { centerX, centerY })
       return { x: centerX, y: centerY }
     }
