@@ -186,19 +186,18 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
-    quidditch: "QUIDDITCH 1v1",
   },
 }
 
 const UI_LABELS: Record<AppLocale, Record<string, string>> = {
   pt: {
-    translate: "🇺🇸 EN / 🇧🇷 PT",
+    translate: "🇧🇷 PT / 🇺🇸 EN",
     downloadApk: "📲 Baixar APK",
-    openRooms: "Salas em Aberto",
-    duel1v1: "Duelo 1v1",
-    battle2v2: "Batalha 2v2",
-    ffa4: "Todos contra Todos (4)",
-    ffa3: "Todos contra Todos (3)",
+    openRooms: "Salas Abertas",
+    duel1v1: "1v1 Duelo (RANKEADA)",
+    battle2v2: "2v2 Batalha (RANKEADA)",
+    ffa4: "Todos contra Todos (4) (RANKEADA)",
+    ffa3: "Todos contra Todos (3) (RANKEADA)",
     updateRooms: "↻ Atualizar",
     hide: "Ocultar",
     show: "Mostrar",
@@ -212,10 +211,10 @@ const UI_LABELS: Record<AppLocale, Record<string, string>> = {
     translate: "🇺🇸 EN / 🇧🇷 PT",
     downloadApk: "📲 Download APK",
     openRooms: "Open Rooms",
-    duel1v1: "1v1 Duel",
-    battle2v2: "2v2 Battle",
-    ffa4: "Free For All (4)",
-    ffa3: "Free For All (3)",
+    duel1v1: "1v1 Duel (RANKED)",
+    battle2v2: "2v2 Battle (RANKED)",
+    ffa4: "Free For All (4) (RANKED)",
+    ffa3: "Free For All (3) (RANKED)",
     updateRooms: "↻ Refresh",
     hide: "Hide",
     show: "Show",
@@ -1203,10 +1202,10 @@ export default function CommonRoom({
         </div>
       </div>
 
-      {/* ── Banner BETA ─────────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-amber-900/95 px-4 py-1.5 text-xs font-medium text-amber-100 shadow-md backdrop-blur-sm">
-        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />
-        <span>{locale === "pt" ? "⚠️ FASE BETA: Bugs podem ocorrer. O equilíbrio de jogo está em constante ajuste." : "⚠️ BETA PHASE: Bugs may occur. Game balance is constantly being adjusted."}</span>
+      {/* ── Banner Torneio ─────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-gradient-to-r from-amber-900/95 to-yellow-900/95 px-4 py-1.5 text-xs font-medium text-amber-100 shadow-md backdrop-blur-sm">
+        <Trophy className="h-3.5 w-3.5 shrink-0 text-yellow-300" />
+        <span>PRIMEIRO TORNEIO DE VARINHAS CRUZADAS - COM PREMIAÇÃO EM 100 R$ ASSIM QUE ALCANÇARMOS 50 JOGADORES!</span>
       </div>
 
       <HomeLobbyChat
