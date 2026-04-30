@@ -404,7 +404,7 @@ export default function CommonRoom({
   const [selectedSpells, setSelectedSpells] = useState<string[]>([])
   const [spellSearch, setSpellSearch] = useState("")
   const [spellSort, setSpellSort] = useState<"name" | "power" | "cost">("name")
-  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "historia" | "death-march" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "worldboss" | "">("")
+  const [gameMode, setGameMode] = useState<"teste" | "torneio-offline" | "historia" | "death-march" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "worldboss" | "1v1-no-curses" | "1v1-random" | "">("")
   const [showGacha, setShowGacha] = useState(false)
   const [gachaShaking, setGachaShaking] = useState(false)
   const [revealedSticker, setRevealedSticker] = useState<string | null>(null)
@@ -1068,22 +1068,37 @@ export default function CommonRoom({
 
   const handleStartDuel = () => {
     if (!currentUser) return
-    if (!isReady || !gameMode || !onStartDuel) return
-
-    // Validar modo sem maldições
-    if (isNoCursesMode) {
-      if (hasUnforgivableSpells(selectedSpells)) {
-        alert(locale === 'en' 
-          ? "Sua build contém maldições imperdoáveis (Avada Kedavra, Crucius, Imperio, Fogo Maldito). Este modo não permite essas magias."
-          : "Sua build contém maldições imperdoáveis (Avada Kedavra, Crucius, Imperio, Fogo Maldito). Este modo não permite essas magias.")
-        return
-      }
+    if (isReady && gameMode && onStartDuel) {
+      onStartDuel({
+        name: currentUser.username,
+        house,
+        wand,
+        potion,
+        spells: selectedSpells,
+        avatar: currentUser.avatarUrl || avatar,
+        gameMode: gameMode as "teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch",
+        userId: currentUser.id,
+        username: currentUser.username,
+        elo: currentUser.elo,
+      })
     }
+  }
 
+  const buildPayload = (): PlayerBuild | null => {
+    if (!currentUser || !isReady || !gameMode) return null
+    
+    // Validar modo sem maldições
+    if (isNoCursesMode && hasUnforgivableSpells(selectedSpells)) {
+      alert(locale === 'en' 
+        ? "Sua build contém maldições imperdoáveis (Avada Kedavra, Crucius, Imperio, Fogo Maldito). Este modo não permite essas magias."
+        : "Sua build contém maldições imperdoáveis (Avada Kedavra, Crucius, Imperio, Fogo Maldito). Este modo não permite essas magias.")
+      return null
+    }
+    
     // Gerar build aleatória para o modo random build
     if (isRandomBuildMode) {
       const randomBuild = generateRandomBuild()
-      onStartDuel({
+      return {
         name: currentUser.username,
         house: randomBuild.house,
         wand: randomBuild.wand,
@@ -1094,12 +1109,12 @@ export default function CommonRoom({
         userId: currentUser.id,
         username: currentUser.username,
         elo: currentUser.elo,
-      })
-      return
+        isVip,
+        customRoomSettings: showCustomRoom ? customSettings : undefined,
+      }
     }
-
-    // Modo normal ou sem maldições
-    onStartDuel({
+    
+    return {
       name: currentUser.username,
       house,
       wand,
@@ -1110,48 +1125,12 @@ export default function CommonRoom({
       userId: currentUser.id,
       username: currentUser.username,
       elo: currentUser.elo,
-    })
-  }
-
-  const buildPayload = (): PlayerBuild | null => {
-    if (!currentUser || !isReady || !gameMode) return null
-    
-    // Não permitir criar sala para os novos modos
-    if (isNoCursesMode || isRandomBuildMode) {
-      return null
-    }
-    
-    return {
-      name: currentUser.username,
-      house,
-      wand,
-      potion,
-      spells: selectedSpells,
-      avatar: currentUser.avatarUrl || avatar,
-      gameMode: gameMode as "teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch",
-      userId: currentUser.id,
-      username: currentUser.username,
-      elo: currentUser.elo,
       isVip,
       customRoomSettings: showCustomRoom ? customSettings : undefined,
     }
   }
 
   const handleCreateRoomClick = () => {
-    // Não permitir criar sala para os novos modos
-    if (isNoCursesMode) {
-      alert(locale === 'en' 
-        ? "O modo '1v1 Sem Maldições' não permite criar salas. Use o botão 'Iniciar Offline' para jogar."
-        : "O modo '1v1 Sem Maldições' não permite criar salas. Use o botão 'Iniciar Offline' para jogar.")
-      return
-    }
-    if (isRandomBuildMode) {
-      alert(locale === 'en' 
-        ? "O modo '1v1 Random Build' não permite criar salas. Use o botão 'Iniciar Offline' para jogar."
-        : "O modo '1v1 Random Build' não permite criar salas. Use o botão 'Iniciar Offline' para jogar.")
-      return
-    }
-    
     const payload = buildPayload()
     if (!payload || !onCreateRoom) return
     onCreateRoom(payload)
@@ -1159,21 +1138,6 @@ export default function CommonRoom({
 
   const handleJoinRoomClick = (matchId: string) => {
     if (!currentUser || !onJoinRoom) return
-    
-    // Não permitir entrar em sala para os novos modos
-    if (isNoCursesMode) {
-      alert(locale === 'en' 
-        ? "O modo '1v1 Sem Maldições' não permite entrar em salas. Use o botão 'Iniciar Offline' para jogar."
-        : "O modo '1v1 Sem Maldições' não permite entrar em salas. Use o botão 'Iniciar Offline' para jogar.")
-      return
-    }
-    if (isRandomBuildMode) {
-      alert(locale === 'en' 
-        ? "O modo '1v1 Random Build' não permite entrar em salas. Use o botão 'Iniciar Offline' para jogar."
-        : "O modo '1v1 Random Build' não permite entrar em salas. Use o botão 'Iniciar Offline' para jogar.")
-      return
-    }
-    
     const room = openRooms.find((r) => r.matchId === matchId)
     if (!room) return
     
@@ -2752,7 +2716,7 @@ export default function CommonRoom({
               size="lg"
               disabled={!isReady}
               onClick={() => {
-                if (gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta" || gameMode === "historia" || isNoCursesMode || isRandomBuildMode) {
+                if (gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta" || gameMode === "historia") {
                   handleStartDuel()
                 } else {
                   handleCreateRoomClick()
@@ -2765,9 +2729,9 @@ export default function CommonRoom({
               }`}
             >
               <Wand2 className="mr-2 h-5 w-5" />
-              {gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta" || gameMode === "historia" || isNoCursesMode || isRandomBuildMode ? ui.startOffline : ui.createRoom}
+              {gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta" || gameMode === "historia" ? ui.startOffline : ui.createRoom}
             </Button>
-            {gameMode !== "teste" && gameMode !== "torneio-offline" && gameMode !== "1v1-no-curses" && gameMode !== "1v1-random" && (
+            {gameMode !== "teste" && gameMode !== "torneio-offline" && (
               <Button
                 size="lg"
                 disabled={!isReady || !openRooms.some((r) => !gameMode || r.mode === gameMode)}
