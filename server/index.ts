@@ -645,8 +645,18 @@ io.on("connection", (socket: Socket) => {
               isWinner = playerTeam === "enemy"
             }
             delta = isWinner ? 20 : -25
+          } else if (room.gameMode === "1v1-no-curses") {
+            // 1v1 Sem Maldições: vitória +30, derrota -15
+            const isPlayerSide = slot.team === "player"
+            isWinner = outcome.outcome === "win" ? isPlayerSide : !isPlayerSide
+            delta = isWinner ? 30 : -15
+          } else if (room.gameMode === "1v1-random") {
+            // 1v1 Random Build: vitória +15, derrota -15
+            const isPlayerSide = slot.team === "player"
+            isWinner = outcome.outcome === "win" ? isPlayerSide : !isPlayerSide
+            delta = isWinner ? 15 : -15
           } else {
-            // 1v1
+            // 1v1 padrão
             const isPlayerSide = slot.team === "player"
             isWinner = outcome.outcome === "win" ? isPlayerSide : !isPlayerSide
             delta = isWinner ? 20 : -25
