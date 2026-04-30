@@ -39,30 +39,33 @@ export default function AdminBalancePanel({ isOpen, onClose, currentUser }: Admi
     try {
       const supabase = getSupabaseClient()
 
-      // READ-ONLY: Fetch all profiles
-      const { data: profiles, error } = await supabase
-        .from("profiles")
-        .select("deck_slots")
+      // READ-ONLY: Fetch match history with player builds for PvP meta analysis
+      const { data: matches, error } = await supabase
+        .from("match_history")
+        .select("player_builds, game_mode")
+        .not("game_mode", "in", '("torneio-offline","historia","floresta","death-march","worldboss","quidditch")')
+        .order("finished_at", { ascending: false })
+        .limit(1000)
 
       if (error) {
-        console.error("Failed to fetch profiles:", error)
+        console.error("Failed to fetch match history:", error)
         return
       }
 
-      if (!profiles || profiles.length === 0) {
+      if (!matches || matches.length === 0) {
         setTotalPlayers(0)
         return
       }
 
-      setTotalPlayers(profiles.length)
+      setTotalPlayers(matches.length)
 
-      // Aggregate spells from deck_slots
+      // Aggregate spells from match history player builds
       const spellCounts: Record<string, number> = {}
-      profiles.forEach((profile) => {
-        if (Array.isArray(profile.deck_slots)) {
-          profile.deck_slots.forEach((slot: { spells?: string[] }) => {
-            if (Array.isArray(slot.spells)) {
-              slot.spells.forEach((spell: string) => {
+      matches.forEach((match) => {
+        if (Array.isArray(match.player_builds)) {
+          match.player_builds.forEach((build: { spells?: string[] }) => {
+            if (Array.isArray(build.spells)) {
+              build.spells.forEach((spell: string) => {
                 spellCounts[spell] = (spellCounts[spell] || 0) + 1
               })
             }
@@ -70,44 +73,44 @@ export default function AdminBalancePanel({ isOpen, onClose, currentUser }: Admi
         }
       })
 
-      // Aggregate potions from deck_slots
+      // Aggregate potions from match history player builds
       const potionCounts: Record<string, number> = {}
-      profiles.forEach((profile) => {
-        if (Array.isArray(profile.deck_slots)) {
-          profile.deck_slots.forEach((slot: { potions?: string }) => {
-            if (slot.potions) {
-              potionCounts[slot.potions] = (potionCounts[slot.potions] || 0) + 1
+      matches.forEach((match) => {
+        if (Array.isArray(match.player_builds)) {
+          match.player_builds.forEach((build: { potion?: string }) => {
+            if (build.potion) {
+              potionCounts[build.potion] = (potionCounts[build.potion] || 0) + 1
             }
           })
         }
       })
 
-      // Aggregate cores from deck_slots
+      // Aggregate cores from match history player builds
       const coreCounts: Record<string, number> = {}
-      profiles.forEach((profile) => {
-        if (Array.isArray(profile.deck_slots)) {
-          profile.deck_slots.forEach((slot: { core?: string }) => {
-            if (slot.core) {
-              coreCounts[slot.core] = (coreCounts[slot.core] || 0) + 1
+      matches.forEach((match) => {
+        if (Array.isArray(match.player_builds)) {
+          match.player_builds.forEach((build: { core?: string }) => {
+            if (build.core) {
+              coreCounts[build.core] = (coreCounts[build.core] || 0) + 1
             }
           })
         }
       })
 
-      // Aggregate wands from deck_slots
+      // Aggregate wands from match history player builds
       const wandCounts: Record<string, number> = {}
-      profiles.forEach((profile) => {
-        if (Array.isArray(profile.deck_slots)) {
-          profile.deck_slots.forEach((slot: { wand?: string }) => {
-            if (slot.wand) {
-              wandCounts[slot.wand] = (wandCounts[slot.wand] || 0) + 1
+      matches.forEach((match) => {
+        if (Array.isArray(match.player_builds)) {
+          match.player_builds.forEach((build: { wand?: string }) => {
+            if (build.wand) {
+              wandCounts[build.wand] = (wandCounts[build.wand] || 0) + 1
             }
           })
         }
       })
 
       // Convert to arrays and calculate percentages
-      const total = profiles.length
+      const total = matches.length
       setTopSpells(sortByCount(spellCounts, total))
       setTopPotions(sortByCount(potionCounts, total))
       setTopCores(sortByCount(coreCounts, total))
@@ -181,10 +184,10 @@ export default function AdminBalancePanel({ isOpen, onClose, currentUser }: Admi
             </div>
           ) : (
             <div className="h-[70vh] overflow-y-auto p-6 space-y-6">
-              {/* Total Players */}
+              {/* Total Matches */}
               <div className="flex items-center gap-4 mb-6">
                 <Badge className="bg-amber-700 text-amber-100 border-amber-600 px-4 py-2 text-sm">
-                  Total Players: {totalPlayers}
+                  Total PvP Matches: {totalPlayers}
                 </Badge>
               </div>
 

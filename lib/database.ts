@@ -656,6 +656,14 @@ export async function saveMatchHistory(data: {
   gameMode: string
   winnerNames: string[]
   loserNames: string[]
+  playerBuilds?: Array<{
+    userId: string
+    username: string
+    spells: string[]
+    potion: string
+    wand: string
+    core: string
+  }>
 }): Promise<void> {
   const supabase = getSupabaseClient()
   await supabase.from("match_history").upsert(
@@ -664,6 +672,7 @@ export async function saveMatchHistory(data: {
       game_mode: data.gameMode,
       winner_names: data.winnerNames,
       loser_names: data.loserNames,
+      player_builds: data.playerBuilds,
       finished_at: new Date().toISOString(),
     },
     { onConflict: "match_id" }
