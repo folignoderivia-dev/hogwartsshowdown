@@ -2317,7 +2317,7 @@ const DuelArena = (
         </div>
       )}
 
-      {gameOver && (
+      {gameOver && !isReadOnlySpectator && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75">
           <div className="w-full max-w-md rounded-xl border-4 border-amber-900 bg-stone-900/95 p-8 text-center shadow-2xl">
             {gameOver === "win" ? (
