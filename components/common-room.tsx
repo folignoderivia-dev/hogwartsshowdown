@@ -758,6 +758,7 @@ export default function CommonRoom({
   const [arrecadado, setArrecadado] = useState(0)
   const [metaObjetivo, setMetaObjetivo] = useState(60)
   const [metaCurrent, setMetaCurrent] = useState(0)
+  const [showMeta, setShowMeta] = useState(true)
 
   useEffect(() => {
     const fetchServerMeta = async () => {
@@ -765,6 +766,7 @@ export default function CommonRoom({
         const meta = await getServerMeta()
         setArrecadado(meta.arrecadado)
         setMetaObjetivo(meta.meta_objetivo)
+        setShowMeta(meta.showMeta)
         console.log("CommonRoom: Fetched server meta", meta)
       } catch (err) {
         console.error("CommonRoom: Failed to fetch server meta", err)
@@ -1423,39 +1425,41 @@ export default function CommonRoom({
         </header>
 
         {/* ── Card Apoie o Projeto + VIP Pitch ────────────────────────────── */}
-        <div className="mx-auto mb-4 w-full max-w-2xl rounded-xl border border-amber-700/40 bg-stone-900/80 px-4 py-3 shadow-lg">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-            {/* Barra de meta */}
-            <div className="mt-3 rounded border border-amber-700/50 bg-stone-800/80 p-2">
-              <p className="text-xs font-semibold text-amber-300">☕ Meta do Servidor: R$ {arrecadado} / R$ {metaObjetivo}</p>
-              <div className="mt-1 h-2 rounded-full bg-stone-700">
-                <div
-                  className="h-2 rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
-                  style={{ width: `${Math.min(100, (arrecadado / metaObjetivo) * 100)}%` }}
-                ></div>
+        {showMeta && (
+          <div className="mx-auto mb-4 w-full max-w-2xl rounded-xl border border-amber-700/40 bg-stone-900/80 px-4 py-3 shadow-lg">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              {/* Barra de meta */}
+              <div className="mt-3 rounded border border-amber-700/50 bg-stone-800/80 p-2">
+                <p className="text-xs font-semibold text-amber-300">☕ Meta do Servidor: R$ {arrecadado} / R$ {metaObjetivo}</p>
+                <div className="mt-1 h-2 rounded-full bg-stone-700">
+                  <div
+                    className="h-2 rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
+                    style={{ width: `${Math.min(100, (arrecadado / metaObjetivo) * 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+              {/* Pitch VIP + botão */}
+              <div className="flex items-center gap-2 sm:shrink-0">
+                <p className="hidden text-right text-[11px] leading-tight text-yellow-400/80 sm:block">
+                  <Crown className="mr-0.5 inline h-3 w-3 text-yellow-400" />
+                  <strong>SEJA VIP</strong> — salas personalizadas,<br />foto própria e feitiços exclusivos
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => setPixModal(true)}
+                  className="shrink-0 border border-yellow-600/60 bg-yellow-900/40 text-yellow-200 hover:bg-yellow-800/60"
+                >
+                  👑 Apoiar
+                </Button>
               </div>
             </div>
-            {/* Pitch VIP + botão */}
-            <div className="flex items-center gap-2 sm:shrink-0">
-              <p className="hidden text-right text-[11px] leading-tight text-yellow-400/80 sm:block">
-                <Crown className="mr-0.5 inline h-3 w-3 text-yellow-400" />
-                <strong>SEJA VIP</strong> — salas personalizadas,<br />foto própria e feitiços exclusivos
-              </p>
-              <Button
-                size="sm"
-                onClick={() => setPixModal(true)}
-                className="shrink-0 border border-yellow-600/60 bg-yellow-900/40 text-yellow-200 hover:bg-yellow-800/60"
-              >
-                👑 Apoiar
-              </Button>
-            </div>
+            {/* Pitch mobile */}
+            <p className="mt-1.5 text-center text-[10px] text-yellow-500/70 sm:hidden">
+              <Crown className="mr-0.5 inline h-2.5 w-2.5" />
+              <strong>SEJA VIP</strong>: salas personalizadas · foto própria · feitiços exclusivos
+            </p>
           </div>
-          {/* Pitch mobile */}
-          <p className="mt-1.5 text-center text-[10px] text-yellow-500/70 sm:hidden">
-            <Crown className="mr-0.5 inline h-2.5 w-2.5" />
-            <strong>SEJA VIP</strong>: salas personalizadas · foto própria · feitiços exclusivos
-          </p>
-        </div>
+        )}
 
         {/* ── Modal PIX ────────────────────────────────────────────────────── */}
         <Dialog open={pixModal} onOpenChange={setPixModal}>

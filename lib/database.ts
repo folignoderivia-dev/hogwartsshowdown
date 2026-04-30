@@ -206,38 +206,43 @@ export async function updateMarchRecord(userId: string, marchWins: number): Prom
   return true
 }
 
-export async function updateServerMeta(arrecadado: number): Promise<boolean> {
+export async function updateServerMeta(arrecadado: number, showMeta?: boolean): Promise<boolean> {
   const supabase = getSupabaseClient()
+  const updateData: { arrecadado: number; show_meta?: boolean } = { arrecadado }
+  if (showMeta !== undefined) {
+    updateData.show_meta = showMeta
+  }
   const { error } = await supabase
     .from("server_meta")
-    .update({ arrecadado })
+    .update(updateData)
     .eq("id", 1)
   return !error
 }
 
-export async function getServerMeta(): Promise<{ arrecadado: number; meta_objetivo: number }> {
+export async function getServerMeta(): Promise<{ arrecadado: number; meta_objetivo: number; showMeta: boolean }> {
   const supabase = getSupabaseClient()
   const { data, error } = await supabase
     .from("server_meta")
-    .select("arrecadado, meta_objetivo")
+    .select("arrecadado, meta_objetivo, show_meta")
     .eq("id", 1)
     .single()
   
   if (error) {
     console.error("getServerMeta: Failed to fetch server_meta", error)
-    return { arrecadado: 0, meta_objetivo: 60 }
+    return { arrecadado: 0, meta_objetivo: 60, showMeta: true }
   }
   
   if (!data) {
     console.warn("getServerMeta: No data found for server_meta")
-    return { arrecadado: 0, meta_objetivo: 60 }
+    return { arrecadado: 0, meta_objetivo: 60, showMeta: true }
   }
   
-  console.log("getServerMeta: Fetched", { arrecadado: data.arrecadado, meta_objetivo: data.meta_objetivo })
+  console.log("getServerMeta: Fetched", { arrecadado: data.arrecadado, meta_objetivo: data.meta_objetivo, showMeta: data.show_meta })
   
   return {
     arrecadado: data.arrecadado ?? 0,
     meta_objetivo: data.meta_objetivo ?? 60,
+    showMeta: data.show_meta ?? true,
   }
 }
 

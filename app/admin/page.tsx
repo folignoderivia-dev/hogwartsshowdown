@@ -56,6 +56,7 @@ export default function AdminPage() {
   const [resettingRanking, setResettingRanking] = useState(false)
   const [arrecadado, setArrecadado] = useState(0)
   const [metaObjetivo, setMetaObjetivo] = useState(60)
+  const [showMeta, setShowMeta] = useState(true)
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -110,10 +111,11 @@ export default function AdminPage() {
     const meta = await getServerMeta()
     setArrecadado(meta.arrecadado)
     setMetaObjetivo(meta.meta_objetivo)
+    setShowMeta(meta.showMeta)
   }, [])
 
   const handleUpdateServerMeta = async () => {
-    const success = await updateServerMeta(arrecadado)
+    const success = await updateServerMeta(arrecadado, showMeta)
     if (success) {
       alert("Meta de doações atualizada com sucesso!")
     } else {
@@ -371,6 +373,17 @@ export default function AdminPage() {
               >
                 Salvar
               </Button>
+            </div>
+            <div className="flex items-center gap-2 rounded border border-amber-700/50 bg-stone-800 px-3 py-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showMeta}
+                  onChange={(e) => setShowMeta(e.target.checked)}
+                  className="h-4 w-4 rounded border-amber-700 bg-stone-900 text-amber-500 focus:ring-amber-500"
+                />
+                <span className="text-xs text-amber-400">Exibir Meta na Página Principal</span>
+              </label>
             </div>
           </div>
         </div>
