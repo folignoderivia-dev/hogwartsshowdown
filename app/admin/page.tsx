@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Shield, Users, AlertTriangle, RefreshCw } from "lucide-react"
+import { Shield, Users, AlertTriangle, RefreshCw, TrendingUp, Bug } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import { updateServerMeta, getServerMeta } from "@/lib/database"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import AdminBalancePanel from "@/components/admin-balance-panel"
+import AdminErrorPanel from "@/components/admin-error-panel"
 
 interface UserProfile {
   id: string
@@ -38,7 +40,7 @@ interface VipRequest {
   created_at: string
 }
 
-type AdminTab = "users" | "reports" | "vip_requests" | "ranking"
+type AdminTab = "users" | "reports" | "vip_requests" | "ranking" | "meta_balance" | "errors"
 
 export default function AdminPage() {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
@@ -374,7 +376,7 @@ export default function AdminPage() {
         </div>
 
         {/* Tabs */}
-        <div className="mb-6 flex gap-2 border-b border-amber-800/40 pb-2">
+        <div className="mb-6 flex flex-wrap gap-2 border-b border-amber-800/40 pb-2">
           <Button
             size="sm"
             variant={activeTab === "users" ? "default" : "ghost"}
@@ -410,6 +412,24 @@ export default function AdminPage() {
           >
             <RefreshCw className="mr-2 h-4 w-4" />
             Resetar Ranking
+          </Button>
+          <Button
+            size="sm"
+            variant={activeTab === "meta_balance" ? "default" : "ghost"}
+            className={activeTab === "meta_balance" ? "bg-amber-700 text-white" : "text-amber-400 hover:bg-amber-900/30"}
+            onClick={() => setActiveTab("meta_balance")}
+          >
+            <TrendingUp className="mr-2 h-4 w-4" />
+            Meta/Balance
+          </Button>
+          <Button
+            size="sm"
+            variant={activeTab === "errors" ? "default" : "ghost"}
+            className={activeTab === "errors" ? "bg-amber-700 text-white" : "text-amber-400 hover:bg-amber-900/30"}
+            onClick={() => setActiveTab("errors")}
+          >
+            <Bug className="mr-2 h-4 w-4" />
+            Erros
           </Button>
         </div>
 
@@ -649,6 +669,24 @@ export default function AdminPage() {
               </Button>
             </CardContent>
           </Card>
+        )}
+
+        {/* Meta/Balance Tab */}
+        {activeTab === "meta_balance" && userProfile && (
+          <AdminBalancePanel
+            isOpen={true}
+            onClose={() => {}}
+            currentUser={userProfile}
+          />
+        )}
+
+        {/* Errors Tab */}
+        {activeTab === "errors" && userProfile && (
+          <AdminErrorPanel
+            isOpen={true}
+            onClose={() => {}}
+            currentUser={userProfile}
+          />
         )}
       </div>
     </div>

@@ -163,18 +163,18 @@ const GAME_MODES = [
   ...OFFLINE_MODES,
 ] as const
 
-const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"], string>> = {
+const MODE_LABELS: Record<AppLocale, Record<string, string>> = {
   pt: {
-    teste: "TESTE (BOT)",
+    teste: "TEST (BOT)",
     "torneio-offline": "TORNEIO-OFFLINE",
     historia: "MODO HISTÓRIA",
-    "death-march": "MARCHA DA MORTE",
+    "death-march": "DEATH MARCH",
     floresta: "FLORESTA PROIBIDA",
     "1v1": "1 VS 1",
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
-    quidditch: "QUADRIBOL 1v1",
+    quidditch: "QUADRIBOL",
   },
   en: {
     teste: "TEST (BOT)",
@@ -186,6 +186,7 @@ const MODE_LABELS: Record<AppLocale, Record<(typeof GAME_MODES)[number]["value"]
     "2v2": "2 VS 2",
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
+    quidditch: "QUIDDITCH",
   },
 }
 
@@ -272,7 +273,6 @@ export default function CommonRoom({
   const [rankingMode, setRankingMode] = useState<"elo" | "offline" | "forest" | "march" | "damagewb" | "story">("elo")
   const [shareFeedback, setShareFeedback] = useState("")
   const [showAdminPanel, setShowAdminPanel] = useState(false)
-  const [showBalancePanel, setShowBalancePanel] = useState(false)
   const [isGmModalOpen, setIsGmModalOpen] = useState(false)
   const [gmMessage, setGmMessage] = useState("")
 
@@ -1352,28 +1352,16 @@ export default function CommonRoom({
                   </Button>
                 )}
                 {currentUser?.isAdmin && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-green-700 bg-green-950/30 text-green-200 hover:bg-green-950/50"
-                      onClick={() => setShowBalancePanel(true)}
-                    >
-                      <TrendingUp className="mr-1 h-3.5 w-3.5" />
-                      {locale === "pt" ? "Meta/Balance" : "Meta/Balance"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-purple-700 bg-purple-950/30 text-purple-200 hover:bg-purple-950/50"
-                      onClick={() => window.location.href = "/admin"}
-                    >
-                      <Shield className="mr-1 h-3.5 w-3.5" />
-                      {locale === "pt" ? "Painel Admin" : "Admin Panel"}
-                    </Button>
-                  </>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-purple-700 bg-purple-950/30 text-purple-200 hover:bg-purple-950/50"
+                    onClick={() => window.location.href = "/admin"}
+                  >
+                    <Shield className="mr-1 h-3.5 w-3.5" />
+                    {locale === "pt" ? "Painel Admin" : "Admin Panel"}
+                  </Button>
                 )}
                 <Button
                   type="button"
@@ -3079,22 +3067,6 @@ export default function CommonRoom({
             </CardContent>
           </Card>
         </div>
-      )}
-      
-      {currentUser && (
-        <AdminErrorPanel
-          isOpen={showAdminPanel}
-          onClose={() => setShowAdminPanel(false)}
-          currentUser={currentUser}
-        />
-      )}
-      
-      {currentUser && (
-        <AdminBalancePanel
-          isOpen={showBalancePanel}
-          onClose={() => setShowBalancePanel(false)}
-          currentUser={currentUser}
-        />
       )}
     </div>
   )
