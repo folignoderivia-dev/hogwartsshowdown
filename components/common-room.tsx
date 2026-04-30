@@ -148,6 +148,8 @@ const ONLINE_MODES = [
   { value: "ffa3", icon: "⚡" },
   { value: "ffa", icon: "🔥" },
   { value: "quidditch", icon: "🏆" },
+  { value: "1v1-no-curses", icon: "🛡️" },
+  { value: "1v1-random", icon: "🎲" },
 ] as const
 
 const OFFLINE_MODES = [
@@ -175,6 +177,8 @@ const MODE_LABELS: Record<AppLocale, Record<string, string>> = {
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
     quidditch: "QUADRIBOL",
+    "1v1-no-curses": "1 VS 1 SEM MALDIÇÕES",
+    "1v1-random": "1 VS 1 RANDOM BUILD",
   },
   en: {
     teste: "TEST (BOT)",
@@ -187,6 +191,8 @@ const MODE_LABELS: Record<AppLocale, Record<string, string>> = {
     ffa3: "ALL IN ONE (3 FFA)",
     ffa: "ALL IN ONE (4 FFA)",
     quidditch: "QUIDDITCH",
+    "1v1-no-curses": "1 VS 1 NO CURSES",
+    "1v1-random": "1 VS 1 RANDOM BUILD",
   },
 }
 
@@ -199,6 +205,8 @@ const UI_LABELS: Record<AppLocale, Record<string, string>> = {
     battle2v2: "2v2 Batalha (RANKEADA)",
     ffa4: "Todos contra Todos (4) (RANKEADA)",
     ffa3: "Todos contra Todos (3) (RANKEADA)",
+    duel1v1NoCurses: "1v1 Sem Maldições (RANKEADA)",
+    duel1v1Random: "1v1 Random Build (RANKEADA)",
     updateRooms: "↻ Atualizar",
     hide: "Ocultar",
     show: "Mostrar",
@@ -216,6 +224,8 @@ const UI_LABELS: Record<AppLocale, Record<string, string>> = {
     battle2v2: "2v2 Battle (RANKED)",
     ffa4: "Free For All (4) (RANKED)",
     ffa3: "Free For All (3) (RANKED)",
+    duel1v1NoCurses: "1v1 No Curses (RANKED)",
+    duel1v1Random: "1v1 Random Build (RANKED)",
     updateRooms: "↻ Refresh",
     hide: "Hide",
     show: "Show",
@@ -275,6 +285,35 @@ export default function CommonRoom({
   const [showAdminPanel, setShowAdminPanel] = useState(false)
   const [isGmModalOpen, setIsGmModalOpen] = useState(false)
   const [gmMessage, setGmMessage] = useState("")
+
+  // ── Helper Functions for New Game Modes ─────────────────────────────────────
+  const UNFORGIVABLE_SPELLS = ["Avada Kedavra", "Crucius", "Imperio", "Fogo Maldito"]
+
+  const hasUnforgivableSpells = (spells: string[]): boolean => {
+    return spells.some(spell => UNFORGIVABLE_SPELLS.includes(spell))
+  }
+
+  const generateRandomBuild = (): { house: string; wand: string; potion: string; spells: string[] } => {
+    const houses = ["gryffindor", "slytherin", "ravenclaw", "hufflepuff"]
+    const wands = ["unicorn", "dragon", "phoenix", "thestral", "basilisk", "thunderbird", "occamy", "kelpie", "acromantula", "rapinomonio", "veela", "crupe", "cinzal", "centauro", "hippogriff", "troll", "oraq_orala", "seminviso"]
+    const potions = ["foco", "elixir", "antidoto", "felix", "veritaserum", "amortentia", "polissuco"]
+    
+    const randomHouse = houses[Math.floor(Math.random() * houses.length)]
+    const randomWand = wands[Math.floor(Math.random() * wands.length)]
+    const randomPotion = potions[Math.floor(Math.random() * potions.length)]
+    
+    // Get 6 random spells
+    const availableSpells = SPELL_DATABASE.map(s => s.name)
+    const shuffledSpells = availableSpells.sort(() => Math.random() - 0.5)
+    const randomSpells = shuffledSpells.slice(0, 6)
+    
+    return {
+      house: randomHouse,
+      wand: randomWand,
+      potion: randomPotion,
+      spells: randomSpells
+    }
+  }
 
   // ── Global Error Telemetry ─────────────────────────────────────────────────
   const lastLoggedErrorRef = useRef<{ message: string; timestamp: number } | null>(null)
@@ -839,10 +878,12 @@ export default function CommonRoom({
   }
 
   const isQuidditchMode = gameMode === "quidditch"
+  const isNoCursesMode = gameMode === "1v1-no-curses"
+  const isRandomBuildMode = gameMode === "1v1-random"
   const isReady =
     !!currentUser &&
     gameMode !== "" &&
-    (isQuidditchMode || (
+    (isQuidditchMode || isRandomBuildMode || (
       house !== "" &&
       wand !== "" &&
       potion !== "" &&
@@ -1027,24 +1068,59 @@ export default function CommonRoom({
 
   const handleStartDuel = () => {
     if (!currentUser) return
-    if (isReady && gameMode && onStartDuel) {
+    if (!isReady || !gameMode || !onStartDuel) return
+
+    // Validar modo sem maldições
+    if (isNoCursesMode) {
+      if (hasUnforgivableSpells(selectedSpells)) {
+        alert(locale === 'en' 
+          ? "Sua build contém maldições imperdoáveis (Avada Kedavra, Crucius, Imperio, Fogo Maldito). Este modo não permite essas magias."
+          : "Sua build contém maldições imperdoáveis (Avada Kedavra, Crucius, Imperio, Fogo Maldito). Este modo não permite essas magias.")
+        return
+      }
+    }
+
+    // Gerar build aleatória para o modo random build
+    if (isRandomBuildMode) {
+      const randomBuild = generateRandomBuild()
       onStartDuel({
         name: currentUser.username,
-        house,
-        wand,
-        potion,
-        spells: selectedSpells,
+        house: randomBuild.house,
+        wand: randomBuild.wand,
+        potion: randomBuild.potion,
+        spells: randomBuild.spells,
         avatar: currentUser.avatarUrl || avatar,
-        gameMode: gameMode as "teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch",
+        gameMode: gameMode as "1v1-random",
         userId: currentUser.id,
         username: currentUser.username,
         elo: currentUser.elo,
       })
+      return
     }
+
+    // Modo normal ou sem maldições
+    onStartDuel({
+      name: currentUser.username,
+      house,
+      wand,
+      potion,
+      spells: selectedSpells,
+      avatar: currentUser.avatarUrl || avatar,
+      gameMode: gameMode as "teste" | "torneio-offline" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "1v1-no-curses",
+      userId: currentUser.id,
+      username: currentUser.username,
+      elo: currentUser.elo,
+    })
   }
 
   const buildPayload = (): PlayerBuild | null => {
     if (!currentUser || !isReady || !gameMode) return null
+    
+    // Não permitir criar sala para os novos modos
+    if (isNoCursesMode || isRandomBuildMode) {
+      return null
+    }
+    
     return {
       name: currentUser.username,
       house,
@@ -1062,6 +1138,20 @@ export default function CommonRoom({
   }
 
   const handleCreateRoomClick = () => {
+    // Não permitir criar sala para os novos modos
+    if (isNoCursesMode) {
+      alert(locale === 'en' 
+        ? "O modo '1v1 Sem Maldições' não permite criar salas. Use o botão 'Iniciar Offline' para jogar."
+        : "O modo '1v1 Sem Maldições' não permite criar salas. Use o botão 'Iniciar Offline' para jogar.")
+      return
+    }
+    if (isRandomBuildMode) {
+      alert(locale === 'en' 
+        ? "O modo '1v1 Random Build' não permite criar salas. Use o botão 'Iniciar Offline' para jogar."
+        : "O modo '1v1 Random Build' não permite criar salas. Use o botão 'Iniciar Offline' para jogar.")
+      return
+    }
+    
     const payload = buildPayload()
     if (!payload || !onCreateRoom) return
     onCreateRoom(payload)
@@ -1069,6 +1159,21 @@ export default function CommonRoom({
 
   const handleJoinRoomClick = (matchId: string) => {
     if (!currentUser || !onJoinRoom) return
+    
+    // Não permitir entrar em sala para os novos modos
+    if (isNoCursesMode) {
+      alert(locale === 'en' 
+        ? "O modo '1v1 Sem Maldições' não permite entrar em salas. Use o botão 'Iniciar Offline' para jogar."
+        : "O modo '1v1 Sem Maldições' não permite entrar em salas. Use o botão 'Iniciar Offline' para jogar.")
+      return
+    }
+    if (isRandomBuildMode) {
+      alert(locale === 'en' 
+        ? "O modo '1v1 Random Build' não permite entrar em salas. Use o botão 'Iniciar Offline' para jogar."
+        : "O modo '1v1 Random Build' não permite entrar em salas. Use o botão 'Iniciar Offline' para jogar.")
+      return
+    }
+    
     const room = openRooms.find((r) => r.matchId === matchId)
     if (!room) return
     
@@ -2591,7 +2696,7 @@ export default function CommonRoom({
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {ONLINE_MODES.map((mode) => {
-                  const labelKey = mode.value === "1v1" ? "duel1v1" : mode.value === "2v2" ? "battle2v2" : mode.value === "ffa" ? "ffa4" : mode.value === "ffa3" ? "ffa3" : mode.value
+                  const labelKey = mode.value === "1v1" ? "duel1v1" : mode.value === "2v2" ? "battle2v2" : mode.value === "ffa" ? "ffa4" : mode.value === "ffa3" ? "ffa3" : mode.value === "1v1-no-curses" ? "duel1v1NoCurses" : mode.value === "1v1-random" ? "duel1v1Random" : mode.value
                   return (
                     <Button
                       key={mode.value}
@@ -2647,7 +2752,7 @@ export default function CommonRoom({
               size="lg"
               disabled={!isReady}
               onClick={() => {
-                if (gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta" || gameMode === "historia") {
+                if (gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta" || gameMode === "historia" || isNoCursesMode || isRandomBuildMode) {
                   handleStartDuel()
                 } else {
                   handleCreateRoomClick()
@@ -2660,9 +2765,9 @@ export default function CommonRoom({
               }`}
             >
               <Wand2 className="mr-2 h-5 w-5" />
-              {gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta" || gameMode === "historia" ? ui.startOffline : ui.createRoom}
+              {gameMode === "teste" || gameMode === "torneio-offline" || gameMode === "floresta" || gameMode === "historia" || isNoCursesMode || isRandomBuildMode ? ui.startOffline : ui.createRoom}
             </Button>
-            {gameMode !== "teste" && gameMode !== "torneio-offline" && (
+            {gameMode !== "teste" && gameMode !== "torneio-offline" && gameMode !== "1v1-no-curses" && gameMode !== "1v1-random" && (
               <Button
                 size="lg"
                 disabled={!isReady || !openRooms.some((r) => !gameMode || r.mode === gameMode)}

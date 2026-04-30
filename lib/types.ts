@@ -1,4 +1,4 @@
-export type GameMode = "teste" | "torneio-offline" | "historia" | "death-march" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "worldboss"
+export type GameMode = "teste" | "torneio-offline" | "historia" | "death-march" | "1v1" | "2v2" | "ffa" | "ffa3" | "quidditch" | "floresta" | "worldboss" | "1v1-no-curses" | "1v1-random"
 
 export interface CustomRoomSettings {
   bannedSpells: string[]
