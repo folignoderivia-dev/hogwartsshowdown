@@ -587,21 +587,40 @@ export default function CommonRoom({
     }
   }
 
-  const handleSaveBuild = () => {
-    const bname = saveBuildName.trim() || `Build ${savedBuilds.length + 1}`
-    const newBuild: SavedBuild = {
-      id: Date.now().toString(),
-      name: bname,
-      createdAt: new Date().toISOString(),
+  const handleSaveBuild = async () => {
+    if (!currentUser) return
+    const bname = saveBuildName.trim() || `Deck ${deckSlots.length + 1}`
+    
+    const newSlot: DeckSlot = {
+      slot_name: bname,
       spells: selectedSpells,
       wand,
-      house,
-      potion,
-      avatar,
+      core: wand,
+      potions: potion,
     }
-    persistBuilds([...savedBuilds, newBuild])
-    setSaveBuildName("")
-    setShowSavePanel(false)
+    
+    const updatedSlots = [...deckSlots, newSlot]
+    
+    try {
+      const supabase = getSupabaseClient()
+      const { error } = await supabase
+        .from("profiles")
+        .update({ deck_slots: updatedSlots })
+        .eq("id", currentUser.id)
+      
+      if (error) {
+        console.error("Failed to save deck slot:", error)
+        alert(locale === 'en' ? 'Error saving deck slot' : 'Erro ao salvar deck slot')
+        return
+      }
+      
+      setDeckSlots(updatedSlots)
+      setSaveBuildName("")
+      setShowSavePanel(false)
+    } catch (error) {
+      console.error("Failed to save deck slot:", error)
+      alert(locale === 'en' ? 'Error saving deck slot' : 'Erro ao salvar deck slot')
+    }
   }
 
   const handleLoadBuild = (b: SavedBuild) => {
@@ -2355,38 +2374,6 @@ export default function CommonRoom({
                         {locale === 'en' ? 'Save New' : 'Salvar Novo'}
                       </Button>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Builds Salvas ────────────────────────────────────────────── */}
-              {currentUser && savedBuilds.length > 0 && (
-                <div className="mb-3">
-                  <p className="mb-1.5 flex items-center gap-1 text-xs text-amber-400">
-                    <FolderOpen className="h-3.5 w-3.5" />
-                    {locale === 'en' ? 'Saved Builds — click to load' : 'Builds Salvas — clique para carregar'}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {savedBuilds.map((b) => (
-                      <div key={b.id} className="flex items-center gap-0.5 rounded-full border border-amber-700/50 bg-stone-800 pl-2.5 pr-1 py-0.5">
-                        <button
-                          type="button"
-                          onClick={() => handleLoadBuild(b)}
-                          className="text-xs text-amber-300 hover:text-amber-100 transition-colors"
-                          title={`Feitiços: ${b.spells.join(", ")}`}
-                        >
-                          {b.name}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteBuild(b.id)}
-                          className="ml-1 rounded-full p-0.5 text-stone-500 hover:bg-red-900/40 hover:text-red-400 transition-colors"
-                          title="Excluir build"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
                   </div>
                 </div>
               )}
