@@ -345,9 +345,20 @@ export default function AdminPage() {
     <div className="min-h-screen bg-stone-950 px-4 py-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-amber-300">🔒 Painel Admin</h1>
-            <p className="text-xs text-stone-500">Hogwarts Showdown</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-amber-300">🔒 Painel Admin</h1>
+              <p className="text-xs text-stone-500">Hogwarts Showdown</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-amber-700 bg-amber-950/40 text-amber-300 hover:bg-amber-900/50"
+              onClick={() => window.location.href = "/"}
+            >
+              ← Retornar ao Lobby
+            </Button>
           </div>
           <div className="flex gap-2">
             <div className="flex items-center gap-2 rounded border border-amber-700/50 bg-stone-800 px-3 py-2">
@@ -379,7 +390,15 @@ export default function AdminPage() {
                 <input
                   type="checkbox"
                   checked={showMeta}
-                  onChange={(e) => setShowMeta(e.target.checked)}
+                  onChange={async (e) => {
+                    setShowMeta(e.target.checked)
+                    const success = await updateServerMeta(arrecadado, e.target.checked)
+                    if (success) {
+                      alert("Configuração de exibição de meta atualizada!")
+                    } else {
+                      setError("Erro ao atualizar configuração de meta")
+                    }
+                  }}
                   className="h-4 w-4 rounded border-amber-700 bg-stone-900 text-amber-500 focus:ring-amber-500"
                 />
                 <span className="text-xs text-amber-400">Exibir Meta na Página Principal</span>

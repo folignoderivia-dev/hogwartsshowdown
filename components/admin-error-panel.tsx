@@ -28,7 +28,7 @@ export default function AdminErrorPanel({ isOpen, onClose, currentUser, isModal 
   const loadErrors = async () => {
     setLoading(true)
     try {
-      const data = await getRecentErrors(100)
+      const data = await getRecentErrors(500)
       setErrors(data)
     } catch (error) {
       console.error("Failed to load errors:", error)

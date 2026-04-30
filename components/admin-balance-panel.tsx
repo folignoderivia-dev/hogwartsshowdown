@@ -46,7 +46,7 @@ export default function AdminBalancePanel({ isOpen, onClose, currentUser, isModa
         .select("player_builds, game_mode")
         .not("game_mode", "in", '("torneio-offline","historia","floresta","death-march","worldboss","quidditch")')
         .order("finished_at", { ascending: false })
-        .limit(1000)
+        .limit(10000)
 
       if (error) {
         console.error("Failed to fetch match history:", error)
