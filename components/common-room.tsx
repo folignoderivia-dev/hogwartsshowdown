@@ -1046,8 +1046,6 @@ export default function CommonRoom({
     const payload = buildPayload()
     if (!payload || !onCreateRoom) return
     onCreateRoom(payload)
-    // Show invite modal after creating room
-    setShowInviteModal(true)
   }
 
   const handleJoinRoomClick = (matchId: string) => {

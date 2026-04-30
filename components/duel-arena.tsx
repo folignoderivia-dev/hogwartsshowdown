@@ -1931,6 +1931,20 @@ const DuelArena = (
                     ? ui.connecting
                     : `${ui.waiting} (${roomPlayerCount}/${expectedOnlinePlayers})`}
                 </p>
+                {!isReadOnlySpectator && (
+                  <Button
+                    onClick={() => {
+                      // Copy room code to clipboard
+                      if (matchId) {
+                        navigator.clipboard.writeText(matchId)
+                        alert(locale === 'pt' ? 'Código da sala copiado!' : 'Room code copied!')
+                      }
+                    }}
+                    className="mt-3 bg-amber-700 hover:bg-amber-600 text-white pointer-events-auto"
+                  >
+                    {locale === 'pt' ? 'Copiar Código da Sala' : 'Copy Room Code'}
+                  </Button>
+                )}
               </div>
             </div>
           )}
