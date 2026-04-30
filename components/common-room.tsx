@@ -277,6 +277,9 @@ export default function CommonRoom({
   const [showSpectatePanel, setShowSpectatePanel] = useState(false)
   const lobbySocketRef = useRef<Socket | null>(null)
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set())
+  const [onlineBots, setOnlineBots] = useState<any[]>([])
+  const [ghostRooms, setGhostRooms] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number; isBotRoom: boolean; botId: string }>>([])
+  const [botFallbackTimeout, setBotFallbackTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [showRankingPanel, setShowRankingPanel] = useState(true)
@@ -314,6 +317,121 @@ export default function CommonRoom({
       spells: randomSpells
     }
   }
+
+  // ── Bot Rotation & Online Presence ─────────────────────────────────────────────
+  
+  // Limpa timeout de fallback ao desmontar
+  useEffect(() => {
+    return () => {
+      if (botFallbackTimeout) {
+        clearTimeout(botFallbackTimeout)
+      }
+    }
+  }, [botFallbackTimeout])
+  
+  // Função para rotacionar bots online (3-6 bots aleatórios)
+  const rotateBots = async () => {
+    try {
+      const supabase = getSupabaseClient()
+      // Busca todos os bots
+      const { data: allBots, error } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, elo, is_bot, simulated_online")
+        .eq("is_bot", true)
+      
+      if (error || !allBots || allBots.length === 0) {
+        console.log("No bots found or error fetching bots")
+        return
+      }
+
+      // Seleciona 3-6 bots aleatórios para ficarem online
+      const numOnline = Math.floor(Math.random() * 4) + 3 // 3-6
+      const shuffled = [...allBots].sort(() => Math.random() - 0.5)
+      const selectedBots = shuffled.slice(0, numOnline)
+      
+      // Atualiza simulated_online para todos os bots
+      const botIds = allBots.map(b => b.id)
+      const selectedIds = selectedBots.map(b => b.id)
+      
+      for (const botId of botIds) {
+        const isOnline = selectedIds.includes(botId)
+        await supabase
+          .from("profiles")
+          .update({ simulated_online: isOnline })
+          .eq("id", botId)
+      }
+
+      setOnlineBots(selectedBots)
+      console.log(`Rotated bots: ${selectedBots.length} online out of ${allBots.length} total`)
+    } catch (error) {
+      console.error("Failed to rotate bots:", error)
+    }
+  }
+
+  // Função para buscar bots online atualmente
+  const fetchOnlineBots = async () => {
+    try {
+      const supabase = getSupabaseClient()
+      const { data: bots, error } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, elo, is_bot, simulated_online")
+        .eq("is_bot", true)
+        .eq("simulated_online", true)
+        .limit(10)
+      
+      if (!error && bots) {
+        setOnlineBots(bots)
+      }
+    } catch (error) {
+      console.error("Failed to fetch online bots:", error)
+    }
+  }
+
+  // Rotaciona bots ao montar o componente e a cada 5 minutos
+  useEffect(() => {
+    rotateBots()
+    const interval = setInterval(rotateBots, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // ── Ghost Rooms (Bots Creating Rooms) ──────────────────────────────────────────
+  
+  // Função para gerar ghost rooms ocasionalmente (1-2 salas de bots)
+  const generateGhostRooms = () => {
+    if (onlineBots.length === 0) return
+    
+    // 30% de chance de gerar ghost rooms
+    if (Math.random() > 0.3) return
+    
+    const numRooms = Math.floor(Math.random() * 2) + 1 // 1-2 salas
+    const modes: PlayerBuild["gameMode"][] = ["1v1", "1v1-no-curses", "1v1-random"]
+    
+    const newGhostRooms = []
+    for (let i = 0; i < numRooms; i++) {
+      const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
+      const randomMode = modes[Math.floor(Math.random() * modes.length)]
+      
+      newGhostRooms.push({
+        matchId: `ghost-${randomBot.id}-${Date.now()}-${i}`,
+        mode: randomMode,
+        host: randomBot.username,
+        playersJoined: 1,
+        playersExpected: 2,
+        isBotRoom: true,
+        botId: randomBot.id,
+      })
+    }
+    
+    setGhostRooms(newGhostRooms)
+    console.log(`Generated ${newGhostRooms.length} ghost rooms`)
+  }
+
+  // Atualiza ghost rooms periodicamente (a cada 2 minutos)
+  useEffect(() => {
+    const interval = setInterval(generateGhostRooms, 2 * 60 * 1000)
+    generateGhostRooms() // Gera imediatamente ao montar
+    return () => clearInterval(interval)
+  }, [onlineBots])
 
   // ── Global Error Telemetry ─────────────────────────────────────────────────
   const lastLoggedErrorRef = useRef<{ message: string; timestamp: number } | null>(null)
@@ -991,7 +1109,22 @@ export default function CommonRoom({
     const lobby = supabase.channel("room_lobby", { config: { presence: { key: currentUser?.id || `anon-${Math.random().toString(36).slice(2, 7)}` } } })
     const syncOnline = () => {
       const state = lobby.presenceState()
-      setOnlineWizards(Object.keys(state).length)
+      const realUsersCount = Object.keys(state).length
+      
+      // Extrai usernames de usuários reais
+      const realUsernames = Object.entries(state).flatMap(([key, presences]) =>
+        (presences as any[]).map((p: any) => p.username).filter((name: string) => name && name !== "Visitante")
+      )
+      
+      // Adiciona usernames de bots online simulados
+      const botUsernames = onlineBots.map(b => b.username)
+      
+      // Merge e limita a 40 usuários totais
+      const allUsernames = [...new Set([...realUsernames, ...botUsernames])].slice(0, 40)
+      
+      setOnlineWizards(realUsersCount + onlineBots.length)
+      setOnlineUsernames(allUsernames)
+      
       // Extrai IDs dos usuários presentes para o indicador de online nos amigos
       const ids = new Set<string>(
         Object.entries(state).flatMap(([key, presences]) =>
@@ -999,11 +1132,6 @@ export default function CommonRoom({
         )
       )
       setOnlineUserIds(ids)
-      // Extrai usernames para exibição (até 20)
-      const usernames = Object.entries(state).flatMap(([key, presences]) =>
-        (presences as any[]).map((p: any) => p.username).filter((name: string) => name && name !== "Visitante")
-      )
-      setOnlineUsernames([...new Set(usernames)].slice(0, 20))
     }
     lobby
       .on("presence", { event: "sync" }, syncOnline)
@@ -1133,11 +1261,65 @@ export default function CommonRoom({
   const handleCreateRoomClick = () => {
     const payload = buildPayload()
     if (!payload || !onCreateRoom) return
+    
+    // Clear any existing bot fallback timeout
+    if (botFallbackTimeout) {
+      clearTimeout(botFallbackTimeout)
+      setBotFallbackTimeout(null)
+    }
+    
     onCreateRoom(payload)
+    
+    // Start 60-second fallback timer for bot to join
+    const timeoutId = setTimeout(async () => {
+      console.log("60-second fallback: No human opponent joined, bot joining...")
+      
+      // Pick a random online bot
+      if (onlineBots.length > 0) {
+        const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
+        console.log(`Bot ${randomBot.username} joining as fallback`)
+        
+        // Simulate bot joining - this would need to trigger the match start
+        // For now, we'll just log it. The actual implementation would need to
+        // communicate with the arena component or socket server
+      }
+    }, 60000) // 60 seconds
+    
+    setBotFallbackTimeout(timeoutId)
   }
 
   const handleJoinRoomClick = (matchId: string) => {
     if (!currentUser || !onJoinRoom) return
+    
+    // Check if it's a ghost room (bot room)
+    const ghostRoom = ghostRooms.find((r) => r.matchId === matchId)
+    if (ghostRoom) {
+      // Bypass standard join logic and load arena directly with bot
+      const bot = onlineBots.find((b) => b.id === ghostRoom.botId)
+      if (!bot) return
+      
+      // Generate random build for bot
+      const botBuild = generateRandomBuild()
+      
+      // Filter out unforgivable spells if mode is "1v1-no-curses"
+      const botSpells = ghostRoom.mode === "1v1-no-curses"
+        ? botBuild.spells.filter(spell => !hasUnforgivableSpells([spell]))
+        : botBuild.spells
+      
+      // Load arena directly with bot opponent
+      const payload = buildPayload()
+      if (!payload) return
+      
+      // Modify game mode to match ghost room
+      payload.gameMode = ghostRoom.mode
+      
+      // Pass bot data to arena (this would need to be handled in the arena component)
+      // For now, we'll use the standard join flow but mark it as a bot match
+      console.log(`Joining ghost room with bot: ${bot.username}`)
+      onJoinRoom(payload, matchId)
+      return
+    }
+    
     const room = openRooms.find((r) => r.matchId === matchId)
     if (!room) return
     

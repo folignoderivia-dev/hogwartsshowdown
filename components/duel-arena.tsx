@@ -225,6 +225,16 @@ function getSpellCastPriority(spellName: string, spell: SpellInfo | undefined, a
   return p
 }
 
+const UNFORGIVABLE_SPELLS = ["Avada Kedavra", "Crucius", "Imperio", "Fogo Maldito"]
+
+const hasUnforgivableSpells = (spells: string[]): boolean => {
+  return spells.some(spell => UNFORGIVABLE_SPELLS.includes(spell))
+}
+
+const filterBuildForNoCursesMode = (spells: string[]): string[] => {
+  return spells.filter(spell => !hasUnforgivableSpells([spell]))
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const computeRoundHash = (turnId: number, state: Duelist[]) => {
   const compact = [...state]
@@ -465,6 +475,13 @@ const DuelArena = (
     const botBase = TORNEIO_BOTS[Math.floor(Math.random() * TORNEIO_BOTS.length)]
     const POTIONS = ["wiggenweld", "mortovivo", "edurus", "maxima", "foco", "merlin", "felix", "aconito", "amortentia"]
     const potion = POTIONS[Math.floor(Math.random() * POTIONS.length)]
+    
+    // Filter out unforgivable spells if mode is "1v1-no-curses"
+    let botSpells = botBase.spells
+    if (playerBuild.gameMode === "1v1-no-curses") {
+      botSpells = filterBuildForNoCursesMode(botSpells)
+    }
+    
     const bot: Duelist = {
       id: `torneio-bot-${stage + 1}`,
       name: `${botBase.name} (${TORNEIO_LABELS[Math.min(stage, TORNEIO_LABELS.length - 1)]})`,
@@ -472,12 +489,12 @@ const DuelArena = (
       wand: botBase.wand,
       potion,
       avatar: DEFAULT_AVATARS[(stage + 1) % DEFAULT_AVATARS.length],
-      spells: botBase.spells,
+      spells: botSpells,
       hp: { bars: buildHpBars(botBase.house) },
       speed: 92 + stage * 3,
       debuffs: [],
       team: "enemy",
-      spellMana: buildSpellManaForSpells(botBase.spells, botBase.house),
+      spellMana: buildSpellManaForSpells(botSpells, botBase.house),
       turnsInBattle: 0,
       disabledSpells: {},
       missStreakBySpell: {},
@@ -998,6 +1015,41 @@ const DuelArena = (
       setDuelists(state)
       notifyFfaEliminations(snapshot, state)
       setBattleLog((prev) => [...prev, ...outcome.logs])
+
+      // AI Emotes: 30% chance for bot to send emote based on game state
+      if (isOfflineMode && Math.random() < 0.3) {
+        const bots = state.filter(d => !d.isPlayer && !isDefeated(d.hp))
+        const player = state.find(d => d.isPlayer)
+        
+        if (bots.length > 0 && player) {
+          const bot = bots[Math.floor(Math.random() * bots.length)]
+          const botHp = getTotalHP(bot.hp)
+          const playerHp = getTotalHP(player.hp)
+          const maxHp = bot.house === "slytherin" ? 400 : 500
+          
+          // Check for critical hit (from animations)
+          const botLandedCrit = outcome.animationsToPlay.some(anim => 
+            anim.casterId === bot.id && anim.isCrit
+          )
+          
+          let emoteText = ""
+          
+          // Bot HP < 30% -> Crying/Angry emote
+          if (botHp / maxHp < 0.3) {
+            const angryEmotes = ["😠", "😤", "😢", "😭"]
+            emoteText = angryEmotes[Math.floor(Math.random() * angryEmotes.length)]
+          }
+          // Bot lands Critical OR Human HP < 30% -> Laughing/Smirk emote
+          else if (botLandedCrit || playerHp / maxHp < 0.3) {
+            const laughEmotes = ["😂", "😏", "😄", "🤣"]
+            emoteText = laughEmotes[Math.floor(Math.random() * laughEmotes.length)]
+          }
+          
+          if (emoteText) {
+            setChatMessages(prev => [...prev, { sender: bot.name, text: emoteText }])
+          }
+        }
+      }
 
       // Flash visual para debuffs recém-aplicados (comparação com snapshot pré-turno)
       for (const newD of state) {
