@@ -12,6 +12,7 @@ interface AdminBalancePanelProps {
   isOpen: boolean
   onClose: () => void
   currentUser: { id: string; username: string; isAdmin?: boolean }
+  isModal?: boolean
 }
 
 interface MetaStats {
@@ -20,7 +21,7 @@ interface MetaStats {
   percentage: number
 }
 
-export default function AdminBalancePanel({ isOpen, onClose, currentUser }: AdminBalancePanelProps) {
+export default function AdminBalancePanel({ isOpen, onClose, currentUser, isModal = true }: AdminBalancePanelProps) {
   const [loading, setLoading] = useState(false)
   const [totalPlayers, setTotalPlayers] = useState(0)
   const [topSpells, setTopSpells] = useState<MetaStats[]>([])
@@ -158,152 +159,166 @@ export default function AdminBalancePanel({ isOpen, onClose, currentUser }: Admi
 
   if (!isOpen) return null
 
+  const content = (
+    <>
+      {loading ? (
+        <div className="flex h-[70vh] items-center justify-center">
+          <p className="text-amber-400">Loading meta analytics...</p>
+        </div>
+      ) : (
+        <div className="h-[70vh] overflow-y-auto p-6 space-y-6">
+          {/* Total Matches */}
+          <div className="flex items-center gap-4 mb-6">
+            <Badge className="bg-amber-700 text-amber-100 border-amber-600 px-4 py-2 text-sm">
+              Total PvP Matches: {totalPlayers}
+            </Badge>
+          </div>
+
+          {/* Top Spells */}
+          <div>
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-amber-300 mb-4">
+              <Sparkles className="h-5 w-5" />
+              Top Spells (Grimoire Meta)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {topSpells.slice(0, 10).map((item) => (
+                <div key={item.name} className="border border-amber-700/50 bg-stone-800 rounded p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-amber-200">{getSpellName(item.name)}</span>
+                    <Badge className="bg-purple-900/50 text-purple-200 border-purple-700 text-xs">
+                      {item.count} ({item.percentage.toFixed(1)}%)
+                    </Badge>
+                  </div>
+                  <div className="w-full bg-stone-700 rounded-full h-2">
+                    <div
+                      className="bg-purple-500 h-2 rounded-full transition-all"
+                      style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Top Potions */}
+          <div>
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-amber-300 mb-4">
+              <Beaker className="h-5 w-5" />
+              Top Potions
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {topPotions.slice(0, 10).map((item) => (
+                <div key={item.name} className="border border-amber-700/50 bg-stone-800 rounded p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-amber-200">{getPotionName(item.name)}</span>
+                    <Badge className="bg-green-900/50 text-green-200 border-green-700 text-xs">
+                      {item.count} ({item.percentage.toFixed(1)}%)
+                    </Badge>
+                  </div>
+                  <div className="w-full bg-stone-700 rounded-full h-2">
+                    <div
+                      className="bg-green-500 h-2 rounded-full transition-all"
+                      style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Top Cores */}
+          <div>
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-amber-300 mb-4">
+              <Shield className="h-5 w-5" />
+              Top Cores
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {topCores.map((item) => (
+                <div key={item.name} className="border border-amber-700/50 bg-stone-800 rounded p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-amber-200">{getCoreName(item.name)}</span>
+                    <Badge className="bg-blue-900/50 text-blue-200 border-blue-700 text-xs">
+                      {item.count} ({item.percentage.toFixed(1)}%)
+                    </Badge>
+                  </div>
+                  <div className="w-full bg-stone-700 rounded-full h-2">
+                    <div
+                      className="bg-blue-500 h-2 rounded-full transition-all"
+                      style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Top Wands */}
+          <div>
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-amber-300 mb-4">
+              <Wand2 className="h-5 w-5" />
+              Top Wands
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {topWands.map((item) => (
+                <div key={item.name} className="border border-amber-700/50 bg-stone-800 rounded p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-amber-200">{getWandName(item.name)}</span>
+                    <Badge className="bg-amber-900/50 text-amber-200 border-amber-700 text-xs">
+                      {item.count} ({item.percentage.toFixed(1)}%)
+                    </Badge>
+                  </div>
+                  <div className="w-full bg-stone-700 rounded-full h-2">
+                    <div
+                      className="bg-amber-500 h-2 rounded-full transition-all"
+                      style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-amber-700/30 p-4 bg-stone-800">
+        <Button onClick={loadMetaStats} className="w-full bg-amber-700 hover:bg-amber-600 text-white">
+          Refresh Analytics
+        </Button>
+      </div>
+    </>
+  )
+
+  if (isModal) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <Card className="w-full max-w-7xl max-h-[90vh] overflow-hidden bg-stone-900 border-amber-700">
+          <CardHeader className="border-b border-amber-700/50 bg-stone-800">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-amber-200">
+                <BarChart3 className="h-5 w-5 text-green-400" />
+                Admin Panel - Meta Analytics
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="text-amber-400 hover:text-amber-200 hover:bg-stone-700"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {content}
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <Card className="w-full max-w-7xl max-h-[90vh] overflow-hidden bg-stone-900 border-amber-700">
-        <CardHeader className="border-b border-amber-700/50 bg-stone-800">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-amber-200">
-              <BarChart3 className="h-5 w-5 text-green-400" />
-              Admin Panel - Meta Analytics
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="text-amber-400 hover:text-amber-200 hover:bg-stone-700"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex h-[70vh] items-center justify-center">
-              <p className="text-amber-400">Loading meta analytics...</p>
-            </div>
-          ) : (
-            <div className="h-[70vh] overflow-y-auto p-6 space-y-6">
-              {/* Total Matches */}
-              <div className="flex items-center gap-4 mb-6">
-                <Badge className="bg-amber-700 text-amber-100 border-amber-600 px-4 py-2 text-sm">
-                  Total PvP Matches: {totalPlayers}
-                </Badge>
-              </div>
-
-              {/* Top Spells */}
-              <div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-amber-300 mb-4">
-                  <Sparkles className="h-5 w-5" />
-                  Top Spells (Grimoire Meta)
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {topSpells.slice(0, 10).map((item) => (
-                    <div key={item.name} className="border border-amber-700/50 bg-stone-800 rounded p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-amber-200">{getSpellName(item.name)}</span>
-                        <Badge className="bg-purple-900/50 text-purple-200 border-purple-700 text-xs">
-                          {item.count} ({item.percentage.toFixed(1)}%)
-                        </Badge>
-                      </div>
-                      <div className="w-full bg-stone-700 rounded-full h-2">
-                        <div
-                          className="bg-purple-500 h-2 rounded-full transition-all"
-                          style={{ width: `${Math.min(item.percentage, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Top Potions */}
-              <div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-amber-300 mb-4">
-                  <Beaker className="h-5 w-5" />
-                  Top Potions
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {topPotions.slice(0, 10).map((item) => (
-                    <div key={item.name} className="border border-amber-700/50 bg-stone-800 rounded p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-amber-200">{getPotionName(item.name)}</span>
-                        <Badge className="bg-green-900/50 text-green-200 border-green-700 text-xs">
-                          {item.count} ({item.percentage.toFixed(1)}%)
-                        </Badge>
-                      </div>
-                      <div className="w-full bg-stone-700 rounded-full h-2">
-                        <div
-                          className="bg-green-500 h-2 rounded-full transition-all"
-                          style={{ width: `${Math.min(item.percentage, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Top Cores */}
-              <div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-amber-300 mb-4">
-                  <Shield className="h-5 w-5" />
-                  Top Cores
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {topCores.map((item) => (
-                    <div key={item.name} className="border border-amber-700/50 bg-stone-800 rounded p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-amber-200">{getCoreName(item.name)}</span>
-                        <Badge className="bg-blue-900/50 text-blue-200 border-blue-700 text-xs">
-                          {item.count} ({item.percentage.toFixed(1)}%)
-                        </Badge>
-                      </div>
-                      <div className="w-full bg-stone-700 rounded-full h-2">
-                        <div
-                          className="bg-blue-500 h-2 rounded-full transition-all"
-                          style={{ width: `${Math.min(item.percentage, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Top Wands */}
-              <div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-amber-300 mb-4">
-                  <Wand2 className="h-5 w-5" />
-                  Top Wands
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {topWands.map((item) => (
-                    <div key={item.name} className="border border-amber-700/50 bg-stone-800 rounded p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-amber-200">{getWandName(item.name)}</span>
-                        <Badge className="bg-amber-900/50 text-amber-200 border-amber-700 text-xs">
-                          {item.count} ({item.percentage.toFixed(1)}%)
-                        </Badge>
-                      </div>
-                      <div className="w-full bg-stone-700 rounded-full h-2">
-                        <div
-                          className="bg-amber-500 h-2 rounded-full transition-all"
-                          style={{ width: `${Math.min(item.percentage, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="border-t border-amber-700/30 p-4 bg-stone-800">
-            <Button onClick={loadMetaStats} className="w-full bg-amber-700 hover:bg-amber-600 text-white">
-              Refresh Analytics
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="w-full">
+      {content}
     </div>
   )
 }

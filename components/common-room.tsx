@@ -808,9 +808,10 @@ export default function CommonRoom({
         },
         (payload) => {
           console.log("CommonRoom: Received server_meta update", payload)
-          const newRecord = payload.new as { arrecadado?: number; meta_objetivo?: number }
+          const newRecord = payload.new as { arrecadado?: number; meta_objetivo?: number; show_meta?: boolean }
           if (newRecord.arrecadado !== undefined) setArrecadado(newRecord.arrecadado)
           if (newRecord.meta_objetivo !== undefined) setMetaObjetivo(newRecord.meta_objetivo)
+          if (newRecord.show_meta !== undefined) setShowMeta(newRecord.show_meta)
         }
       )
       .subscribe((status) => {

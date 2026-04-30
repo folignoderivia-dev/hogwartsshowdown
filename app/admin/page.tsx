@@ -686,20 +686,36 @@ export default function AdminPage() {
 
         {/* Meta/Balance Tab */}
         {activeTab === "meta_balance" && userProfile && (
-          <AdminBalancePanel
-            isOpen={true}
-            onClose={() => {}}
-            currentUser={userProfile}
-          />
+          <Card className="border-amber-800/40 bg-stone-900">
+            <CardHeader>
+              <CardTitle className="text-amber-300">Meta Analytics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AdminBalancePanel
+                isOpen={true}
+                onClose={() => {}}
+                currentUser={userProfile}
+                isModal={false}
+              />
+            </CardContent>
+          </Card>
         )}
 
         {/* Errors Tab */}
         {activeTab === "errors" && userProfile && (
-          <AdminErrorPanel
-            isOpen={true}
-            onClose={() => {}}
-            currentUser={userProfile}
-          />
+          <Card className="border-amber-800/40 bg-stone-900">
+            <CardHeader>
+              <CardTitle className="text-amber-300">Error Log</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AdminErrorPanel
+                isOpen={true}
+                onClose={() => {}}
+                currentUser={userProfile}
+                isModal={false}
+              />
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
