@@ -1898,17 +1898,6 @@ export default function CommonRoom({
                     >
                       {rankingMode === "elo" ? (locale === 'en' ? 'PVE' : 'PVE') : rankingMode === "offline" ? (locale === 'en' ? 'Forest' : 'Floresta') : rankingMode === "forest" ? (locale === 'en' ? 'March' : 'Marcha') : rankingMode === "march" ? (locale === 'en' ? 'WB' : 'WB') : rankingMode === "story" ? (locale === 'en' ? 'Story' : 'História') : (locale === 'en' ? 'PVP' : 'PVP')}
                     </Button>
-                    {currentUser?.isAdmin && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-6 border-red-700 px-2 text-xs text-red-300"
-                        onClick={() => setShowAdminPanel(true)}
-                      >
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        Admin
-                      </Button>
-                    )}
                   </div>
                 </div>
               ) : (
@@ -2600,24 +2589,27 @@ export default function CommonRoom({
                 🌐 {locale === 'pt' ? 'ONLINE' : 'ONLINE'}
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {ONLINE_MODES.map((mode) => (
-                  <Button
-                    key={mode.value}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setGameMode(mode.value as GameMode)}
-                    className={`h-10 w-full justify-center px-2 text-xs sm:text-sm transition-all ${
-                      gameMode === mode.value
-                        ? "border-green-500 bg-green-900/50 text-green-200 shadow-lg shadow-green-900/30 scale-105"
-                        : "border-green-800/50 bg-stone-800 text-green-300/70 hover:border-green-600 hover:bg-green-900/30"
-                    }`}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className="text-lg">{mode.icon}</span>
-                      <span>{MODE_LABELS[locale][mode.value]}</span>
-                    </span>
-                  </Button>
-                ))}
+                {ONLINE_MODES.map((mode) => {
+                  const labelKey = mode.value === "1v1" ? "duel1v1" : mode.value === "2v2" ? "battle2v2" : mode.value === "ffa" ? "ffa4" : mode.value === "ffa3" ? "ffa3" : mode.value
+                  return (
+                    <Button
+                      key={mode.value}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setGameMode(mode.value as GameMode)}
+                      className={`h-10 w-full justify-center px-2 text-xs sm:text-sm transition-all ${
+                        gameMode === mode.value
+                          ? "border-green-500 bg-green-900/50 text-green-200 shadow-lg shadow-green-900/30 scale-105"
+                          : "border-green-800/50 bg-stone-800 text-green-300/70 hover:border-green-600 hover:bg-green-900/30"
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-lg">{mode.icon}</span>
+                        <span>{UI_LABELS[locale][labelKey] || MODE_LABELS[locale][mode.value]}</span>
+                      </span>
+                    </Button>
+                  )
+                })}
               </div>
             </div>
             
