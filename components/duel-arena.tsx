@@ -2054,6 +2054,7 @@ const DuelArena = (
                 const disabledByDebuff = (player?.disabledSpells?.[spell] ?? 0) > 0
                 const hasSeminviso = playerBuild.wand === "seminviso"
                 const isLocked = lockedSpell === spell
+                const requiresTarget = info && !isSelfTargetSpell(spell) && !isAreaSpell(spell)
                 const disabled =
                   !mana ||
                   mana.current <= 0 ||
@@ -2068,6 +2069,9 @@ const DuelArena = (
                   (!!tauntLock && spell !== player.lastSpellUsed)
                 return (
                   <div key={spell} className="relative">
+                    {requiresTarget && (
+                      <div className="absolute -top-2 -left-1 z-10 text-xs text-amber-400">🎯</div>
+                    )}
                     {hasSeminviso && (
                       <button
                         type="button"
