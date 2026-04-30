@@ -643,8 +643,13 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
     })
     
     const state = outcome.newDuelists
-    setDuelists(state)
     setBattleLog((prev) => [...prev, ...outcome.logs])
+    
+    // Play animations PRIMEIRO antes de atualizar duelists
+    await playAnimations(outcome.animationsToPlay, snapshot)
+    
+    // ATUALIZA duelists DEPOIS das animações (barra de vida, debuffs, etc)
+    setDuelists(state)
     
     // Flash visual para debuffs recém-aplicados
     for (const newD of state) {
@@ -660,9 +665,6 @@ export default function StoryArena({ playerBuild, currentUser, onExit, onAuthCha
         }
       }
     }
-    
-    // Play animations
-    await playAnimations(outcome.animationsToPlay, state)
     
     const nextTurn = roundTurn + 1
     turnNumberRef.current = nextTurn
