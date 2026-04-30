@@ -1377,7 +1377,16 @@ const DuelArena = (
           const outcome = yourDelta > 0 ? "win" : "lose"
           onBattleEnd?.(outcome, playerBuild.userId)
         }
-        saveMatchHistory({ matchId: mId, gameMode, winnerNames, loserNames }).catch(() => null)
+        // Extract player builds from duelists for meta analysis
+        const playerBuilds = duelistsRef.current.map((d) => ({
+          userId: d.id,
+          username: d.name,
+          spells: d.spells || [],
+          potion: d.potion || "",
+          wand: d.wand || "",
+          core: "", // Core is not stored in Duelist, wand ID contains the core info
+        }))
+        saveMatchHistory({ matchId: mId, gameMode, winnerNames, loserNames, playerBuilds }).catch(() => null)
       }
     )
 
