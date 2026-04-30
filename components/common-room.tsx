@@ -2682,6 +2682,22 @@ export default function CommonRoom({
                 })}
               </div>
             </div>
+
+            {/* Avisos para novos modos */}
+            {isRandomBuildMode && (
+              <div className="rounded-md bg-blue-900/30 border border-blue-500/50 px-3 py-2">
+                <p className="text-xs text-blue-200">
+                  🎲 {locale === 'en' ? 'Your build will be randomly generated. Only name and avatar are preserved.' : 'Sua build será gerada aleatoriamente. Apenas nome e avatar são preservados.'}
+                </p>
+              </div>
+            )}
+            {isNoCursesMode && (
+              <div className="rounded-md bg-red-900/30 border border-red-500/50 px-3 py-2">
+                <p className="text-xs text-red-200">
+                  🛡️ {locale === 'en' ? 'Unforgivable curses are forbidden in this mode (Avada Kedavra, Crucius, Imperio, Fogo Maldito).' : 'Maldições imperdoáveis são proibidas neste modo (Avada Kedavra, Crucius, Imperio, Fogo Maldito).'}
+                </p>
+              </div>
+            )}
             
             {/* OFFLINE MODES */}
             <div className="space-y-2">
