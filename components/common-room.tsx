@@ -397,7 +397,16 @@ export default function CommonRoom({
   // ── Ghost Rooms (Bots Creating Rooms) ──────────────────────────────────────────
   
   // Função para gerar ghost rooms ocasionalmente (1-2 salas de bots)
+  // Socket-Native: Only if real players online >= 2, 15 min cooldown
   const generateGhostRooms = () => {
+    const realPlayersCount = onlineWizards - onlineBots.length
+    
+    // Only create ghost rooms if real players online >= 2
+    if (realPlayersCount < 2) {
+      console.log("Smart Ghost Rooms: Not enough real players online, skipping")
+      return
+    }
+    
     if (onlineBots.length === 0) return
     
     // 30% de chance de gerar ghost rooms
@@ -423,15 +432,15 @@ export default function CommonRoom({
     }
     
     setGhostRooms(newGhostRooms)
-    console.log(`Generated ${newGhostRooms.length} ghost rooms`)
+    console.log(`Generated ${newGhostRooms.length} ghost rooms (Socket-Native, real players: ${realPlayersCount})`)
   }
 
-  // Atualiza ghost rooms periodicamente (a cada 2 minutos)
+  // Atualiza ghost rooms periodicamente (a cada 15 minutos, não 2 minutos)
   useEffect(() => {
-    const interval = setInterval(generateGhostRooms, 2 * 60 * 1000)
+    const interval = setInterval(generateGhostRooms, 15 * 60 * 1000) // 15 minutos
     generateGhostRooms() // Gera imediatamente ao montar
     return () => clearInterval(interval)
-  }, [onlineBots])
+  }, [onlineBots, onlineWizards])
 
   // ── Global Error Telemetry ─────────────────────────────────────────────────
   const lastLoggedErrorRef = useRef<{ message: string; timestamp: number } | null>(null)
@@ -1270,56 +1279,55 @@ export default function CommonRoom({
     
     onCreateRoom(payload)
     
-    // Start 60-second fallback timer for bot to join
-    const timeoutId = setTimeout(async () => {
-      console.log("60-second fallback: No human opponent joined, bot joining...")
-      
-      // Pick a random online bot
-      if (onlineBots.length > 0) {
-        const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
-        console.log(`Bot ${randomBot.username} joining as fallback`)
-        
-        // Simulate bot joining - this would need to trigger the match start
-        // For now, we'll just log it. The actual implementation would need to
-        // communicate with the arena component or socket server
-      }
-    }, 60000) // 60 seconds
+    // Start 60-second fallback timer for bot to join (WebSocket-Native)
+    // Only if real players online < 2
+    const realPlayersCount = onlineWizards - onlineBots.length
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
     
-    setBotFallbackTimeout(timeoutId)
+    if (realPlayersCount < 2) {
+      timeoutId = setTimeout(async () => {
+        console.log("60-second fallback: Fetching bot to join via WebSocket...")
+        
+        // Fetch random online bot from database
+        if (onlineBots.length > 0) {
+          const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
+          
+          // Fetch bot's deck_slots from database
+          const supabase = getSupabaseClient()
+          const { data: botProfile, error } = await supabase
+            .from("profiles")
+            .select("id, username, avatar_url, deck_slots, elo")
+            .eq("id", randomBot.id)
+            .single()
+          
+          if (error || !botProfile) {
+            console.error("Failed to fetch bot profile:", error)
+            return
+          }
+          
+          // TODO: Emit socket event to server to simulate bot joining
+          // This would be handled in the arena component when it detects a bot opponent
+          console.log(`Bot ${botProfile.username} ready to join via WebSocket`)
+          
+          // Store bot data for arena to use
+          setGhostRooms(prev => [...prev, {
+            matchId: "",
+            mode: payload.gameMode || "1v1",
+            host: botProfile.username,
+            playersJoined: 1,
+            playersExpected: 2,
+            isBotRoom: true,
+            botId: botProfile.id,
+          }])
+        }
+      }, 60000) // 60 seconds
+      
+      setBotFallbackTimeout(timeoutId)
+    }
   }
 
   const handleJoinRoomClick = (matchId: string) => {
     if (!currentUser || !onJoinRoom) return
-    
-    // Check if it's a ghost room (bot room)
-    const ghostRoom = ghostRooms.find((r) => r.matchId === matchId)
-    if (ghostRoom) {
-      // Bypass standard join logic and load arena directly with bot
-      const bot = onlineBots.find((b) => b.id === ghostRoom.botId)
-      if (!bot) return
-      
-      // Generate random build for bot
-      const botBuild = generateRandomBuild()
-      
-      // Filter out unforgivable spells if mode is "1v1-no-curses"
-      const botSpells = ghostRoom.mode === "1v1-no-curses"
-        ? botBuild.spells.filter(spell => !hasUnforgivableSpells([spell]))
-        : botBuild.spells
-      
-      // Load arena directly with bot opponent
-      const payload = buildPayload()
-      if (!payload) return
-      
-      // Modify game mode to match ghost room
-      payload.gameMode = ghostRoom.mode
-      
-      // Pass bot data to arena (this would need to be handled in the arena component)
-      // For now, we'll use the standard join flow but mark it as a bot match
-      console.log(`Joining ghost room with bot: ${bot.username}`)
-      onJoinRoom(payload, matchId)
-      return
-    }
-    
     const room = openRooms.find((r) => r.matchId === matchId)
     if (!room) return
     

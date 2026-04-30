@@ -47,6 +47,10 @@ interface DuelArenaProps {
   participantNames?: string[]
   matchStatus?: "waiting" | "in_progress" | "finished"
   unlockedStickers?: string[]
+  /** Indica se o oponente é um bot (para WebSocket-Native bot emulation) */
+  isBotMatch?: boolean
+  /** Dados do bot para carregar build de deck_slots */
+  botData?: { id: string; username: string; avatar_url: string; deck_slots: string[]; elo: number }
 }
 
 const HAND_BOTTOM = "https://i.postimg.cc/hPdCk474/varinhaposicao03.png"
@@ -333,7 +337,7 @@ function Heart({ fillPercent }: { fillPercent: number }) {
 }
 
 const DuelArena = (
-  { playerBuild, onReturn, onBattleEnd, onFfaPlayerEliminated, matchId, isSpectator = false, participantIds = [], participantNames = [], matchStatus, unlockedStickers = [] }: DuelArenaProps
+  { playerBuild, onReturn, onBattleEnd, onFfaPlayerEliminated, matchId, isSpectator = false, participantIds = [], participantNames = [], matchStatus, unlockedStickers = [], isBotMatch = false, botData }: DuelArenaProps
 ) => {
   const { locale, cycleLocale } = useLanguage()
   const ui = uiTexts[locale]
@@ -431,7 +435,18 @@ const DuelArena = (
         const duelHouse = isLocal ? playerBuild.house : "slytherin"
         const duelWand = isLocal ? playerBuild.wand : "dragon"
         const duelAvatar = isLocal ? playerBuild.avatar : DEFAULT_AVATARS[(idx + 1) % DEFAULT_AVATARS.length]
-        const duelSpells = isLocal ? playerBuild.spells : []
+        
+        // Load bot build from deck_slots if this is a bot match
+        let duelSpells = isLocal ? playerBuild.spells : []
+        if (!isLocal && isBotMatch && botData && botData.deck_slots && botData.deck_slots.length > 0) {
+          duelSpells = botData.deck_slots
+          
+          // Filter out unforgivable spells if mode is "1v1-no-curses"
+          if (playerBuild.gameMode === "1v1-no-curses") {
+            duelSpells = filterBuildForNoCursesMode(duelSpells)
+          }
+        }
+        
         return {
           id: duelId,
           name: duelName,
@@ -451,7 +466,7 @@ const DuelArena = (
         } as Duelist
       })
     },
-    [participantNames, playerBuild.avatar, playerBuild.gameMode, playerBuild.house, playerBuild.name, playerBuild.spells, playerBuild.userId, playerBuild.wand]
+    [participantNames, playerBuild.avatar, playerBuild.gameMode, playerBuild.house, playerBuild.name, playerBuild.spells, playerBuild.userId, playerBuild.wand, isBotMatch, botData]
   )
   const buildChallengeRound = useCallback((stage: number): Duelist[] => {
     const playerMod = HOUSE_MODIFIERS[playerBuild.house] || { speed: 1, mana: 1, damage: 1, defense: 1 }
@@ -1017,7 +1032,8 @@ const DuelArena = (
       setBattleLog((prev) => [...prev, ...outcome.logs])
 
       // AI Emotes: 30% chance for bot to send emote based on game state
-      if (isOfflineMode && Math.random() < 0.3) {
+      // Socket-Native: Emit via socket chat for online bot matches
+      if ((isOfflineMode || isBotMatch) && Math.random() < 0.3) {
         const bots = state.filter(d => !d.isPlayer && !isDefeated(d.hp))
         const player = state.find(d => d.isPlayer)
         
@@ -1046,7 +1062,20 @@ const DuelArena = (
           }
           
           if (emoteText) {
-            setChatMessages(prev => [...prev, { sender: bot.name, text: emoteText }])
+            // For offline mode, use local chat
+            if (isOfflineMode) {
+              setChatMessages(prev => [...prev, { sender: bot.name, text: emoteText }])
+            }
+            // For online bot matches, emit via socket chat
+            else if (isBotMatch && socketRef.current?.connected) {
+              socketRef.current.emit("CHAT_MESSAGE", {
+                matchId,
+                senderId: bot.id,
+                senderName: bot.name,
+                text: emoteText,
+                isEmote: true,
+              })
+            }
           }
         }
       }
