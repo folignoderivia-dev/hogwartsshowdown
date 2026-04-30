@@ -1183,9 +1183,9 @@ export default function CommonRoom({
   return (
     <div className="min-h-screen bg-cover bg-center bg-fixed p-2 sm:p-3 lg:p-4" style={{ backgroundImage: "url('https://i.postimg.cc/D0y9DbnS/clube.png')" }}>
       {/* ── Online Users List (Top Bar) ───────────────────────────────────────────── */}
-      <div className="sticky top-0 z-40 bg-stone-900/95 border-b border-amber-800/30 px-2 py-1">
+      <div className="sticky top-0 z-40 bg-stone-900/95 border-b border-amber-800/30 px-2 py-2">
         <div className="mx-auto max-w-[1400px]">
-          <div className="flex flex-col gap-0.5 text-[10px] text-amber-300/80">
+          <div className="flex flex-col gap-1 text-[10px] text-amber-300/80">
             <div className="flex items-center gap-2">
               <span className="text-green-400">🟢</span>
               <span>{locale === "pt" ? "Online:" : "Online:"}</span>
@@ -1205,20 +1205,20 @@ export default function CommonRoom({
       </div>
 
       {/* ── Banner Torneio ─────────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-gradient-to-r from-amber-900/95 to-yellow-900/95 px-4 py-1.5 text-xs font-medium text-amber-100 shadow-md backdrop-blur-sm">
-        <Trophy className="h-3.5 w-3.5 shrink-0 text-yellow-300" />
+      <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-gradient-to-r from-amber-900/95 to-yellow-900/95 px-4 py-2 text-xs font-medium text-amber-100 shadow-md backdrop-blur-sm">
+        <Trophy className="h-4 w-4 shrink-0 text-yellow-300" />
         <span>PRIMEIRO TORNEIO DE VARINHAS CRUZADAS - COM PREMIAÇÃO EM 100 R$ ASSIM QUE ALCANÇARMOS 50 JOGADORES!</span>
       </div>
 
       <HomeLobbyChat
         authorName={currentUser?.username?.trim() || ""}
         layout="topBanner"
-        className="relative z-30 -mx-2 mb-1 sm:mx-0"
+        className="relative z-30 -mx-2 mb-4 sm:mx-0"
       />
 
       <div className="mx-auto max-w-[1400px]">
         {/* Header with Medieval Style */}
-        <header className="mb-5 text-center relative">
+        <header className="mb-8 text-center relative">
           {/* Discord Icon - Top Left */}
           <a
             href="https://discord.gg/4YHnXquhNf"
