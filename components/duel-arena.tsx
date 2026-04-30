@@ -712,6 +712,72 @@ const DuelArena = (
     }
   }, [])
 
+  // ── Bot AI Action Calculation (Reused from Offline Mode) ─────────────────────
+  
+  const calculateBotAction = useCallback((bot: Duelist, state: Duelist[], turnId: number): RoundAction => {
+    // Check if bot is stunned/frozen
+    if (bot.debuffs.some((d) => d.type === "stun" || d.type === "freeze")) {
+      return { casterId: bot.id, type: "skip", turnId }
+    }
+    
+    // Decide whether to use potion (20% chance if potion available and not used yet)
+    const shouldUsePotion = bot.potion && !(bot.usedPotions?.includes(bot.potion)) && Math.random() < 0.2
+    
+    if (shouldUsePotion && bot.potion) {
+      return { casterId: bot.id, type: "potion", potionType: bot.potion, turnId }
+    }
+    
+    // Select spell using AI logic
+    const availableBotSpells = bot.spells.filter((s) => (bot.disabledSpells?.[s] ?? 0) <= 0)
+    const botPool = availableBotSpells.length > 0 ? availableBotSpells : bot.spells
+    let spellName = botPool[Math.floor(Math.random() * botPool.length)]
+    if (bot.debuffs.some((d) => d.type === "taunt") && bot.lastSpellUsed && bot.spells.includes(bot.lastSpellUsed)) {
+      spellName = bot.lastSpellUsed
+    }
+    
+    // 2v2 logic
+    if (playerBuild.gameMode === "2v2") {
+      const roll = Math.random()
+      const hasFerula = bot.spells.includes("Ferula")
+      if (roll < 0.3 && hasFerula) {
+        spellName = "Ferula"
+      }
+    }
+    
+    // Select target
+    let target: Duelist | undefined
+    if (isSelfTargetSpell(spellName)) {
+      target = state.find((d) => d.id === bot.id && !isDefeated(d.hp))
+    } else if (isAreaSpell(spellName)) {
+      const enemies = state.filter((d) => d.team !== bot.team && !isDefeated(d.hp))
+      const pool = getValidTargetsForSpell(spellName, bot, state)
+      target = enemies[0] || pool[0]
+    } else {
+      const targets = getValidTargetsForSpell(spellName, bot, state)
+      target = targets[Math.floor(Math.random() * targets.length)]
+    }
+    
+    return target
+      ? { casterId: bot.id, type: "cast", spellName, targetId: target.id, areaAll: isAreaSpell(spellName), turnId }
+      : { casterId: bot.id, type: "skip", turnId }
+  }, [playerBuild.gameMode])
+
+  // ── WebSocket Combat Emulation for Bot Matches ─────────────────────────────
+  
+  const handleBotActionEmission = useCallback((bot: Duelist, state: Duelist[], turnId: number) => {
+    if (!isBotMatch || !socketRef.current?.connected) return
+    
+    // Calculate bot's action using offline AI logic
+    const botAction = calculateBotAction(bot, state, turnId)
+    
+    // Emit bot's action via WebSocket as if it were a real player
+    const eventId = `${bot.id}-${turnId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const payload: RoundAction = { ...botAction, eventId }
+    
+    console.log(`[Bot Emulation] Emitting bot action:`, payload)
+    socketRef.current.emit("SUBMIT_ACTION", { matchId, userId: bot.id, turn: turnId, action: payload })
+  }, [isBotMatch, matchId, calculateBotAction])
+
   /** Envia intenção de ação ao servidor Socket.io autoritativo. */
   const submitTurnAction = useCallback(
     (action: RoundAction) => {
@@ -729,6 +795,15 @@ const DuelArena = (
       setDebugLastEvent(`SUBMIT_ACTION T${tn}`)
       socket.emit("SUBMIT_ACTION", { matchId, userId: selfDuelistId, turn: tn, action: payload })
 
+      // WebSocket Combat Emulation: If bot match, also emit bot's action
+      if (isBotMatch) {
+        const bots = duelistsRef.current.filter(d => !d.isPlayer && !isDefeated(d.hp))
+        if (bots.length > 0) {
+          const bot = bots[0] // Assume single bot opponent for now
+          handleBotActionEmission(bot, duelistsRef.current, tn)
+        }
+      }
+
       // Timeout de segurança: se em 35s não houver resposta, desbloqueie o cliente
       if (ackTimeoutRef.current) clearTimeout(ackTimeoutRef.current)
       ackTimeoutRef.current = setTimeout(() => {
@@ -743,7 +818,7 @@ const DuelArena = (
         })
       }, 35_000)
     },
-    [isOfflineMode, matchId, selfDuelistId]
+    [isOfflineMode, matchId, selfDuelistId, isBotMatch, handleBotActionEmission]
   )
   const arenaRef = useRef<HTMLDivElement | null>(null)
   const hudRefs = useRef<Record<string, HTMLButtonElement | null>>({})

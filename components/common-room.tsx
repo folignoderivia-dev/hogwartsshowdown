@@ -278,8 +278,8 @@ export default function CommonRoom({
   const lobbySocketRef = useRef<Socket | null>(null)
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set())
   const [onlineBots, setOnlineBots] = useState<any[]>([])
-  const [ghostRooms, setGhostRooms] = useState<Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number; isBotRoom: boolean; botId: string }>>([])
   const [botFallbackTimeout, setBotFallbackTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [pendingBotMatch, setPendingBotMatch] = useState<{ botData: any; playerBuild: PlayerBuild } | null>(null)
   const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [showRankingPanel, setShowRankingPanel] = useState(true)
@@ -387,60 +387,50 @@ export default function CommonRoom({
     }
   }
 
-  // Rotaciona bots ao montar o componente e a cada 5 minutos
+  // Rotaciona bots ao montar o componente e a cada 5-15 minutos (aleatório)
   useEffect(() => {
     rotateBots()
-    const interval = setInterval(rotateBots, 5 * 60 * 1000)
+    // Random interval between 5-15 minutes
+    const randomInterval = (Math.floor(Math.random() * 11) + 5) * 60 * 1000
+    const interval = setInterval(rotateBots, randomInterval)
     return () => clearInterval(interval)
   }, [])
 
-  // ── Ghost Rooms (Bots Creating Rooms) ──────────────────────────────────────────
+  // ── Organic Active Join (3+ Players Rule) ─────────────────────────────────────
   
-  // Função para gerar ghost rooms ocasionalmente (1-2 salas de bots)
-  // Socket-Native: Only if real players online >= 2, 15 min cooldown
-  const generateGhostRooms = () => {
-    const realPlayersCount = onlineWizards - onlineBots.length
-    
-    // Only create ghost rooms if real players online >= 2
-    if (realPlayersCount < 2) {
-      console.log("Smart Ghost Rooms: Not enough real players online, skipping")
-      return
-    }
-    
-    if (onlineBots.length === 0) return
-    
-    // 30% de chance de gerar ghost rooms
-    if (Math.random() > 0.3) return
-    
-    const numRooms = Math.floor(Math.random() * 2) + 1 // 1-2 salas
-    const modes: PlayerBuild["gameMode"][] = ["1v1", "1v1-no-curses", "1v1-random"]
-    
-    const newGhostRooms = []
-    for (let i = 0; i < numRooms; i++) {
-      const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
-      const randomMode = modes[Math.floor(Math.random() * modes.length)]
-      
-      newGhostRooms.push({
-        matchId: `ghost-${randomBot.id}-${Date.now()}-${i}`,
-        mode: randomMode,
-        host: randomBot.username,
-        playersJoined: 1,
-        playersExpected: 2,
-        isBotRoom: true,
-        botId: randomBot.id,
-      })
-    }
-    
-    setGhostRooms(newGhostRooms)
-    console.log(`Generated ${newGhostRooms.length} ghost rooms (Socket-Native, real players: ${realPlayersCount})`)
-  }
-
-  // Atualiza ghost rooms periodicamente (a cada 15 minutos, não 2 minutos)
+  // Intervalo de 3 minutos para checar salas abertas e fazer bot entrar
   useEffect(() => {
-    const interval = setInterval(generateGhostRooms, 15 * 60 * 1000) // 15 minutos
-    generateGhostRooms() // Gera imediatamente ao montar
+    const interval = setInterval(async () => {
+      const realPlayersCount = onlineWizards - onlineBots.length
+      
+      // Only if 3+ real players online AND there's an open room waiting
+      if (realPlayersCount >= 3 && openRooms.length > 0) {
+        // Select a random open room
+        const randomRoom = openRooms[Math.floor(Math.random() * openRooms.length)]
+        
+        if (randomRoom && onlineBots.length > 0) {
+          const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
+          
+          // Fetch bot's deck_slots from database
+          const supabase = getSupabaseClient()
+          const { data: botProfile, error } = await supabase
+            .from("profiles")
+            .select("id, username, avatar_url, deck_slots, elo")
+            .eq("id", randomBot.id)
+            .single()
+          
+          if (!error && botProfile) {
+            console.log(`Organic Active Join: Bot ${botProfile.username} joining room ${randomRoom.matchId}`)
+            
+            // TODO: Emit socket event to simulate bot joining the room
+            // For now, we rely on the 60s fallback for stability
+          }
+        }
+      }
+    }, 3 * 60 * 1000) // 3 minutes
+    
     return () => clearInterval(interval)
-  }, [onlineBots, onlineWizards])
+  }, [onlineWizards, onlineBots.length, openRooms])
 
   // ── Global Error Telemetry ─────────────────────────────────────────────────
   const lastLoggedErrorRef = useRef<{ message: string; timestamp: number } | null>(null)
@@ -1305,20 +1295,23 @@ export default function CommonRoom({
             return
           }
           
-          // TODO: Emit socket event to server to simulate bot joining
-          // This would be handled in the arena component when it detects a bot opponent
+          // Store bot data and player build for arena
+          // The Host client will use this to force transition to Arena with isBotMatch=true
+          setPendingBotMatch({
+            botData: {
+              id: botProfile.id,
+              username: botProfile.username,
+              avatar_url: botProfile.avatar_url,
+              deck_slots: botProfile.deck_slots || [],
+              elo: botProfile.elo,
+            },
+            playerBuild: payload,
+          })
+          
           console.log(`Bot ${botProfile.username} ready to join via WebSocket`)
           
-          // Store bot data for arena to use
-          setGhostRooms(prev => [...prev, {
-            matchId: "",
-            mode: payload.gameMode || "1v1",
-            host: botProfile.username,
-            playersJoined: 1,
-            playersExpected: 2,
-            isBotRoom: true,
-            botId: botProfile.id,
-          }])
+          // Force transition to arena with bot match
+          // This will be handled by the parent component checking pendingBotMatch
         }
       }, 60000) // 60 seconds
       
