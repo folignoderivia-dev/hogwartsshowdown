@@ -437,9 +437,16 @@ const DuelArena = (
         const duelAvatar = isLocal ? playerBuild.avatar : DEFAULT_AVATARS[(idx + 1) % DEFAULT_AVATARS.length]
         
         // Load bot build from deck_slots if this is a bot match
+        // Multi-deck selection: bots have 3 decks, randomly pick one
         let duelSpells = isLocal ? playerBuild.spells : []
         if (!isLocal && isBotMatch && botData && botData.deck_slots && botData.deck_slots.length > 0) {
-          duelSpells = botData.deck_slots
+          // deck_slots is an array of arrays (3 decks), pick one randomly
+          const deckSlots = botData.deck_slots
+          const selectedDeckIndex = Math.floor(Math.random() * deckSlots.length)
+          const selectedDeck = deckSlots[selectedDeckIndex]
+          
+          // Ensure selected deck is an array of spells
+          duelSpells = Array.isArray(selectedDeck) ? selectedDeck : deckSlots
           
           // Filter out unforgivable spells if mode is "1v1-no-curses"
           if (playerBuild.gameMode === "1v1-no-curses") {
@@ -714,6 +721,8 @@ const DuelArena = (
 
   // ── Bot AI Action Calculation (Reused from Offline Mode) ─────────────────────
   
+  const botActionTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  
   const calculateBotAction = useCallback((bot: Duelist, state: Duelist[], turnId: number): RoundAction => {
     // Check if bot is stunned/frozen
     if (bot.debuffs.some((d) => d.type === "stun" || d.type === "freeze")) {
@@ -762,21 +771,52 @@ const DuelArena = (
       : { casterId: bot.id, type: "skip", turnId }
   }, [playerBuild.gameMode])
 
-  // ── WebSocket Combat Emulation for Bot Matches ─────────────────────────────
+  // ── WebSocket Combat Emulation for Bot Matches (20s Delay) ───────────────────
   
   const handleBotActionEmission = useCallback((bot: Duelist, state: Duelist[], turnId: number) => {
     if (!isBotMatch || !socketRef.current?.connected) return
     
-    // Calculate bot's action using offline AI logic
-    const botAction = calculateBotAction(bot, state, turnId)
+    // Clear any existing timeout for this bot
+    if (botActionTimeoutRef.current[bot.id]) {
+      clearTimeout(botActionTimeoutRef.current[bot.id])
+    }
     
-    // Emit bot's action via WebSocket as if it were a real player
-    const eventId = `${bot.id}-${turnId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const payload: RoundAction = { ...botAction, eventId }
-    
-    console.log(`[Bot Emulation] Emitting bot action:`, payload)
-    socketRef.current.emit("SUBMIT_ACTION", { matchId, userId: bot.id, turn: turnId, action: payload })
+    // 20-second delay to simulate human thinking
+    botActionTimeoutRef.current[bot.id] = setTimeout(() => {
+      // Calculate bot's action using offline AI logic
+      const botAction = calculateBotAction(bot, state, turnId)
+      
+      // Emit bot's action via WebSocket as if it were a real player
+      const eventId = `${bot.id}-${turnId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const payload: RoundAction = { ...botAction, eventId }
+      
+      console.log(`[Bot Emulation] Emitting bot action after 20s delay:`, payload)
+      socketRef.current.emit("SUBMIT_ACTION", { matchId, userId: bot.id, turn: turnId, action: payload })
+      
+      // Rare emoji system (15% chance) during or after turn
+      if (Math.random() < 0.15) {
+        const emojis = ["😀", "😂", "😎", "🤔", "😤", "🔥", "⚡", "💪"]
+        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)]
+        socketRef.current.emit("CHAT_MESSAGE", {
+          matchId,
+          senderId: bot.id,
+          senderName: bot.name,
+          text: randomEmoji,
+          isEmote: true,
+        })
+      }
+    }, 20000) // 20 seconds delay
   }, [isBotMatch, matchId, calculateBotAction])
+
+  // ── Cleanup Bot Action Timeouts on Unmount ─────────────────────────────────────
+  
+  useEffect(() => {
+    return () => {
+      Object.values(botActionTimeoutRef.current).forEach(timeout => {
+        if (timeout) clearTimeout(timeout)
+      })
+    }
+  }, [])
 
   /** Envia intenção de ação ao servidor Socket.io autoritativo. */
   const submitTurnAction = useCallback(

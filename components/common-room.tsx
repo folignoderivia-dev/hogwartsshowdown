@@ -278,8 +278,6 @@ export default function CommonRoom({
   const lobbySocketRef = useRef<Socket | null>(null)
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set())
   const [onlineBots, setOnlineBots] = useState<any[]>([])
-  const [botFallbackTimeout, setBotFallbackTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
-  const [pendingBotMatch, setPendingBotMatch] = useState<{ botData: any; playerBuild: PlayerBuild } | null>(null)
   const [showOpenRoomsPanel, setShowOpenRoomsPanel] = useState(true)
   const [showFriendsPanel, setShowFriendsPanel] = useState(true)
   const [showRankingPanel, setShowRankingPanel] = useState(true)
@@ -318,118 +316,102 @@ export default function CommonRoom({
     }
   }
 
-  // ── Bot Rotation & Online Presence ─────────────────────────────────────────────
+  // ── Hardcoded Bot Schedule ───────────────────────────────────────────────────
   
-  // Limpa timeout de fallback ao desmontar
-  useEffect(() => {
-    return () => {
-      if (botFallbackTimeout) {
-        clearTimeout(botFallbackTimeout)
-      }
-    }
-  }, [botFallbackTimeout])
-  
-  // Função para rotacionar bots online (3-6 bots aleatórios)
-  const rotateBots = async () => {
-    try {
-      const supabase = getSupabaseClient()
-      // Busca todos os bots
-      const { data: allBots, error } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url, elo, is_bot, simulated_online")
-        .eq("is_bot", true)
-      
-      if (error || !allBots || allBots.length === 0) {
-        console.log("No bots found or error fetching bots")
-        return
-      }
-
-      // Seleciona 3-6 bots aleatórios para ficarem online
-      const numOnline = Math.floor(Math.random() * 4) + 3 // 3-6
-      const shuffled = [...allBots].sort(() => Math.random() - 0.5)
-      const selectedBots = shuffled.slice(0, numOnline)
-      
-      // Atualiza simulated_online para todos os bots
-      const botIds = allBots.map(b => b.id)
-      const selectedIds = selectedBots.map(b => b.id)
-      
-      for (const botId of botIds) {
-        const isOnline = selectedIds.includes(botId)
-        await supabase
-          .from("profiles")
-          .update({ simulated_online: isOnline })
-          .eq("id", botId)
-      }
-
-      setOnlineBots(selectedBots)
-      console.log(`Rotated bots: ${selectedBots.length} online out of ${allBots.length} total`)
-    } catch (error) {
-      console.error("Failed to rotate bots:", error)
+  const getScheduledBotUsernames = (): string[] => {
+    const hour = new Date().getHours()
+    
+    if (hour >= 0 && hour < 4) {
+      return ['morgana', 'catatau']
+    } else if (hour >= 7 && hour < 12) {
+      return ['mione', 'chapeuseletor']
+    } else if (hour >= 13 && hour < 17) {
+      return ['Pottermore', 'Riddle']
+    } else if (hour >= 18 && hour < 22) {
+      return ['jacare', 'ocampeao']
+    } else {
+      return []
     }
   }
 
-  // Função para buscar bots online atualmente
-  const fetchOnlineBots = async () => {
+  // ── Fetch Scheduled Bots for Online List ─────────────────────────────────────
+  
+  const fetchScheduledBots = useCallback(async () => {
     try {
+      const scheduledUsernames = getScheduledBotUsernames()
+      
+      if (scheduledUsernames.length === 0) {
+        setOnlineBots([])
+        return
+      }
+      
       const supabase = getSupabaseClient()
       const { data: bots, error } = await supabase
         .from("profiles")
-        .select("id, username, avatar_url, elo, is_bot, simulated_online")
+        .select("id, username, avatar_url, deck_slots, elo")
+        .in("username", scheduledUsernames)
         .eq("is_bot", true)
-        .eq("simulated_online", true)
-        .limit(10)
       
       if (!error && bots) {
         setOnlineBots(bots)
+      } else {
+        setOnlineBots([])
       }
     } catch (error) {
-      console.error("Failed to fetch online bots:", error)
+      console.error("Failed to fetch scheduled bots:", error)
+      setOnlineBots([])
     }
-  }
-
-  // Rotaciona bots ao montar o componente e a cada 5-15 minutos (aleatório)
-  useEffect(() => {
-    rotateBots()
-    // Random interval between 5-15 minutes
-    const randomInterval = (Math.floor(Math.random() * 11) + 5) * 60 * 1000
-    const interval = setInterval(rotateBots, randomInterval)
-    return () => clearInterval(interval)
   }, [])
 
-  // ── Organic Active Join (3+ Players Rule) ─────────────────────────────────────
+  // ── Update Scheduled Bots on Mount and Every Minute ───────────────────────────
   
-  // Intervalo de 3 minutos para checar salas abertas e fazer bot entrar
   useEffect(() => {
-    const interval = setInterval(async () => {
+    fetchScheduledBots()
+    const interval = setInterval(fetchScheduledBots, 60 * 1000) // Update every minute
+    return () => clearInterval(interval)
+  }, [fetchScheduledBots])
+
+  // ── 15-Minute Room Hunter ─────────────────────────────────────────────────────
+  
+  const roomHunterIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  
+  useEffect(() => {
+    // Clear any existing interval
+    if (roomHunterIntervalRef.current) {
+      clearInterval(roomHunterIntervalRef.current)
+    }
+    
+    // Start 15-minute interval
+    roomHunterIntervalRef.current = setInterval(async () => {
       const realPlayersCount = onlineWizards - onlineBots.length
       
-      // Only if 3+ real players online AND there's an open room waiting
-      if (realPlayersCount >= 3 && openRooms.length > 0) {
-        // Select a random open room
-        const randomRoom = openRooms[Math.floor(Math.random() * openRooms.length)]
+      // Only run if real players >= 2
+      if (realPlayersCount < 2) return
+      
+      // Filter for 1v1 and 1v1-no-curses rooms
+      const eligibleRooms = openRooms.filter(room => 
+        room.mode === "1v1" || room.mode === "1v1-no-curses"
+      )
+      
+      if (eligibleRooms.length === 0 || onlineBots.length === 0) return
+      
+      // Pick one room and one bot
+      const randomRoom = eligibleRooms[Math.floor(Math.random() * eligibleRooms.length)]
+      const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
+      
+      if (randomRoom && randomBot) {
+        console.log(`Room Hunter: Bot ${randomBot.username} joining room ${randomRoom.matchId}`)
         
-        if (randomRoom && onlineBots.length > 0) {
-          const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
-          
-          // Fetch bot's deck_slots from database
-          const supabase = getSupabaseClient()
-          const { data: botProfile, error } = await supabase
-            .from("profiles")
-            .select("id, username, avatar_url, deck_slots, elo")
-            .eq("id", randomBot.id)
-            .single()
-          
-          if (!error && botProfile) {
-            console.log(`Organic Active Join: Bot ${botProfile.username} joining room ${randomRoom.matchId}`)
-            
-            // TODO: Emit socket event to simulate bot joining the room
-            // For now, we rely on the 60s fallback for stability
-          }
-        }
+        // TODO: Simulate bot joining via WebSocket
+        // The room creator's client will detect this and transition to Arena
       }
-    }, 3 * 60 * 1000) // 3 minutes
+    }, 15 * 60 * 1000) // 15 minutes
     
-    return () => clearInterval(interval)
+    return () => {
+      if (roomHunterIntervalRef.current) {
+        clearInterval(roomHunterIntervalRef.current)
+      }
+    }
   }, [onlineWizards, onlineBots.length, openRooms])
 
   // ── Global Error Telemetry ─────────────────────────────────────────────────
@@ -1260,63 +1242,7 @@ export default function CommonRoom({
   const handleCreateRoomClick = () => {
     const payload = buildPayload()
     if (!payload || !onCreateRoom) return
-    
-    // Clear any existing bot fallback timeout
-    if (botFallbackTimeout) {
-      clearTimeout(botFallbackTimeout)
-      setBotFallbackTimeout(null)
-    }
-    
     onCreateRoom(payload)
-    
-    // Start 60-second fallback timer for bot to join (WebSocket-Native)
-    // Only if real players online < 2
-    const realPlayersCount = onlineWizards - onlineBots.length
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
-    
-    if (realPlayersCount < 2) {
-      timeoutId = setTimeout(async () => {
-        console.log("60-second fallback: Fetching bot to join via WebSocket...")
-        
-        // Fetch random online bot from database
-        if (onlineBots.length > 0) {
-          const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
-          
-          // Fetch bot's deck_slots from database
-          const supabase = getSupabaseClient()
-          const { data: botProfile, error } = await supabase
-            .from("profiles")
-            .select("id, username, avatar_url, deck_slots, elo")
-            .eq("id", randomBot.id)
-            .single()
-          
-          if (error || !botProfile) {
-            console.error("Failed to fetch bot profile:", error)
-            return
-          }
-          
-          // Store bot data and player build for arena
-          // The Host client will use this to force transition to Arena with isBotMatch=true
-          setPendingBotMatch({
-            botData: {
-              id: botProfile.id,
-              username: botProfile.username,
-              avatar_url: botProfile.avatar_url,
-              deck_slots: botProfile.deck_slots || [],
-              elo: botProfile.elo,
-            },
-            playerBuild: payload,
-          })
-          
-          console.log(`Bot ${botProfile.username} ready to join via WebSocket`)
-          
-          // Force transition to arena with bot match
-          // This will be handled by the parent component checking pendingBotMatch
-        }
-      }, 60000) // 60 seconds
-      
-      setBotFallbackTimeout(timeoutId)
-    }
   }
 
   const handleJoinRoomClick = (matchId: string) => {
