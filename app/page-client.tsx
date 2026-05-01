@@ -111,23 +111,23 @@ export default function PageClient() {
     setBotData(null)
   }
 
-  const handleCreateRoom = (build: PlayerBuild) => {
-    if (!build.userId) return
+  const handleCreateRoom = async (build: PlayerBuild): Promise<{ matchId: string }> => {
+    if (!build.userId) throw new Error("No userId")
     setPlayerBuild(build)
     if (typeof window !== "undefined") window.localStorage.setItem(`duel:lastBuild:${build.userId}`, JSON.stringify(build))
-    void (async () => {
-      // Quadribol gerencia seu próprio socket e matchId — vai direto para a tela
-      if (build.gameMode === "quidditch") {
-        handleStartDuel(build)
-        return
-      }
-      if (!isOnlineMode(build)) {
-        handleStartDuel(build)
-        return
-      }
-      const created = await createRoom(build.gameMode, build.userId!, build.username || build.name)
-      attachMatch(build, created)
-    })()
+    
+    // Quadribol gerencia seu próprio socket e matchId — vai direto para a tela
+    if (build.gameMode === "quidditch") {
+      handleStartDuel(build)
+      return { matchId: `Q-${Date.now()}` }
+    }
+    if (!isOnlineMode(build)) {
+      handleStartDuel(build)
+      return { matchId: `offline-${Date.now()}` }
+    }
+    const created = await createRoom(build.gameMode, build.userId!, build.username || build.name)
+    attachMatch(build, created)
+    return { matchId: created.matchId }
   }
 
   const handleJoinOpenRoom = (build: PlayerBuild, matchId: string) => {

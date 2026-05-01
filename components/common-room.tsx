@@ -55,7 +55,7 @@ import { getRandomSticker } from "@/lib/stickers-data"
 
 interface CommonRoomProps {
   onStartDuel: (build: PlayerBuild) => void
-  onCreateRoom?: (build: PlayerBuild) => void
+  onCreateRoom?: (build: PlayerBuild) => Promise<{ matchId: string }>
   onJoinRoom?: (build: PlayerBuild, matchId: string) => void
   onRefreshRooms?: () => void
   openRooms?: Array<{ matchId: string; mode: PlayerBuild["gameMode"]; host: string; playersJoined: number; playersExpected: number; isVipRoom?: boolean }>
@@ -294,6 +294,7 @@ export default function CommonRoom({
   const [gmMessage, setGmMessage] = useState("")
   const [botFallbackTimeout, setBotFallbackTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [rankingAlertTimeout, setRankingAlertTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [createdRoomMatchId, setCreatedRoomMatchId] = useState<string | null>(null)
 
   // ── Helper Functions for New Game Modes ─────────────────────────────────────
   const UNFORGIVABLE_SPELLS = ["Avada Kedavra", "Crucius", "Imperio", "Fogo Maldito"]
@@ -1243,7 +1244,7 @@ export default function CommonRoom({
     }
   }
 
-  const handleCreateRoomClick = () => {
+  const handleCreateRoomClick = async () => {
     const payload = buildPayload()
     if (!payload || !onCreateRoom) return
     
@@ -1253,7 +1254,11 @@ export default function CommonRoom({
       setBotFallbackTimeout(null)
     }
     
-    onCreateRoom(payload)
+    // Create room and get the matchId
+    const { matchId } = await onCreateRoom(payload)
+    
+    // Save the matchId of the created room for bot fallback tracking
+    setCreatedRoomMatchId(matchId)
     
     // Emit alert to global chat via Socket.io when room is created
     if (currentUser && lobbySocketRef.current) {
@@ -1305,10 +1310,12 @@ export default function CommonRoom({
   const handleJoinRoomClick = (matchId: string) => {
     if (!currentUser || !onJoinRoom) return
     
-    // Clear bot fallback timeout when a real player joins
-    if (botFallbackTimeout) {
+    // Clear bot fallback timeout only if a real player joins the specific room created by the host
+    if (botFallbackTimeout && matchId === createdRoomMatchId) {
+      console.log(`Bot fallback: Real player joined the host's room (${matchId}), canceling bot fallback`)
       clearTimeout(botFallbackTimeout)
       setBotFallbackTimeout(null)
+      setCreatedRoomMatchId(null) // Clear the tracked room since a real player joined
     }
     
     const room = openRooms.find((r) => r.matchId === matchId)
