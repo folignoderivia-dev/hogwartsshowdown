@@ -98,12 +98,53 @@ export default function PageClient() {
     // Store bot data for the arena component
     setBotData(botData)
     
+    // Generate a matchId for the bot match
+    const botMatchId = `bot-${botData.id}-${Date.now()}`
+    
+    // Use the current game mode from playerBuild, or default to 1v1
+    const currentGameMode = playerBuild?.gameMode || "1v1"
+    
+    // Create a bot build from the bot data
+    const botBuild: PlayerBuild = {
+      name: botData.username,
+      house: "gryffindor",
+      wand: "unicorn",
+      potion: "foco",
+      spells: botData.deck_slots || [],
+      avatar: botData.avatar_url || "",
+      gameMode: currentGameMode,
+      userId: botData.id,
+      username: botData.username,
+      elo: botData.elo || 500,
+    }
+    
+    // Set the player build and bot data
+    setPlayerBuild(playerBuild || botBuild)
+    
     // Transition to arena with bot data
     // The DuelArena component will use isBotMatch and botData props
-    setActiveMatchId(`bot-${botData.id}-${Date.now()}`)
+    setActiveMatchId(botMatchId)
     setIsSpectator(false)
     setMatchPending(false)
     setScreen("battle")
+    
+    // Emit socket event to add bot to active matches list
+    // This simulates the bot joining the room and appearing in the duel list
+    if (typeof window !== "undefined") {
+      const socket = (window as any).lobbySocket
+      if (socket) {
+        socket.emit("bot_joined_match", {
+          matchId: botMatchId,
+          bot: {
+            id: botData.id,
+            username: botData.username,
+            avatar_url: botData.avatar_url,
+            elo: botData.elo,
+          },
+          gameMode: currentGameMode,
+        })
+      }
+    }
   }
   
   const handleClearBotFallback = () => {
