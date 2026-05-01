@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useRef, type FormEvent } from "react"
+import { useState, useMemo, useEffect, useRef, useCallback, type FormEvent } from "react"
 import { io as ioClient, type Socket } from "socket.io-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
