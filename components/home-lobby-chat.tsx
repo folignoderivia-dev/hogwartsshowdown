@@ -51,7 +51,6 @@ export default function HomeLobbyChat({
 }) {
   const [messages, setMessages] = useState<LobbyChatMessage[]>([])
   const [draft, setDraft] = useState("")
-  const [currentMessageIndex, setCurrentMessageIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const socketRef = useRef<Socket | null>(null)
@@ -61,15 +60,24 @@ export default function HomeLobbyChat({
     setMessages(loadMessages())
   }, [])
 
-  // Auto-rotate messages in carousel mode (one message at a time, slow rotation)
+  // Auto-scroll horizontal marquee for messages
   useEffect(() => {
     if (messages.length <= 1) return
     
-    const interval = setInterval(() => {
-      setCurrentMessageIndex((prev) => (prev + 1) % messages.length)
-    }, 5000) // Rotate every 5 seconds
+    const scrollInterval = setInterval(() => {
+      if (trackRef.current) {
+        const scrollAmount = 2 // pixels per tick
+        const maxScroll = trackRef.current.scrollWidth - trackRef.current.clientWidth
+        
+        if (trackRef.current.scrollLeft >= maxScroll) {
+          trackRef.current.scrollLeft = 0
+        } else {
+          trackRef.current.scrollLeft += scrollAmount
+        }
+      }
+    }, 50) // Update every 50ms for smooth scrolling
     
-    return () => clearInterval(interval)
+    return () => clearInterval(scrollInterval)
   }, [messages.length])
 
   useEffect(() => {
@@ -162,13 +170,15 @@ export default function HomeLobbyChat({
               {messages.length === 0 ? (
                 <span className="shrink-0 text-[11px] text-amber-600/80">Diga olá ao lobby…</span>
               ) : (
-                <span
-                  key={messages[currentMessageIndex]?.id || 'empty'}
-                  className="inline-flex min-w-0 max-w-[min(100%,600px)] items-baseline gap-2 overflow-hidden rounded-sm bg-stone-800/60 px-3 py-2 animate-in fade-in slide-in-from-left-2 duration-500"
-                >
-                  <span className="font-semibold text-amber-300">{messages[currentMessageIndex]?.author || ''}</span>
-                  <span className="whitespace-normal break-words text-amber-100/95">· {messages[currentMessageIndex]?.text || ''}</span>
-                </span>
+                messages.map((m) => (
+                  <span
+                    key={m.id}
+                    className="inline-flex min-w-0 max-w-[min(100%,600px)] items-baseline gap-2 overflow-hidden rounded-sm bg-stone-800/60 px-3 py-2 shrink-0"
+                  >
+                    <span className="font-semibold text-amber-300">{m.author}</span>
+                    <span className="whitespace-normal break-words text-amber-100/95">· {m.text}</span>
+                  </span>
+                ))
               )}
             </div>
           </div>
