@@ -48,6 +48,7 @@ import {
 } from "@/lib/database"
 import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/supabase"
 import HomeLobbyChat from "@/components/home-lobby-chat"
+import type { HomeLobbyChatRef } from "@/components/home-lobby-chat"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
 import WorldBossArena from "@/components/world-boss-arena"
@@ -71,8 +72,6 @@ interface CommonRoomProps {
   onBotFallback?: (botData: any) => void
   /** Clear bot fallback timer when a real player joins */
   onClearBotFallback?: () => void
-  /** Callback to add alert to global chat */
-  onAddAlert?: (alert: { id: string; author: string; text: string; ts: number; type?: "alert" | "normal" }) => void
 }
 
 const HOUSES = [
@@ -261,7 +260,6 @@ export default function CommonRoom({
   pendingRoomInvite,
   onBotFallback,
   onClearBotFallback,
-  onAddAlert,
 }: CommonRoomProps) {
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
@@ -297,6 +295,7 @@ export default function CommonRoom({
   const [gmMessage, setGmMessage] = useState("")
   const [botFallbackTimeout, setBotFallbackTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [rankingAlertTimeout, setRankingAlertTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const chatRef = useRef<HomeLobbyChatRef>(null)
 
   // ── Helper Functions for New Game Modes ─────────────────────────────────────
   const UNFORGIVABLE_SPELLS = ["Avada Kedavra", "Crucius", "Imperio", "Fogo Maldito"]
@@ -393,7 +392,7 @@ export default function CommonRoom({
 
     const scheduleRankingAlert = () => {
       const timeoutId = setTimeout(() => {
-        if (ranking.length > 0 && onAddAlert) {
+        if (ranking.length > 0 && chatRef.current) {
           const topPlayer = ranking[0]
           const alert = {
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -402,7 +401,7 @@ export default function CommonRoom({
             ts: Date.now(),
             type: "alert" as const,
           }
-          onAddAlert(alert)
+          chatRef.current.addAlert(alert)
         }
         
         // Schedule next alert in 30 minutes
@@ -420,7 +419,7 @@ export default function CommonRoom({
         clearTimeout(rankingAlertTimeout)
       }
     }
-  }, [ranking, rankingMode, onAddAlert])
+  }, [ranking, rankingMode])
 
   // ── Global Error Telemetry ─────────────────────────────────────────────────
   const lastLoggedErrorRef = useRef<{ message: string; timestamp: number } | null>(null)
@@ -1260,7 +1259,7 @@ export default function CommonRoom({
     onCreateRoom(payload)
     
     // Emit alert to global chat when room is created
-    if (onAddAlert && currentUser) {
+    if (currentUser && chatRef.current) {
       const alert = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         author: "Sistema",
@@ -1268,18 +1267,20 @@ export default function CommonRoom({
         ts: Date.now(),
         type: "alert" as const,
       }
-      onAddAlert(alert)
+      chatRef.current.addAlert(alert)
     }
     
     // Start 2-minute bot fallback timer for 1v1 and 1v1-no-curses modes
     if (payload.gameMode === "1v1" || payload.gameMode === "1v1-no-curses") {
-      const realPlayersCount = onlineWizards - onlineBots.length
-      
       const timeoutId = setTimeout(async () => {
         console.log("2-minute bot fallback: No human opponent joined, checking for bot...")
         
+        // Recalculate real players count at timeout time
+        const currentRealPlayersCount = onlineWizards - onlineBots.length
+        console.log(`Bot fallback: realPlayersCount=${currentRealPlayersCount}, onlineBots=${onlineBots.length}`)
+        
         // Check if there are scheduled bots online and real players >= 1
-        if (realPlayersCount >= 1 && onlineBots.length > 0) {
+        if (currentRealPlayersCount >= 1 && onlineBots.length > 0) {
           // Select a random bot from online bots
           const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
           
@@ -1290,7 +1291,7 @@ export default function CommonRoom({
             onBotFallback(randomBot)
           }
         } else {
-          console.log("Bot fallback: Not enough real players or no bots available")
+          console.log(`Bot fallback: Not enough real players (${currentRealPlayersCount}) or no bots available (${onlineBots.length})`)
         }
         
         setBotFallbackTimeout(null)
@@ -1471,10 +1472,10 @@ export default function CommonRoom({
       </div>
 
       <HomeLobbyChat
+        ref={chatRef}
         authorName={currentUser?.username?.trim() || ""}
         layout="topBanner"
         className="relative z-30 -mx-2 mb-4 sm:mx-0"
-        onAddAlert={onAddAlert}
       />
 
       <div className="mx-auto max-w-[1400px]">
