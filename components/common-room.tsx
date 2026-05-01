@@ -348,8 +348,10 @@ export default function CommonRoom({
   const fetchScheduledBots = useCallback(async () => {
     try {
       const scheduledUsernames = getScheduledBotUsernames()
+      console.log(`fetchScheduledBots: Scheduled bot usernames for current hour:`, scheduledUsernames)
       
       if (scheduledUsernames.length === 0) {
+        console.log("fetchScheduledBots: No bots scheduled for current hour")
         setOnlineBots([])
         return
       }
@@ -361,13 +363,17 @@ export default function CommonRoom({
         .in("username", scheduledUsernames)
         .eq("is_bot", true)
       
+      console.log(`fetchScheduledBots: Supabase query result - bots:`, bots, `error:`, error)
+      
       if (!error && bots) {
+        console.log(`fetchScheduledBots: Loaded ${bots.length} bots from Supabase:`, bots.map(b => b.username))
         setOnlineBots(bots)
       } else {
+        console.log(`fetchScheduledBots: No bots loaded - error:`, error)
         setOnlineBots([])
       }
     } catch (error) {
-      console.error("Failed to fetch scheduled bots:", error)
+      console.error("fetchScheduledBots: Failed to fetch scheduled bots:", error)
       setOnlineBots([])
     }
   }, [])
