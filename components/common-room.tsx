@@ -71,6 +71,8 @@ interface CommonRoomProps {
   onBotFallback?: (botData: any) => void
   /** Clear bot fallback timer when a real player joins */
   onClearBotFallback?: () => void
+  /** Callback to add alert to global chat */
+  onAddAlert?: (alert: { id: string; author: string; text: string; ts: number; type?: "alert" | "normal" }) => void
 }
 
 const HOUSES = [
@@ -259,6 +261,7 @@ export default function CommonRoom({
   pendingRoomInvite,
   onBotFallback,
   onClearBotFallback,
+  onAddAlert,
 }: CommonRoomProps) {
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
@@ -293,6 +296,7 @@ export default function CommonRoom({
   const [isGmModalOpen, setIsGmModalOpen] = useState(false)
   const [gmMessage, setGmMessage] = useState("")
   const [botFallbackTimeout, setBotFallbackTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [rankingAlertTimeout, setRankingAlertTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Helper Functions for New Game Modes ─────────────────────────────────────
   const UNFORGIVABLE_SPELLS = ["Avada Kedavra", "Crucius", "Imperio", "Fogo Maldito"]
@@ -377,6 +381,46 @@ export default function CommonRoom({
     const interval = setInterval(fetchScheduledBots, 60 * 1000) // Update every minute
     return () => clearInterval(interval)
   }, [fetchScheduledBots])
+
+  // ── 30-Minute Ranking Alerts ───────────────────────────────────────────────────
+  
+  useEffect(() => {
+    // Clear any existing ranking alert timeout
+    if (rankingAlertTimeout) {
+      clearTimeout(rankingAlertTimeout)
+      setRankingAlertTimeout(null)
+    }
+
+    const scheduleRankingAlert = () => {
+      const timeoutId = setTimeout(() => {
+        if (ranking.length > 0 && onAddAlert) {
+          const topPlayer = ranking[0]
+          const alert = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            author: "Sistema",
+            text: `Parabéns ${topPlayer.username} está liderando o ranking ${rankingMode === "elo" ? "ELO" : rankingMode}!`,
+            ts: Date.now(),
+            type: "alert" as const,
+          }
+          onAddAlert(alert)
+        }
+        
+        // Schedule next alert in 30 minutes
+        scheduleRankingAlert()
+      }, 30 * 60 * 1000) // 30 minutes
+      
+      setRankingAlertTimeout(timeoutId)
+    }
+
+    // Start first alert in 30 minutes
+    scheduleRankingAlert()
+
+    return () => {
+      if (rankingAlertTimeout) {
+        clearTimeout(rankingAlertTimeout)
+      }
+    }
+  }, [ranking, rankingMode, onAddAlert])
 
   // ── Global Error Telemetry ─────────────────────────────────────────────────
   const lastLoggedErrorRef = useRef<{ message: string; timestamp: number } | null>(null)
@@ -1215,6 +1259,18 @@ export default function CommonRoom({
     
     onCreateRoom(payload)
     
+    // Emit alert to global chat when room is created
+    if (onAddAlert && currentUser) {
+      const alert = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        author: "Sistema",
+        text: `${currentUser.username} abriu uma sala no modo ${payload.gameMode}`,
+        ts: Date.now(),
+        type: "alert" as const,
+      }
+      onAddAlert(alert)
+    }
+    
     // Start 2-minute bot fallback timer for 1v1 and 1v1-no-curses modes
     if (payload.gameMode === "1v1" || payload.gameMode === "1v1-no-curses") {
       const realPlayersCount = onlineWizards - onlineBots.length
@@ -1418,6 +1474,7 @@ export default function CommonRoom({
         authorName={currentUser?.username?.trim() || ""}
         layout="topBanner"
         className="relative z-30 -mx-2 mb-4 sm:mx-0"
+        onAddAlert={onAddAlert}
       />
 
       <div className="mx-auto max-w-[1400px]">

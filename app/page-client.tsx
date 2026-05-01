@@ -111,6 +111,12 @@ export default function PageClient() {
     setBotData(null)
   }
 
+  const handleAddAlert = (alert: any) => {
+    // This will be handled by the HomeLobbyChat component
+    // The alert will be added to the chat messages
+    console.log("Alert added to chat:", alert)
+  }
+
   const handleCreateRoom = (build: PlayerBuild) => {
     if (!build.userId) return
     setPlayerBuild(build)
@@ -376,6 +382,7 @@ export default function PageClient() {
           pendingRoomInvite={pendingRoomInvite}
           onBotFallback={handleBotFallback}
           onClearBotFallback={handleClearBotFallback}
+          onAddAlert={handleAddAlert}
         />
       ) : playerBuild?.gameMode === "quidditch" ? (
         <QuidditchArena

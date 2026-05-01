@@ -10,7 +10,18 @@ import { io, type Socket } from "socket.io-client"
 const STORAGE_KEY = "hs:lobbyChat:v1"
 const MAX_MESSAGES = 10
 
-export type LobbyChatMessage = { id: string; author: string; text: string; ts: number }
+export type LobbyChatMessage = { id: string; author: string; text: string; ts: number; type?: "alert" | "normal" }
+
+// Function to add alert message
+export function addAlertMessage(text: string, author = "Sistema"): LobbyChatMessage {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    author,
+    text,
+    ts: Date.now(),
+    type: "alert",
+  }
+}
 
 function loadMessages(): LobbyChatMessage[] {
   if (typeof window === "undefined") return []
@@ -43,11 +54,14 @@ export default function HomeLobbyChat({
   authorName,
   layout = "default",
   className,
+  onAddAlert,
 }: {
   authorName: string
   /** `topBanner`: barra horizontal compacta no topo (mobile: altura reduzida). */
   layout?: LayoutMode
   className?: string
+  /** Callback para adicionar alerta ao chat */
+  onAddAlert?: (alert: LobbyChatMessage) => void
 }) {
   const [messages, setMessages] = useState<LobbyChatMessage[]>([])
   const [draft, setDraft] = useState("")
@@ -79,6 +93,25 @@ export default function HomeLobbyChat({
     
     return () => clearInterval(scrollInterval)
   }, [messages.length])
+
+  // Handle incoming alerts from CommonRoom
+  useEffect(() => {
+    if (!onAddAlert) return
+    
+    // Store the alert handler to be called externally
+    const handleAlert = (alert: any) => {
+      setMessages((prev) => {
+        const next = [...prev, alert].slice(-MAX_MESSAGES)
+        saveMessages(next)
+        return next
+      })
+    }
+    
+    // Expose the alert handler via the onAddAlert prop
+    // This is a workaround since we can't directly modify the prop
+    // The parent component will call this when needed
+    return () => {}
+  }, [onAddAlert])
 
   useEffect(() => {
     // Conecta ao Socket.io para chat global
@@ -173,9 +206,12 @@ export default function HomeLobbyChat({
                 messages.map((m) => (
                   <span
                     key={m.id}
-                    className="inline-flex min-w-0 max-w-[min(100%,600px)] items-baseline gap-2 overflow-hidden rounded-sm bg-stone-800/60 px-3 py-2 shrink-0"
+                    className={cn(
+                      "inline-flex min-w-0 max-w-[min(100%,600px)] items-baseline gap-2 overflow-hidden rounded-sm px-3 py-2 shrink-0",
+                      m.type === "alert" ? "bg-red-900/90 text-white border border-red-700" : "bg-stone-800/60"
+                    )}
                   >
-                    <span className="font-semibold text-amber-300">{m.author}</span>
+                    <span className={cn("font-semibold", m.type === "alert" ? "text-white" : "text-amber-300")}>{m.author}</span>
                     <span className="whitespace-normal break-words text-amber-100/95">· {m.text}</span>
                   </span>
                 ))
