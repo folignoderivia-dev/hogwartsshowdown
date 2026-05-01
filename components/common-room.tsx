@@ -1215,15 +1215,15 @@ export default function CommonRoom({
     
     onCreateRoom(payload)
     
-    // Start 1-minute bot fallback timer for 1v1 and 1v1-no-curses modes
+    // Start 2-minute bot fallback timer for 1v1 and 1v1-no-curses modes
     if (payload.gameMode === "1v1" || payload.gameMode === "1v1-no-curses") {
       const realPlayersCount = onlineWizards - onlineBots.length
       
       const timeoutId = setTimeout(async () => {
-        console.log("1-minute bot fallback: No human opponent joined, checking for bot...")
+        console.log("2-minute bot fallback: No human opponent joined, checking for bot...")
         
-        // Check if there are scheduled bots online and real players >= 2
-        if (realPlayersCount >= 2 && onlineBots.length > 0) {
+        // Check if there are scheduled bots online and real players >= 1
+        if (realPlayersCount >= 1 && onlineBots.length > 0) {
           // Select a random bot from online bots
           const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
           
@@ -1238,7 +1238,7 @@ export default function CommonRoom({
         }
         
         setBotFallbackTimeout(null)
-      }, 60000) // 1 minute
+      }, 120000) // 2 minutes
       
       setBotFallbackTimeout(timeoutId)
     }
