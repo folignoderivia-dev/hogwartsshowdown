@@ -48,7 +48,6 @@ import {
 } from "@/lib/database"
 import { clearSupabaseSessionAndResetClient, getSupabaseClient } from "@/lib/supabase"
 import HomeLobbyChat from "@/components/home-lobby-chat"
-import type { HomeLobbyChatRef } from "@/components/home-lobby-chat"
 import { useLanguage } from "@/contexts/language-context"
 import type { AppLocale } from "@/contexts/language-context"
 import WorldBossArena from "@/components/world-boss-arena"
@@ -295,7 +294,6 @@ export default function CommonRoom({
   const [gmMessage, setGmMessage] = useState("")
   const [botFallbackTimeout, setBotFallbackTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [rankingAlertTimeout, setRankingAlertTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
-  const chatRef = useRef<HomeLobbyChatRef>(null)
 
   // ── Helper Functions for New Game Modes ─────────────────────────────────────
   const UNFORGIVABLE_SPELLS = ["Avada Kedavra", "Crucius", "Imperio", "Fogo Maldito"]
@@ -392,16 +390,15 @@ export default function CommonRoom({
 
     const scheduleRankingAlert = () => {
       const timeoutId = setTimeout(() => {
-        if (ranking.length > 0 && chatRef.current) {
+        if (ranking.length > 0 && lobbySocketRef.current) {
           const topPlayer = ranking[0]
-          const alert = {
+          lobbySocketRef.current.emit("global_chat_message", {
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             author: "Sistema",
             text: `Parabéns ${topPlayer.username} está liderando o ranking ${rankingMode === "elo" ? "ELO" : rankingMode}!`,
             ts: Date.now(),
-            type: "alert" as const,
-          }
-          chatRef.current.addAlert(alert)
+            type: "alert",
+          })
         }
         
         // Schedule next alert in 30 minutes
@@ -1258,16 +1255,15 @@ export default function CommonRoom({
     
     onCreateRoom(payload)
     
-    // Emit alert to global chat when room is created
-    if (currentUser && chatRef.current) {
-      const alert = {
+    // Emit alert to global chat via Socket.io when room is created
+    if (currentUser && lobbySocketRef.current) {
+      lobbySocketRef.current.emit("global_chat_message", {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         author: "Sistema",
         text: `${currentUser.username} abriu uma sala no modo ${payload.gameMode}`,
         ts: Date.now(),
-        type: "alert" as const,
-      }
-      chatRef.current.addAlert(alert)
+        type: "alert",
+      })
     }
     
     // Start 2-minute bot fallback timer for 1v1 and 1v1-no-curses modes
@@ -1472,7 +1468,6 @@ export default function CommonRoom({
       </div>
 
       <HomeLobbyChat
-        ref={chatRef}
         authorName={currentUser?.username?.trim() || ""}
         layout="topBanner"
         className="relative z-30 -mx-2 mb-4 sm:mx-0"

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,10 +11,6 @@ const STORAGE_KEY = "hs:lobbyChat:v1"
 const MAX_MESSAGES = 10
 
 export type LobbyChatMessage = { id: string; author: string; text: string; ts: number; type?: "alert" | "normal" }
-
-export type HomeLobbyChatRef = {
-  addAlert: (alert: LobbyChatMessage) => void
-}
 
 // Function to add alert message
 export function addAlertMessage(text: string, author = "Sistema"): LobbyChatMessage {
@@ -274,6 +270,4 @@ export default function HomeLobbyChat({
       </CardContent>
     </Card>
   )
-})
-
-HomeLobbyChat.displayName = "HomeLobbyChat"
+}
