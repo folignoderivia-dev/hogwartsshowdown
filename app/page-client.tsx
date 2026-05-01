@@ -104,7 +104,7 @@ export default function PageClient() {
     // Use the current game mode from playerBuild, or default to 1v1
     const currentGameMode = playerBuild?.gameMode || "1v1"
     
-    // Create a bot build from the bot data
+    // Create a bot build from the bot data - using correct PlayerBuild structure
     const botBuild: PlayerBuild = {
       name: botData.username,
       house: "gryffindor",
@@ -119,7 +119,7 @@ export default function PageClient() {
     }
     
     // Set the player build and bot data
-    setPlayerBuild(playerBuild || botBuild)
+    setPlayerBuild(botBuild)
     
     // Transition to arena with bot data
     // The DuelArena component will use isBotMatch and botData props
