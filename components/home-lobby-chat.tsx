@@ -7,34 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { io, type Socket } from "socket.io-client"
 
-const STORAGE_KEY = "hs:lobbyChat:v1"
 const MAX_MESSAGES = 80
 
 export type LobbyChatMessage = { id: string; author: string; text: string; ts: number }
-
-function loadMessages(): LobbyChatMessage[] {
-  if (typeof window === "undefined") return []
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed
-      .filter((m): m is LobbyChatMessage => m && typeof m.id === "string" && typeof m.text === "string")
-      .slice(-MAX_MESSAGES)
-  } catch {
-    return []
-  }
-}
-
-function saveMessages(list: LobbyChatMessage[]) {
-  if (typeof window === "undefined") return
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(-MAX_MESSAGES)))
-  } catch {
-    // storage cheio ou privado
-  }
-}
 
 type LayoutMode = "default" | "topBanner"
 
@@ -56,7 +31,7 @@ export default function HomeLobbyChat({
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
-    // Don't load from localStorage - start empty to get fresh global messages from server
+    // Start with empty messages - will be populated from server history
     setMessages([])
   }, [])
 
@@ -80,7 +55,6 @@ export default function HomeLobbyChat({
           ts: data.ts,
         }
         const next = [...prev, entry].slice(-MAX_MESSAGES)
-        saveMessages(next)
         return next
       })
     })
@@ -123,7 +97,6 @@ export default function HomeLobbyChat({
     socketRef.current?.emit("global_chat_message", { author, text, ts: Date.now() })
     setMessages((prev) => {
       const next = [...prev, entry].slice(-MAX_MESSAGES)
-      saveMessages(next)
       return next
     })
     setDraft("")
