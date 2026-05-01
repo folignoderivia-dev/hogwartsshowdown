@@ -737,7 +737,14 @@ const DuelArena = (
     }
     
     // Select spell using AI logic
-    const availableBotSpells = bot.spells.filter((s) => (bot.disabledSpells?.[s] ?? 0) <= 0)
+    // Filter spells that are not disabled AND have available mana (respect spell.cost and spell.pp)
+    const availableBotSpells = bot.spells.filter((s) => {
+      const isDisabled = (bot.disabledSpells?.[s] ?? 0) > 0
+      const spellInfo = getSpellInfo(s, SPELL_DATABASE)
+      const hasMana = spellInfo && bot.spellMana?.[s]?.current && bot.spellMana[s].current > 0
+      return !isDisabled && hasMana
+    })
+    
     const botPool = availableBotSpells.length > 0 ? availableBotSpells : bot.spells
     let spellName = botPool[Math.floor(Math.random() * botPool.length)]
     if (bot.debuffs.some((d) => d.type === "taunt") && bot.lastSpellUsed && bot.spells.includes(bot.lastSpellUsed)) {
