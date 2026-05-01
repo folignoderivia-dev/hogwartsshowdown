@@ -381,7 +381,7 @@ export default function CommonRoom({
       clearInterval(roomHunterIntervalRef.current)
     }
     
-    // Start 15-minute interval
+    // Start 1-minute interval (changed from 15 minutes per user request)
     roomHunterIntervalRef.current = setInterval(async () => {
       const realPlayersCount = onlineWizards - onlineBots.length
       
@@ -405,7 +405,7 @@ export default function CommonRoom({
         // TODO: Simulate bot joining via WebSocket
         // The room creator's client will detect this and transition to Arena
       }
-    }, 15 * 60 * 1000) // 15 minutes
+    }, 1 * 60 * 1000) // 1 minute
     
     return () => {
       if (roomHunterIntervalRef.current) {
