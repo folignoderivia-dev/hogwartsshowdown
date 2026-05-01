@@ -32,6 +32,7 @@ export default function PageClient() {
   const [isSpectator, setIsSpectator] = useState(false)
   const [resumableMatch, setResumableMatch] = useState<{ matchId: string; mode: PlayerBuild["gameMode"]; status: "waiting" | "in_progress" } | null>(null)
   const [pendingRoomInvite, setPendingRoomInvite] = useState<string | null>(null)
+  const [botData, setBotData] = useState<any | null>(null)
 
   useEffect(() => {
     void (async () => {
@@ -90,6 +91,25 @@ export default function PageClient() {
     setIsSpectator(false)
     setScreen("battle")
   }, [applyExternalState])
+
+  const handleBotFallback = (botData: any) => {
+    console.log("Bot fallback triggered, transitioning to arena with bot:", botData)
+    
+    // Store bot data for the arena component
+    setBotData(botData)
+    
+    // Transition to arena with bot data
+    // The DuelArena component will use isBotMatch and botData props
+    setActiveMatchId(`bot-${botData.id}-${Date.now()}`)
+    setIsSpectator(false)
+    setMatchPending(false)
+    setScreen("battle")
+  }
+  
+  const handleClearBotFallback = () => {
+    // Clear bot data when a real player joins
+    setBotData(null)
+  }
 
   const handleCreateRoom = (build: PlayerBuild) => {
     if (!build.userId) return
@@ -354,6 +374,8 @@ export default function PageClient() {
           resumableMatch={resumableMatch}
           onResumeMatch={handleResumeMatch}
           pendingRoomInvite={pendingRoomInvite}
+          onBotFallback={handleBotFallback}
+          onClearBotFallback={handleClearBotFallback}
         />
       ) : playerBuild?.gameMode === "quidditch" ? (
         <QuidditchArena
@@ -390,15 +412,11 @@ export default function PageClient() {
       ) : (
         <DuelArena
           playerBuild={playerBuild!}
+          matchId={activeMatchId || undefined}
+          isBotMatch={!!botData}
+          botData={botData}
           onReturn={handleReturnToCommonRoom}
           onBattleEnd={handleBattleEnd}
-          onFfaPlayerEliminated={handleFfaPlayerEliminated}
-          matchId={activeMatchId || undefined}
-          isSpectator={isSpectator}
-          participantIds={externalMatchState?.participantIds || []}
-          participantNames={externalMatchState?.participantNames || []}
-          matchStatus={externalMatchState?.status}
-          unlockedStickers={accountUser?.unlockedStickers}
         />
       )}
       {matchPending && screen === "battle" && (

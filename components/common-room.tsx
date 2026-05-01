@@ -67,6 +67,10 @@ interface CommonRoomProps {
   currentUser: DbUser | null
   onAuthChange: (user: DbUser | null) => void
   pendingRoomInvite?: string | null
+  /** Host-driven bot fallback: called when 1-minute timer expires */
+  onBotFallback?: (botData: any) => void
+  /** Clear bot fallback timer when a real player joins */
+  onClearBotFallback?: () => void
 }
 
 const HOUSES = [
@@ -253,6 +257,8 @@ export default function CommonRoom({
   currentUser,
   onAuthChange,
   pendingRoomInvite,
+  onBotFallback,
+  onClearBotFallback,
 }: CommonRoomProps) {
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
@@ -286,6 +292,7 @@ export default function CommonRoom({
   const [showAdminPanel, setShowAdminPanel] = useState(false)
   const [isGmModalOpen, setIsGmModalOpen] = useState(false)
   const [gmMessage, setGmMessage] = useState("")
+  const [botFallbackTimeout, setBotFallbackTimeout] = useState<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Helper Functions for New Game Modes ─────────────────────────────────────
   const UNFORGIVABLE_SPELLS = ["Avada Kedavra", "Crucius", "Imperio", "Fogo Maldito"]
@@ -370,49 +377,6 @@ export default function CommonRoom({
     const interval = setInterval(fetchScheduledBots, 60 * 1000) // Update every minute
     return () => clearInterval(interval)
   }, [fetchScheduledBots])
-
-  // ── 15-Minute Room Hunter ─────────────────────────────────────────────────────
-  
-  const roomHunterIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  
-  useEffect(() => {
-    // Clear any existing interval
-    if (roomHunterIntervalRef.current) {
-      clearInterval(roomHunterIntervalRef.current)
-    }
-    
-    // Start 1-minute interval (changed from 15 minutes per user request)
-    roomHunterIntervalRef.current = setInterval(async () => {
-      const realPlayersCount = onlineWizards - onlineBots.length
-      
-      // Only run if real players >= 2
-      if (realPlayersCount < 2) return
-      
-      // Filter for 1v1 and 1v1-no-curses rooms
-      const eligibleRooms = openRooms.filter(room => 
-        room.mode === "1v1" || room.mode === "1v1-no-curses"
-      )
-      
-      if (eligibleRooms.length === 0 || onlineBots.length === 0) return
-      
-      // Pick one room and one bot
-      const randomRoom = eligibleRooms[Math.floor(Math.random() * eligibleRooms.length)]
-      const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
-      
-      if (randomRoom && randomBot) {
-        console.log(`Room Hunter: Bot ${randomBot.username} joining room ${randomRoom.matchId}`)
-        
-        // TODO: Simulate bot joining via WebSocket
-        // The room creator's client will detect this and transition to Arena
-      }
-    }, 1 * 60 * 1000) // 1 minute
-    
-    return () => {
-      if (roomHunterIntervalRef.current) {
-        clearInterval(roomHunterIntervalRef.current)
-      }
-    }
-  }, [onlineWizards, onlineBots.length, openRooms])
 
   // ── Global Error Telemetry ─────────────────────────────────────────────────
   const lastLoggedErrorRef = useRef<{ message: string; timestamp: number } | null>(null)
@@ -1242,11 +1206,53 @@ export default function CommonRoom({
   const handleCreateRoomClick = () => {
     const payload = buildPayload()
     if (!payload || !onCreateRoom) return
+    
+    // Clear any existing bot fallback timeout
+    if (botFallbackTimeout) {
+      clearTimeout(botFallbackTimeout)
+      setBotFallbackTimeout(null)
+    }
+    
     onCreateRoom(payload)
+    
+    // Start 1-minute bot fallback timer for 1v1 and 1v1-no-curses modes
+    if (payload.gameMode === "1v1" || payload.gameMode === "1v1-no-curses") {
+      const realPlayersCount = onlineWizards - onlineBots.length
+      
+      const timeoutId = setTimeout(async () => {
+        console.log("1-minute bot fallback: No human opponent joined, checking for bot...")
+        
+        // Check if there are scheduled bots online and real players >= 2
+        if (realPlayersCount >= 2 && onlineBots.length > 0) {
+          // Select a random bot from online bots
+          const randomBot = onlineBots[Math.floor(Math.random() * onlineBots.length)]
+          
+          console.log(`Bot fallback: Selected bot ${randomBot.username} to join the match`)
+          
+          // Call the parent component to transition to arena with bot data
+          if (onBotFallback) {
+            onBotFallback(randomBot)
+          }
+        } else {
+          console.log("Bot fallback: Not enough real players or no bots available")
+        }
+        
+        setBotFallbackTimeout(null)
+      }, 60000) // 1 minute
+      
+      setBotFallbackTimeout(timeoutId)
+    }
   }
 
   const handleJoinRoomClick = (matchId: string) => {
     if (!currentUser || !onJoinRoom) return
+    
+    // Clear bot fallback timeout when a real player joins
+    if (botFallbackTimeout) {
+      clearTimeout(botFallbackTimeout)
+      setBotFallbackTimeout(null)
+    }
+    
     const room = openRooms.find((r) => r.matchId === matchId)
     if (!room) return
     
