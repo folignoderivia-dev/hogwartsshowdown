@@ -1268,12 +1268,14 @@ export default function CommonRoom({
     
     // Start 2-minute bot fallback timer for 1v1 and 1v1-no-curses modes
     if (payload.gameMode === "1v1" || payload.gameMode === "1v1-no-curses") {
+      console.log(`Bot fallback timer starting: onlineWizards=${onlineWizards}, onlineBots=${onlineBots.length}`)
+      
       const timeoutId = setTimeout(async () => {
         console.log("2-minute bot fallback: No human opponent joined, checking for bot...")
         
         // Recalculate real players count at timeout time
         const currentRealPlayersCount = onlineWizards - onlineBots.length
-        console.log(`Bot fallback: realPlayersCount=${currentRealPlayersCount}, onlineBots=${onlineBots.length}`)
+        console.log(`Bot fallback: realPlayersCount=${currentRealPlayersCount}, onlineBots=${onlineBots.length}, onlineWizards=${onlineWizards}`)
         
         // Check if there are scheduled bots online and real players >= 1
         if (currentRealPlayersCount >= 1 && onlineBots.length > 0) {
@@ -1284,7 +1286,10 @@ export default function CommonRoom({
           
           // Call the parent component to transition to arena with bot data
           if (onBotFallback) {
+            console.log(`Bot fallback: Calling onBotFallback with bot data`, randomBot)
             onBotFallback(randomBot)
+          } else {
+            console.log("Bot fallback: onBotFallback is not defined")
           }
         } else {
           console.log(`Bot fallback: Not enough real players (${currentRealPlayersCount}) or no bots available (${onlineBots.length})`)
